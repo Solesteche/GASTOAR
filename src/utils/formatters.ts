@@ -171,10 +171,10 @@ export interface CoupleBalanceSummary {
 }
 
 export function calculateCoupleBalances(
-  transactions: Transaction[],
+  transactions: Transaction[] = [],
   profile: CoupleProfile
 ): CoupleBalanceSummary {
-  const coupleTxs = transactions.filter(t => t.tipo === 'pareja');
+  const coupleTxs = (transactions || []).filter(t => t && t.tipo === 'pareja');
 
   let totalCoupleSpent = 0;
   let user1Paid = 0;
@@ -183,6 +183,7 @@ export function calculateCoupleBalances(
   let user2ShouldPay = 0;
 
   coupleTxs.forEach(tx => {
+    if (!tx) return;
     const amount = tx.monto || 0;
     totalCoupleSpent += amount;
 

@@ -26,6 +26,7 @@ interface SubscriptionsViewProps {
   currentSubscription?: UserSubscription | null;
   onSelectPlanPayment: (plan: SubscriptionPlan, cycle: BillingCycle) => void;
   onOpenAdminPanel?: () => void;
+  onOpenCardAlerts?: () => void;
 }
 
 export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({
@@ -34,6 +35,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({
   currentSubscription,
   onSelectPlanPayment,
   onOpenAdminPanel,
+  onOpenCardAlerts,
 }) => {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [selectedPlanForPayment, setSelectedPlanForPayment] = useState<SubscriptionPlan | null>(null);
@@ -227,7 +229,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({
                 </ul>
               </div>
 
-              <div className="pt-6">
+              <div className="pt-6 space-y-2">
                 {isCurrent ? (
                   <div className="w-full py-3 rounded-2xl bg-emerald-50 text-emerald-700 font-bold text-xs flex items-center justify-center gap-1.5 border border-emerald-200">
                     <CheckCircle2 className="w-4 h-4" />

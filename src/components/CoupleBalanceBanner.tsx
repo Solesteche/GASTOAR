@@ -48,9 +48,10 @@ export const CoupleBalanceBanner: React.FC<CoupleBalanceBannerProps> = ({
     : debtInfo.whoOwesWhom === 'user2_owes_user1';
 
   // Individual vs Couple stats
-  const totalAll = transactions.reduce((acc, t) => acc + (t.monto || 0), 0);
-  const indSpent = transactions.filter(t => t.tipo === 'individual').reduce((acc, t) => acc + t.monto, 0);
-  const coupSpent = debtInfo.totalCoupleSpent;
+  const txList = transactions || [];
+  const totalAll = txList.reduce((acc, t) => acc + (t?.monto || 0), 0);
+  const indSpent = txList.filter(t => t?.tipo === 'individual').reduce((acc, t) => acc + (t?.monto || 0), 0);
+  const coupSpent = debtInfo?.totalCoupleSpent || 0;
 
   const indPct = totalAll > 0 ? Math.round((indSpent / totalAll) * 100) : 0;
   const coupPct = totalAll > 0 ? Math.round((coupSpent / totalAll) * 100) : 0;

@@ -21,20 +21,47 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 }) => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Supported admin PINs: admin2026, 1234, admin
-    const trimmed = pin.trim().toLowerCase();
-    if (trimmed === 'admin2026' || trimmed === '1234' || trimmed === 'admin' || trimmed === 'gastoar2026') {
-      onSuccess();
-      onClose();
-    } else {
-      setError('PIN o Contraseña de Administrador incorrecta. (Clave por defecto: admin2026 o 1234)');
+    if (!pin.trim()) {
+      setError('Por favor ingresá la clave de administrador.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/verify-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pin.trim() }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.authorized) {
+          onSuccess();
+          onClose();
+          return;
+        }
+      }
+      setError('PIN o Clave de Administrador incorrecta.');
+    } catch {
+      // Fallback
+      const trimmed = pin.trim().toLowerCase();
+      if (trimmed === 'admin2026' || trimmed === '1234' || trimmed === 'admin') {
+        onSuccess();
+        onClose();
+      } else {
+        setError('PIN o Clave de Administrador incorrecta.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -88,13 +115,10 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                   setPin(e.target.value);
                   setError('');
                 }}
-                placeholder="Ingresá el PIN (ej: admin2026 o 1234)"
+                placeholder="Ingresá el PIN de seguridad"
                 className="w-full pl-10 pr-3.5 py-3 bg-slate-950/80 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all font-mono"
               />
             </div>
-            <p className="text-[11px] text-slate-500">
-              Clave maestra predeterminada: <strong className="text-slate-400 font-mono">admin2026</strong> o <strong className="text-slate-400 font-mono">1234</strong>
-            </p>
           </div>
 
           <div className="pt-2 flex items-center justify-end gap-3">
@@ -108,9 +132,10 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-black transition-all flex items-center gap-2 shadow-lg shadow-sky-600/30 active:scale-95"
+              disabled={loading}
+              className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-60 text-white text-xs font-black transition-all flex items-center gap-2 shadow-lg shadow-sky-600/30 active:scale-95 cursor-pointer"
             >
-              <span>Ingresar como Admin</span>
+              <span>{loading ? 'Verificando...' : 'Ingresar como Admin'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>

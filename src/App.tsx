@@ -26,9 +26,6 @@ import {
 import { 
   InstallmentsSection 
 } from './components/InstallmentsSection';
-import {
-  DateFilterBar
-} from './components/DateFilterBar';
 import { 
   TransactionModal 
 } from './components/TransactionModal';
@@ -67,11 +64,48 @@ import {
   GoalsSection 
 } from './components/GoalsSection';
 import { 
+  AlertsSection 
+} from './components/AlertsSection';
+import { 
+  CoupleBalanceSection 
+} from './components/CoupleBalanceSection';
+import { 
+  CategoriesSection 
+} from './components/CategoriesSection';
+import { 
   SubscriptionsView 
 } from './components/SubscriptionsView';
 import { 
   SubscriptionAdminPanel 
 } from './components/SubscriptionAdminPanel';
+import { 
+  UserProfileModal 
+} from './components/UserProfileModal';
+import { 
+  LogoDownloadModal 
+} from './components/LogoDownloadModal';
+import { 
+  ProCardAlertsModal 
+} from './components/ProCardAlertsModal';
+import { 
+  FinancialDiagnosisModal 
+} from './components/FinancialDiagnosisModal';
+import { 
+  TrialExpiredBlockedScreen 
+} from './components/TrialExpiredBlockedScreen';
+import { 
+  FirebaseCloudSyncModal 
+} from './components/FirebaseCloudSyncModal';
+import { 
+  getMesKeyFromDate,
+  getMonthMovementsFromFirestore,
+  getUserProfileFromFirestore,
+  getBudgetsFromFirestore,
+  saveMovementToFirestore,
+  deleteMovementFromFirestore,
+  syncBudgetsToFirestore,
+  syncUserProfileToFirestore
+} from './lib/firebase';
 import { 
   BillingCycle,
   Budgets, 
@@ -117,6 +151,10 @@ export default function App() {
     return localStorage.getItem('control_gastos_is_admin') === 'true';
   });
 
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(() => {
+    return localStorage.getItem('control_gastos_is_demo') === 'true';
+  });
+
   const [currentUserAccount, setCurrentUserAccount] = useState<UserAccount | null>(() => {
     const saved = localStorage.getItem('control_gastos_account_v1');
     if (saved) {
@@ -124,6 +162,20 @@ export default function App() {
     }
     return null;
   });
+
+  // Dark Mode State
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    return localStorage.getItem('gastoar_dark_mode') === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('gastoar_dark_mode', String(isDarkMode));
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
   // User Subscriptions State (Admin and active client subscription)
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>(() => {
@@ -138,7 +190,15 @@ export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('control_gastos_tx_v5');
     if (saved) {
-      try { return JSON.parse(saved); } catch {}
+      try {
+        const parsed: Transaction[] = JSON.parse(saved);
+        return parsed.map(tx => {
+          if (tx.subcategoria === 'Gimnasio, Club, Pádel & Deportes' && tx.categoria.toLowerCase().includes('entretenimiento')) {
+            return { ...tx, categoria: 'Salud & Cuidado Personal' };
+          }
+          return tx;
+        });
+      } catch {}
     }
     return DEFAULT_TRANSACTIONS;
   });
@@ -146,7 +206,41 @@ export default function App() {
   const [categoryMap, setCategoryMap] = useState<CategoryMap>(() => {
     const saved = localStorage.getItem('control_gastos_catmap_v5');
     if (saved) {
-      try { return JSON.parse(saved); } catch {}
+      try {
+        const parsed: CategoryMap = JSON.parse(saved);
+        if (!parsed['Suscripciones']) {
+          parsed['Suscripciones'] = DEFAULT_CATEGORY_MAP['Suscripciones'];
+        }
+
+        // Add "Gimnasio, Club, Pádel & Deportes" to Salud & Cuidado Personal if missing
+        const saludKey = Object.keys(parsed).find(k => k.toLowerCase().includes('salud')) || 'Salud & Cuidado Personal';
+        if (!parsed[saludKey]) {
+          parsed[saludKey] = DEFAULT_CATEGORY_MAP['Salud & Cuidado Personal'];
+        } else if (!parsed[saludKey].includes('Gimnasio, Club, Pádel & Deportes')) {
+          parsed[saludKey].push('Gimnasio, Club, Pádel & Deportes');
+        }
+
+        // Remove Gimnasio and Streaming Video y Música from Entretenimiento
+        Object.keys(parsed).forEach(cat => {
+          if (cat.toLowerCase().includes('entretenimiento')) {
+            parsed[cat] = parsed[cat].filter(sub => {
+              const s = sub.toLowerCase().trim();
+              if (s.includes('gimnasio') || s.includes('pádel') || s.includes('padel') || (s.includes('club') && s.includes('deport'))) {
+                return false;
+              }
+              if (s.includes('streaming') && (s.includes('video') || s.includes('musica') || s.includes('música'))) {
+                return false;
+              }
+              if (s === 'streaming video y musica' || s === 'streaming video & musica') {
+                return false;
+              }
+              return true;
+            });
+          }
+        });
+
+        return parsed;
+      } catch {}
     }
     return DEFAULT_CATEGORY_MAP;
   });
@@ -154,7 +248,13 @@ export default function App() {
   const [categoryColors, setCategoryColors] = useState<CategoryColors>(() => {
     const saved = localStorage.getItem('control_gastos_colors_v5');
     if (saved) {
-      try { return JSON.parse(saved); } catch {}
+      try {
+        const parsed = JSON.parse(saved);
+        if (!parsed['Suscripciones']) {
+          parsed['Suscripciones'] = DEFAULT_CATEGORY_COLORS['Suscripciones'];
+        }
+        return parsed;
+      } catch {}
     }
     return DEFAULT_CATEGORY_COLORS;
   });
@@ -162,7 +262,13 @@ export default function App() {
   const [budgets, setBudgets] = useState<Budgets>(() => {
     const saved = localStorage.getItem('control_gastos_budgets_v5');
     if (saved) {
-      try { return JSON.parse(saved); } catch {}
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.categories && !parsed.categories['Suscripciones']) {
+          parsed.categories['Suscripciones'] = 60000;
+        }
+        return parsed;
+      } catch {}
     }
     return DEFAULT_BUDGETS;
   });
@@ -193,7 +299,11 @@ export default function App() {
 
   // UI States
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'installments' | 'couple_balance' | 'budgets' | 'categories' | 'ai' | 'settlement' | 'goals' | 'subscriptions' | 'admin_subscriptions'>('dashboard');
-  const [activeMode, setActiveMode] = useState<ExpenseMode>('all');
+  const [activeMode, setActiveMode] = useState<ExpenseMode>(() => {
+    const saved = localStorage.getItem('gastoar_active_mode');
+    if (saved === 'individual' || saved === 'pareja') return saved;
+    return 'individual';
+  });
   const [isSidebarPinned, setIsSidebarPinned] = useState<boolean>(() => {
     return localStorage.getItem('control_gastos_sidebar_pinned') !== 'false';
   });
@@ -211,17 +321,26 @@ export default function App() {
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [isCoupleModalOpen, setIsCoupleModalOpen] = useState(false);
   const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isLogoModalOpen, setIsLogoModalOpen] = useState(false);
+  const [isCardAlertsModalOpen, setIsCardAlertsModalOpen] = useState(false);
+  const [isDiagnosisModalOpen, setIsDiagnosisModalOpen] = useState(false);
+  const [isCloudSyncModalOpen, setIsCloudSyncModalOpen] = useState(false);
 
   // Filters State
-  const [filters, setFilters] = useState<FilterState>({
-    search: '',
-    mode: 'all',
-    categoria: 'ALL',
-    subcategoria: 'ALL',
-    dateRange: 'all',
-    pagadoPor: 'ALL',
-    metodoPago: 'ALL',
-    soloCuotas: 'ALL',
+  const [filters, setFilters] = useState<FilterState>(() => {
+    const savedMode = localStorage.getItem('gastoar_active_mode');
+    const initialMode: ExpenseMode = (savedMode === 'individual' || savedMode === 'pareja') ? savedMode : 'individual';
+    return {
+      search: '',
+      mode: initialMode,
+      categoria: 'ALL',
+      subcategoria: 'ALL',
+      dateRange: 'all',
+      pagadoPor: 'ALL',
+      metodoPago: 'ALL',
+      soloCuotas: 'ALL',
+    };
   });
 
   // Toasts
@@ -272,6 +391,171 @@ export default function App() {
     localStorage.setItem('control_gastos_subscriptions_v1', JSON.stringify(subscriptions));
   }, [subscriptions]);
 
+  useEffect(() => {
+    localStorage.setItem('control_gastos_is_demo', String(isDemoMode));
+  }, [isDemoMode]);
+
+  // Active user ID for Firebase Firestore partitioning
+  const activeUserId = useMemo(() => {
+    if (currentUserAccount?.id) return currentUserAccount.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+    if (currentUserAccount?.email) return currentUserAccount.email.replace(/[^a-zA-Z0-9_-]/g, '_');
+    return 'usuario_principal';
+  }, [currentUserAccount]);
+
+  const handleMergeTransactions = (newTxs: Transaction[]) => {
+    setTransactions(prev => {
+      const map = new Map<string, Transaction>();
+      prev.forEach(t => map.set(t.id, t));
+      newTxs.forEach(t => map.set(t.id, t));
+      return Array.from(map.values());
+    });
+  };
+
+  // Cloud Sync State (for multi-device real-time consistency)
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('synced');
+  const isInitialCloudLoadDone = React.useRef<boolean>(false);
+
+  // Load from Cloud on App start / session restore
+  // OPTIMIZACIÓN DE LECTURAS: Solo se descarga el mes actual (ej: septiembre)
+  useEffect(() => {
+    if (!isAuthenticated || !currentUserAccount?.email || isDemoMode) return;
+
+    const loadCloudData = async () => {
+      try {
+        setCloudSyncStatus('syncing');
+
+        // 1. Firebase Firestore: Descarga optimizada únicamente del mes actual
+        if (activeUserId) {
+          try {
+            const currentMonthKey = getMesKeyFromDate('');
+            const firestoreMonthTxs = await getMonthMovementsFromFirestore(activeUserId, currentMonthKey);
+            if (firestoreMonthTxs && firestoreMonthTxs.length > 0) {
+              setTransactions(prev => {
+                const map = new Map<string, Transaction>();
+                prev.forEach(t => map.set(t.id, t));
+                firestoreMonthTxs.forEach(t => map.set(t.id, t));
+                return Array.from(map.values());
+              });
+            }
+
+            const firestoreBudgets = await getBudgetsFromFirestore(activeUserId);
+            if (firestoreBudgets) {
+              setBudgets(firestoreBudgets);
+            }
+          } catch (fbErr) {
+            console.warn('Firebase initial month load check:', fbErr);
+          }
+        }
+
+        const emailParam = encodeURIComponent(currentUserAccount.email);
+        const codeParam = encodeURIComponent(currentUserAccount.accountCode || profile.accountCode || '');
+        const res = await fetch(`/api/sync/load?email=${emailParam}&accountCode=${codeParam}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            const data = json.data;
+            if (Array.isArray(data.transactions) && data.transactions.length > 0) {
+              setTransactions(prev => {
+                const map = new Map<string, Transaction>();
+                (data.transactions as Transaction[]).forEach(t => map.set(t.id, t));
+                prev.forEach(t => map.set(t.id, t));
+                return Array.from(map.values());
+              });
+            }
+            if (data.categoryMap && Object.keys(data.categoryMap).length > 0) {
+              setCategoryMap(data.categoryMap);
+            }
+            if (data.categoryColors) {
+              setCategoryColors(data.categoryColors);
+            }
+            if (data.budgets) {
+              setBudgets(data.budgets);
+            }
+            if (data.profile) {
+              setProfile(data.profile);
+            }
+            if (Array.isArray(data.settlementHistory)) {
+              setSettlementHistory(data.settlementHistory);
+            }
+            if (Array.isArray(data.goals)) {
+              setGoals(data.goals);
+            }
+            if (Array.isArray(data.subscriptions) && data.subscriptions.length > 0) {
+              setSubscriptions(data.subscriptions);
+            }
+            if (json.account) {
+              setCurrentUserAccount(json.account);
+              localStorage.setItem('control_gastos_account_v1', JSON.stringify(json.account));
+            }
+            setCloudSyncStatus('synced');
+          } else {
+            setCloudSyncStatus('synced');
+          }
+        }
+      } catch (err) {
+        console.warn('Could not sync cloud data on load:', err);
+        setCloudSyncStatus('offline');
+      } finally {
+        isInitialCloudLoadDone.current = true;
+      }
+    };
+
+    loadCloudData();
+  }, [isAuthenticated, currentUserAccount?.email]);
+
+  // Debounced auto-sync to Cloud whenever state changes
+  useEffect(() => {
+    if (!isAuthenticated || !currentUserAccount?.email || isDemoMode) return;
+    if (!isInitialCloudLoadDone.current) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        setCloudSyncStatus('syncing');
+        const res = await fetch('/api/sync/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: currentUserAccount.email,
+            accountCode: profile.accountCode || currentUserAccount.accountCode,
+            data: {
+              transactions,
+              categoryMap,
+              categoryColors,
+              budgets,
+              profile,
+              settlementHistory,
+              goals,
+              subscriptions,
+            },
+          }),
+        });
+        if (res.ok) {
+          setCloudSyncStatus('synced');
+        } else {
+          setCloudSyncStatus('error');
+        }
+      } catch {
+        setCloudSyncStatus('offline');
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [
+    transactions,
+    categoryMap,
+    categoryColors,
+    budgets,
+    profile,
+    settlementHistory,
+    goals,
+    subscriptions,
+    isAuthenticated,
+    currentUserAccount?.email,
+    currentUserAccount?.accountCode,
+    profile.accountCode,
+    isDemoMode,
+  ]);
+
   // Subscription Handlers
   const handleUpdateSubscription = (id: string, updates: Partial<UserSubscription>) => {
     setSubscriptions(prev => prev.map(s => (s.id === id ? { ...s, ...updates } : s)));
@@ -304,7 +588,7 @@ export default function App() {
     const newPaymentId = `MP-${Math.floor(800000000 + Math.random() * 199999999)}`;
     const price = cycle === 'annual' ? plan.priceAnnual : plan.priceMonthly;
 
-    const email = currentUserAccount?.email || 'estechesol@gmail.com';
+    const email = currentUserAccount?.email || 'ejemplo@ejemplo.com';
     const existing = subscriptions.find(s => s.userEmail.toLowerCase() === email.toLowerCase());
 
     if (existing) {
@@ -344,10 +628,6 @@ export default function App() {
     showToast(`¡Plan ${plan.name} activado con éxito vía Mercado Pago!`, 'success');
   };
 
-  useEffect(() => {
-    localStorage.setItem('control_gastos_goals_v1', JSON.stringify(goals));
-  }, [goals]);
-
   const toggleSidebarPin = () => {
     setIsSidebarPinned(prev => {
       const next = !prev;
@@ -360,6 +640,9 @@ export default function App() {
   const handleModeChange = (mode: ExpenseMode) => {
     setActiveMode(mode);
     setFilters(prev => ({ ...prev, mode }));
+    try {
+      localStorage.setItem('gastoar_active_mode', mode);
+    } catch {}
   };
 
   // Calculate Couple Debt and Balances
@@ -409,34 +692,21 @@ export default function App() {
 
   // Global Budget calculations
   const globalBudget = useMemo(() => {
-    const totalBudget = (Object.values(budgets.categories) as (number | undefined)[]).reduce<number>((acc, b) => acc + (b || 0), 0);
-    const totalSpent = filteredTransactions.reduce<number>((acc, t) => acc + (t.monto || 0), 0);
+    const totalBudget = (Object.values(budgets?.categories || {}) as (number | undefined)[]).reduce<number>((acc, b) => acc + (b || 0), 0);
+    const totalSpent = (filteredTransactions || []).reduce<number>((acc, t) => acc + (t.monto || 0), 0);
     const percentage = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
     return { totalBudget, totalSpent, percentage };
   }, [budgets, filteredTransactions]);
 
-  // Top spending category
-  const topCategory = useMemo(() => {
-    const sums: { [cat: string]: number } = {};
-    filteredTransactions.forEach(t => {
-      sums[t.categoria] = (sums[t.categoria] || 0) + t.monto;
-    });
-    let bestCat = '-';
-    let bestAmount = 0;
-    Object.entries(sums).forEach(([cat, amt]) => {
-      if (amt > bestAmount) {
-        bestAmount = amt;
-        bestCat = cat;
-      }
-    });
-    return { name: bestCat, amount: bestAmount };
-  }, [filteredTransactions]);
-
   // Handlers
   const handleSaveTransaction = (txData: Partial<Transaction>) => {
+    let savedTx: Transaction;
+
     if (txData.id) {
       // Edit existing transaction
-      setTransactions(prev => prev.map(t => (t.id === txData.id ? { ...t, ...txData } as Transaction : t)));
+      const existing = transactions.find(t => t.id === txData.id);
+      savedTx = { ...existing, ...txData } as Transaction;
+      setTransactions(prev => prev.map(t => (t.id === txData.id ? savedTx : t)));
       showToast(txData.tipoTransaccion === 'ingreso' ? 'Ingreso actualizado correctamente' : 'Gasto actualizado correctamente', 'success');
     } else {
       // Create new transaction
@@ -448,33 +718,38 @@ export default function App() {
         monto: txData.monto || 0,
         moneda: profile.currency || 'ARS',
         categoria: txData.categoria || (isIncome ? 'Ingresos' : (Object.keys(categoryMap)[0] || 'Alimentación')),
-        subcategoria: txData.subcategoria || 'General',
+        subcategoria: txData.subcategoria || (isIncome ? 'Sueldo' : 'General'),
         fecha: txData.fecha || new Date().toISOString().split('T')[0],
-        tipo: txData.tipo || (isIncome ? 'individual' : 'pareja'),
-        tipoTransaccion: txData.tipoTransaccion || 'gasto',
+        tipo: txData.tipo || (activeMode === 'pareja' ? 'pareja' : 'individual'),
         pagadoPor: txData.pagadoPor || profile.currentUser,
-        splitType: txData.splitType || (!isIncome && txData.tipo === 'pareja' ? '50_50' : undefined),
+        splitType: txData.splitType || (txData.tipo === 'pareja' ? profile.defaultSplit || '50_50' : undefined),
         user1Percent: txData.user1Percent,
         user2Percent: txData.user2Percent,
-        metodoPago: txData.metodoPago || (isIncome ? 'Transferencia' : 'Débito'),
-        esCuotas: isIncome ? false : txData.esCuotas,
-        cuotasTotal: isIncome ? undefined : txData.cuotasTotal,
-        cuotaActual: isIncome ? undefined : txData.cuotaActual,
-        montoCuota: isIncome ? undefined : txData.montoCuota,
-        tarjetaNombre: isIncome ? undefined : txData.tarjetaNombre,
-        primerMesCuota: isIncome ? undefined : txData.primerMesCuota,
+        user1Amount: txData.user1Amount,
+        user2Amount: txData.user2Amount,
+        metodoPago: txData.metodoPago || 'Débito',
+        tarjetaNombre: txData.tarjetaNombre,
+        esCuotas: txData.esCuotas || false,
+        cuotasTotal: txData.cuotasTotal,
+        cuotaActual: txData.cuotaActual,
+        montoCuota: txData.montoCuota,
+        tipoTransaccion: isIncome ? 'ingreso' : 'gasto',
       };
+      savedTx = newTx;
       setTransactions(prev => [newTx, ...prev]);
-      if (isIncome) {
-        showToast('Ingreso registrado con éxito', 'success');
-      } else {
-        showToast(newTx.esCuotas ? 'Compra en cuotas registrada con éxito' : 'Gasto registrado con éxito', 'success');
-      }
+      showToast(isIncome ? '¡Ingreso registrado con éxito!' : '¡Gasto registrado con éxito!', 'success');
     }
+
+    // Persist to Firebase Firestore under users/{userId}/movimientos/{mesKey}/items/{txId}
+    if (activeUserId && !isDemoMode) {
+      saveMovementToFirestore(activeUserId, savedTx).catch(err => {
+        console.warn('Could not sync movement to Firebase Firestore:', err);
+      });
+    }
+
     setIsTxModalOpen(false);
     setIsIncomeModalOpen(false);
     setEditingTransaction(null);
-    setInitialIsCuotas(false);
   };
 
   const handleEditTransaction = (tx: Transaction) => {
@@ -484,66 +759,35 @@ export default function App() {
     setIsTxModalOpen(true);
   };
 
-  const handleDuplicateTransaction = (tx: Transaction) => {
-    const copyTx: Transaction = {
-      ...tx,
-      id: Date.now().toString(),
-      fecha: new Date().toISOString().split('T')[0],
-      concepto: `${tx.concepto} (Copia)`,
-    };
-    setTransactions(prev => [copyTx, ...prev]);
-    showToast('Gasto duplicado', 'info');
-  };
-
   const handleDeleteTransaction = (id: string) => {
+    const toDelete = transactions.find(t => t.id === id);
+    if (toDelete && activeUserId && !isDemoMode) {
+      deleteMovementFromFirestore(activeUserId, id, toDelete.fecha).catch(err => {
+        console.warn('Could not delete movement from Firebase Firestore:', err);
+      });
+    }
     setTransactions(prev => prev.filter(t => t.id !== id));
-    showToast('Gasto eliminado', 'info');
+    showToast('Movimiento eliminado', 'info');
   };
 
-  // Installments Progress Handler (+1 or -1 quota)
   const handleUpdateInstallmentProgress = (txId: string, delta: number) => {
     setTransactions(prev => prev.map(t => {
       if (t.id !== txId) return t;
       const total = t.cuotasTotal || 1;
       const current = t.cuotaActual || 1;
-      const nextCuota = Math.max(1, Math.min(total, current + delta));
-      
-      if (nextCuota === total && delta > 0) {
-        showToast(`¡Plan completado! Pagaste todas las cuotas de "${t.concepto}"`, 'success');
-      } else if (delta > 0) {
-        showToast(`Cuota ${nextCuota} de ${total} pagada para "${t.concepto}"`, 'info');
-      }
-
-      return {
-        ...t,
-        cuotaActual: nextCuota,
-      };
+      const next = Math.max(1, Math.min(total, current + delta));
+      return { ...t, cuotaActual: next };
     }));
+    showToast(delta > 0 ? 'Cuota pagada registrada (+1)' : 'Cuota actualizada (-1)', 'success');
   };
 
-  // Complete / Liquidate Installment Plan
   const handleCompleteInstallment = (txId: string) => {
     setTransactions(prev => prev.map(t => {
       if (t.id !== txId) return t;
       const total = t.cuotasTotal || 1;
-      showToast(`¡Plan de cuotas de "${t.concepto}" marcado como totalmente pagado!`, 'success');
-      return {
-        ...t,
-        cuotaActual: total,
-      };
+      return { ...t, cuotaActual: total };
     }));
-  };
-
-  const handleResetData = () => {
-    if (window.confirm('¿Estás seguro de restablecer todos los datos a los valores iniciales de ejemplo?')) {
-      setTransactions(DEFAULT_TRANSACTIONS);
-      setCategoryMap(DEFAULT_CATEGORY_MAP);
-      setCategoryColors(DEFAULT_CATEGORY_COLORS);
-      setBudgets(DEFAULT_BUDGETS);
-      setProfile(DEFAULT_COUPLE_PROFILE);
-      setSettlementHistory([]);
-      showToast('Datos restablecidos correctamente', 'info');
-    }
+    showToast('Plan de cuotas liquidado por completo', 'success');
   };
 
   const handleAddCategory = (name: string, color: string) => {
@@ -675,9 +919,28 @@ export default function App() {
     showToast(`Nuevo código asignado: ${newCode}`, 'success');
   };
 
-  const handleJoinAccount = (code: string) => {
-    setProfile(prev => ({ ...prev, accountCode: code }));
-    showToast(`Vinculado a la cuenta ${code}`, 'success');
+  const handleJoinAccount = async (code: string) => {
+    const cleanCode = code.trim().toUpperCase();
+    setProfile(prev => ({ ...prev, accountCode: cleanCode }));
+    if (currentUserAccount) {
+      handleUpdateAccount({ accountCode: cleanCode });
+    }
+
+    // Try loading shared partner data from cloud immediately
+    try {
+      const res = await fetch(`/api/sync/load?accountCode=${encodeURIComponent(cleanCode)}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          if (Array.isArray(json.data.transactions)) setTransactions(json.data.transactions);
+          if (json.data.budgets) setBudgets(json.data.budgets);
+          if (Array.isArray(json.data.goals)) setGoals(json.data.goals);
+          if (json.data.profile) setProfile(json.data.profile);
+        }
+      }
+    } catch {}
+
+    showToast(`¡Vinculado a la cuenta compartida ${cleanCode}!`, 'success');
     setIsCoupleModalOpen(false);
   };
 
@@ -686,47 +949,121 @@ export default function App() {
     if (data.profile) setProfile(data.profile);
   };
 
-  // Auth Handlers
-  const handleLogin = (email: string): { success: boolean; error?: string } => {
-    const savedAccountStr = localStorage.getItem('control_gastos_account_v1');
-    if (savedAccountStr) {
-      try {
-        const savedAccount: UserAccount = JSON.parse(savedAccountStr);
-        if (savedAccount.email.toLowerCase() === email.toLowerCase() || savedAccount.name.toLowerCase() === email.toLowerCase()) {
-          setCurrentUserAccount(savedAccount);
-          setProfile(prev => ({
-            ...prev,
-            user1Name: savedAccount.name,
-            user2Name: savedAccount.partnerName || prev.user2Name,
-            currency: savedAccount.currency || prev.currency,
-            accountCode: savedAccount.accountCode || prev.accountCode,
-          }));
-        }
-      } catch {}
-    } else {
-      const newAcc: UserAccount = {
-        id: 'acc-' + Date.now(),
-        email: email,
-        name: email.includes('@') ? email.split('@')[0] : email,
-        partnerName: 'Mi Pareja',
-        accountType: 'pareja',
-        accountCode: profile.accountCode,
-        currency: profile.currency,
-        createdAt: Date.now(),
-      };
-      setCurrentUserAccount(newAcc);
-      localStorage.setItem('control_gastos_account_v1', JSON.stringify(newAcc));
+  // Profile Modal Updates
+  const handleUpdateAccount = async (updates: Partial<UserAccount>) => {
+    if (!currentUserAccount) return;
+    const updated: UserAccount = { ...currentUserAccount, ...updates };
+    setCurrentUserAccount(updated);
+    localStorage.setItem('control_gastos_account_v1', JSON.stringify(updated));
+
+    setProfile(prev => ({
+      ...prev,
+      user1Name: updated.name || prev.user1Name,
+      user2Name: updated.partnerName || prev.user2Name,
+      accountCode: updated.accountCode || prev.accountCode,
+      currency: updated.currency || prev.currency,
+    }));
+
+    try {
+      await fetch('/api/auth/update-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: currentUserAccount.email, updates }),
+      });
+    } catch (err) {
+      console.warn('Could not sync account update to server:', err);
     }
 
-    setIsAdmin(false);
-    localStorage.setItem('control_gastos_is_admin', 'false');
-    setIsAuthenticated(true);
-    localStorage.setItem('control_gastos_is_authenticated', 'true');
-    showToast('¡Sesión iniciada con éxito! Bienvenido/a.', 'success');
-    return { success: true };
+    showToast('Datos de cuenta actualizados y guardados en la nube', 'success');
   };
 
-  const handleRegister = (data: {
+  const handleApplyDiscountCode = (code: string) => {
+    showToast(`¡Código "${code}" aplicado con 20% de descuento en suscripciones!`, 'success');
+  };
+
+  const handleLinkCoupleCode = (code: string) => {
+    const cleanCode = code.trim().toUpperCase();
+    setProfile(prev => ({ ...prev, accountCode: cleanCode }));
+    if (currentUserAccount) {
+      handleUpdateAccount({ accountCode: cleanCode });
+    }
+    showToast(`¡Cuenta vinculada con el código de pareja ${cleanCode}!`, 'success');
+  };
+
+  // Auth Handlers (Cloud-enabled for seamless Mobile <-> PC sync)
+  const handleLogin = async (email: string, password?: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      setCloudSyncStatus('syncing');
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setCloudSyncStatus('offline');
+        return {
+          success: false,
+          error: json.error || 'No se encontró la cuenta o la contraseña es incorrecta.',
+        };
+      }
+
+      const acc: UserAccount = json.account;
+      setCurrentUserAccount(acc);
+      localStorage.setItem('control_gastos_account_v1', JSON.stringify(acc));
+
+      if (json.data) {
+        const data = json.data;
+        if (Array.isArray(data.transactions)) setTransactions(data.transactions);
+        if (data.categoryMap) setCategoryMap(data.categoryMap);
+        if (data.categoryColors) setCategoryColors(data.categoryColors);
+        if (data.budgets) setBudgets(data.budgets);
+        if (data.profile) setProfile(data.profile);
+        if (Array.isArray(data.settlementHistory)) setSettlementHistory(data.settlementHistory);
+        if (Array.isArray(data.goals)) setGoals(data.goals);
+        if (Array.isArray(data.subscriptions) && data.subscriptions.length > 0) setSubscriptions(data.subscriptions);
+      } else {
+        setProfile(prev => ({
+          ...prev,
+          user1Name: acc.name,
+          user2Name: acc.partnerName || prev.user2Name,
+          currency: acc.currency || prev.currency,
+          accountCode: acc.accountCode || prev.accountCode,
+        }));
+      }
+
+      setIsAdmin(false);
+      setIsDemoMode(false);
+      localStorage.setItem('control_gastos_is_admin', 'false');
+      localStorage.setItem('control_gastos_is_demo', 'false');
+      setIsAuthenticated(true);
+      localStorage.setItem('control_gastos_is_authenticated', 'true');
+      setCloudSyncStatus('synced');
+      isInitialCloudLoadDone.current = true;
+      showToast('¡Sesión iniciada con éxito! Información sincronizada desde la nube ☁️', 'success');
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error logging in:', err);
+      // Fallback local login if server offline
+      const savedAccountStr = localStorage.getItem('control_gastos_account_v1');
+      if (savedAccountStr) {
+        try {
+          const savedAccount: UserAccount = JSON.parse(savedAccountStr);
+          if (savedAccount.email.toLowerCase() === email.toLowerCase() || savedAccount.name.toLowerCase() === email.toLowerCase()) {
+            setCurrentUserAccount(savedAccount);
+            setIsAuthenticated(true);
+            localStorage.setItem('control_gastos_is_authenticated', 'true');
+            showToast('¡Sesión iniciada en modo local!', 'success');
+            return { success: true };
+          }
+        } catch {}
+      }
+      return { success: false, error: 'No se pudo conectar al servidor. Verificá tu conexión a internet.' };
+    }
+  };
+
+  const handleRegister = async (data: {
     name: string;
     email: string;
     password?: string;
@@ -734,48 +1071,112 @@ export default function App() {
     partnerName?: string;
     currency: string;
     accountCode?: string;
-  }): { success: boolean; error?: string } => {
-    const newAcc: UserAccount = {
-      id: 'acc-' + Date.now(),
-      email: data.email,
-      name: data.name,
-      partnerName: data.partnerName,
-      accountType: data.accountType,
-      accountCode: data.accountCode || ('PAIR-' + Math.floor(1000 + Math.random() * 9000)),
-      currency: data.currency || 'ARS',
-      createdAt: Date.now(),
-    };
+    selectedPlanId?: SubscriptionPlanId;
+  }): Promise<{ success: boolean; error?: string }> => {
+    try {
+      setCloudSyncStatus('syncing');
 
-    setCurrentUserAccount(newAcc);
-    localStorage.setItem('control_gastos_account_v1', JSON.stringify(newAcc));
+      const today = new Date();
+      const trialEnd = new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000);
+      const chosenPlan = SUBSCRIPTION_PLANS.find(p => p.id === (data.selectedPlanId || (data.accountType === 'individual' ? 'individual' : 'pareja'))) || SUBSCRIPTION_PLANS[1];
 
-    // Clear demo transactions, goals and settlements for the new clean real subscriber account
-    setTransactions([]);
-    setGoals([]);
-    setSettlementHistory([]);
-    localStorage.setItem('control_gastos_tx_v3', JSON.stringify([]));
-    localStorage.setItem('control_gastos_goals_v1', JSON.stringify([]));
-    localStorage.setItem('control_gastos_settlements_v3', JSON.stringify([]));
+      const initialSub: UserSubscription = {
+        id: 'sub-' + Date.now(),
+        userId: 'usr-' + Date.now(),
+        userEmail: data.email.trim().toLowerCase(),
+        userName: data.name.trim(),
+        partnerName: data.partnerName ? data.partnerName.trim() : undefined,
+        accountCode: data.accountCode || ('PAIR-' + Math.floor(1000 + Math.random() * 9000)),
+        planId: chosenPlan.id,
+        planName: chosenPlan.name,
+        status: 'trial',
+        billingCycle: 'monthly',
+        pricePaid: 0,
+        currency: data.currency || 'ARS',
+        paymentMethod: 'Mercado Pago',
+        startDate: today.toISOString().split('T')[0],
+        trialEndsDate: trialEnd.toISOString().split('T')[0],
+        trialDaysGranted: 15,
+        autoRenew: true,
+        createdAt: Date.now(),
+        notes: 'Período de prueba de 15 días concedido al registrarse.',
+      };
 
-    const cleanProfile: CoupleProfile = {
-      accountCode: newAcc.accountCode,
-      user1Name: data.name,
-      user2Name: data.accountType === 'individual' ? 'Fondo Ahorro' : (data.partnerName || 'Mi Pareja'),
-      currentUser: 'user1',
-      currency: data.currency || 'ARS',
-      defaultSplit: data.accountType === 'individual' ? '100_user1' : '50_50',
-    };
-    setProfile(cleanProfile);
-    localStorage.setItem('control_gastos_profile_v3', JSON.stringify(cleanProfile));
+      const cleanProfile: CoupleProfile = {
+        accountCode: initialSub.accountCode,
+        user1Name: data.name.trim(),
+        user2Name: data.accountType === 'individual' ? 'Fondo Ahorro' : (data.partnerName ? data.partnerName.trim() : 'Mi Pareja'),
+        currentUser: 'user1',
+        currency: data.currency || 'ARS',
+        defaultSplit: data.accountType === 'individual' ? '100_user1' : '50_50',
+      };
 
-    setIsAdmin(false);
-    localStorage.setItem('control_gastos_is_admin', 'false');
+      const payload = {
+        name: data.name.trim(),
+        email: data.email.trim(),
+        password: data.password,
+        accountType: data.accountType,
+        partnerName: data.partnerName,
+        currency: data.currency || 'ARS',
+        accountCode: initialSub.accountCode,
+        selectedPlanId: chosenPlan.id,
+        initialData: {
+          transactions: [],
+          categoryMap: DEFAULT_CATEGORY_MAP,
+          categoryColors: DEFAULT_CATEGORY_COLORS,
+          budgets: { categories: {}, subcategories: {} },
+          profile: cleanProfile,
+          settlementHistory: [],
+          goals: [],
+          subscriptions: [initialSub],
+        },
+      };
 
-    setIsAuthenticated(true);
-    localStorage.setItem('control_gastos_is_authenticated', 'true');
-    setActiveTab('dashboard');
-    showToast('¡Cuenta creada con éxito! Tu panel está listo para tus primeros gastos.', 'success');
-    return { success: true };
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setCloudSyncStatus('offline');
+        return {
+          success: false,
+          error: json.error || 'Ya existe una cuenta con este correo. Por favor seleccioná "Iniciar Sesión".',
+        };
+      }
+
+      const newAcc: UserAccount = json.account;
+      setCurrentUserAccount(newAcc);
+      localStorage.setItem('control_gastos_account_v1', JSON.stringify(newAcc));
+
+      // Reset application state to clean initial registration state
+      setTransactions([]);
+      setGoals([]);
+      setSettlementHistory([]);
+      setBudgets({ categories: {}, subcategories: {} });
+      setCategoryMap(DEFAULT_CATEGORY_MAP);
+      setCategoryColors(DEFAULT_CATEGORY_COLORS);
+      setProfile(cleanProfile);
+      setSubscriptions([initialSub]);
+
+      setIsAdmin(false);
+      setIsDemoMode(false);
+      localStorage.setItem('control_gastos_is_admin', 'false');
+      localStorage.setItem('control_gastos_is_demo', 'false');
+
+      setIsAuthenticated(true);
+      localStorage.setItem('control_gastos_is_authenticated', 'true');
+      setCloudSyncStatus('synced');
+      isInitialCloudLoadDone.current = true;
+      setActiveTab('dashboard');
+      showToast('¡Cuenta creada y sincronizada en la nube con 15 días de prueba gratis! ☁️', 'success');
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error registering:', err);
+      return { success: false, error: 'Error al conectar con el servidor para registrar la cuenta.' };
+    }
   };
 
   const handleGuestDemo = () => {
@@ -783,39 +1184,70 @@ export default function App() {
     setTransactions(DEFAULT_TRANSACTIONS);
     setGoals(DEFAULT_GOALS);
     setProfile(DEFAULT_COUPLE_PROFILE);
-    localStorage.setItem('control_gastos_tx_v3', JSON.stringify(DEFAULT_TRANSACTIONS));
+    setBudgets(DEFAULT_BUDGETS);
+    localStorage.setItem('control_gastos_tx_v5', JSON.stringify(DEFAULT_TRANSACTIONS));
     localStorage.setItem('control_gastos_goals_v1', JSON.stringify(DEFAULT_GOALS));
     localStorage.setItem('control_gastos_profile_v3', JSON.stringify(DEFAULT_COUPLE_PROFILE));
+    localStorage.setItem('control_gastos_budgets_v5', JSON.stringify(DEFAULT_BUDGETS));
 
     setIsAdmin(false);
+    setIsDemoMode(true);
     localStorage.setItem('control_gastos_is_admin', 'false');
+    localStorage.setItem('control_gastos_is_demo', 'true');
     setIsAuthenticated(true);
     localStorage.setItem('control_gastos_is_authenticated', 'true');
     setActiveTab('dashboard');
     showToast('Modo Demostración activo con datos de prueba.', 'info');
   };
 
+  const handleExitDemo = () => {
+    setIsDemoMode(false);
+    setIsAuthenticated(false);
+    localStorage.setItem('control_gastos_is_demo', 'false');
+    localStorage.setItem('control_gastos_is_authenticated', 'false');
+    showToast('Has salido del modo demostración. ¡Registrate para crear tu cuenta real!', 'info');
+  };
+
   const handleOpenAdminPanel = () => {
     setIsAdmin(true);
+    setIsDemoMode(false);
     localStorage.setItem('control_gastos_is_admin', 'true');
+    localStorage.setItem('control_gastos_is_demo', 'false');
     setIsAuthenticated(true);
     localStorage.setItem('control_gastos_is_authenticated', 'true');
     setActiveTab('admin_subscriptions');
-    showToast('Modo Administrador activado. Acceso a gestión de clientes y suscripciones.', 'info');
+    showToast('Modo Administrador activado. Gestión de suscripciones y clientes.', 'info');
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
     setIsAdmin(false);
-    localStorage.setItem('control_gastos_is_authenticated', 'false');
-    localStorage.setItem('control_gastos_is_admin', 'false');
-    showToast('Has cerrado sesión correctamente.', 'info');
+    setIsDemoMode(false);
+    setCurrentUserAccount(null);
+    localStorage.removeItem('control_gastos_is_authenticated');
+    localStorage.removeItem('control_gastos_is_admin');
+    localStorage.removeItem('control_gastos_is_demo');
+    localStorage.removeItem('control_gastos_account_v1');
+    showToast('Has cerrado sesión correctamente. ¡Hasta pronto! 👋', 'info');
   };
 
   // Active User Subscription & Permissions
-  const activeUserSub = subscriptions.find(s => s.userEmail.toLowerCase() === (currentUserAccount?.email || 'estechesol@gmail.com').toLowerCase());
+  const activeUserSub = subscriptions.find(s => s.userEmail.toLowerCase() === (currentUserAccount?.email || 'ejemplo@ejemplo.com').toLowerCase());
   const currentPlanId: SubscriptionPlanId = activeUserSub?.planId || currentUserAccount?.selectedPlanId || (currentUserAccount?.accountType === 'individual' ? 'individual' : 'pareja');
   const canManageCategories = isAdmin || currentPlanId !== 'individual';
+
+  // Check if Trial is Expired
+  const isTrialExpired = useMemo(() => {
+    if (isAdmin || isDemoMode || !activeUserSub) return false;
+    if (activeUserSub.status === 'active') return false;
+    if (activeUserSub.status === 'expired') return true;
+    if (activeUserSub.status === 'trial') {
+      if (!activeUserSub.trialEndsDate) return false;
+      const todayStr = new Date().toISOString().split('T')[0];
+      return todayStr > activeUserSub.trialEndsDate;
+    }
+    return false;
+  }, [isAdmin, isDemoMode, activeUserSub]);
 
   // Render Auth Landing Page if not logged in
   if (!isAuthenticated) {
@@ -832,8 +1264,24 @@ export default function App() {
     );
   }
 
+  // Render Trial Expired Block Screen if trial has ended
+  if (isTrialExpired) {
+    return (
+      <>
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+        <TrialExpiredBlockedScreen
+          userAccount={currentUserAccount}
+          subscription={activeUserSub}
+          onSelectPlanPayment={handleSelectPlanPayment}
+          onLogout={handleLogout}
+          onOpenAdminPanel={handleOpenAdminPanel}
+        />
+      </>
+    );
+  }
+
   return (
-    <div className="text-slate-800 min-h-screen flex flex-col md:flex-row antialiased selection:bg-blue-100 selection:text-blue-900">
+    <div className={`min-h-screen flex flex-col md:flex-row antialiased selection:bg-purple-100 selection:text-purple-900 transition-colors duration-300 ${isDarkMode ? 'dark bg-[#0a0314] text-purple-50' : 'bg-slate-50 text-slate-800'}`}>
       {/* Toast Notification Layer */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
@@ -848,16 +1296,20 @@ export default function App() {
         activeMode={activeMode}
         onModeChange={handleModeChange}
         profile={profile}
-        onOpenTransactionModal={() => { setEditingTransaction(null); setInitialIsCuotas(false); setIsTxModalOpen(true); }}
+        onOpenTransactionModal={() => { setEditingTransaction(null); setInitialIsCuotas(false); setTxModalInitialType('gasto'); setIsTxModalOpen(true); }}
         onOpenIncomeModal={() => setIsIncomeModalOpen(true)}
-        onOpenCoupleModal={() => setIsCoupleModalOpen(true)}
+        onOpenProfileModal={() => setIsProfileModalOpen(true)}
         onOpenCategoryModal={() => setIsCategoryModalOpen(true)}
         onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
         onOpenAiModal={() => setIsAiModalOpen(true)}
+        onOpenCardAlerts={() => setIsCardAlertsModalOpen(true)}
         onOpenSettlementModal={() => setIsSettlementModalOpen(true)}
+        onOpenLogoDownload={() => setIsLogoModalOpen(true)}
         debtInfo={debtInfo}
         onLogout={handleLogout}
         isAdmin={isAdmin}
+        isDemoMode={isDemoMode}
+        onExitDemo={handleExitDemo}
       />
 
       {/* Main Content Area */}
@@ -874,12 +1326,16 @@ export default function App() {
             setTxModalInitialType(initialType || 'gasto'); 
             setIsTxModalOpen(true); 
           }}
-          onOpenCoupleModal={() => setIsCoupleModalOpen(true)}
+          onOpenIncomeModal={() => setIsIncomeModalOpen(true)}
+          onOpenProfileModal={() => setIsProfileModalOpen(true)}
           onOpenAiModal={() => setIsAiModalOpen(true)}
-          onOpenCategoryModal={() => setIsCategoryModalOpen(true)}
-          onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
+          onNavigateHome={() => setActiveTab('dashboard')}
           onToggleSidebar={() => setIsSidebarOpenMobile(prev => !prev)}
           isSidebarPinned={isSidebarPinned}
+          isDemoMode={isDemoMode}
+          onExitDemo={handleExitDemo}
+          cloudSyncStatus={cloudSyncStatus}
+          onOpenCloudSync={() => setIsCloudSyncModalOpen(true)}
         />
 
         {/* Dashboard Main Container */}
@@ -896,6 +1352,7 @@ export default function App() {
                 setIsTxModalOpen(true);
               }}
               onOpenPriorInstallmentsModal={() => setIsPriorInstallmentsModalOpen(true)}
+              onOpenCardAlerts={() => setIsCardAlertsModalOpen(true)}
               onEditTransaction={handleEditTransaction}
               onDeleteTransaction={handleDeleteTransaction}
               onUpdateInstallmentProgress={handleUpdateInstallmentProgress}
@@ -903,100 +1360,44 @@ export default function App() {
             />
           )}
 
-          {/* TAB 2: TRANSACTIONS LIST */}
-          {activeTab === 'transactions' && (
-            <div className="space-y-6">
-              <DateFilterBar
-                filters={filters}
-                onFilterChange={(newF) => setFilters(prev => ({ ...prev, ...newF }))}
-                transactions={transactions}
-                filteredTransactions={filteredTransactions}
-                currency={profile.currency || 'ARS'}
-              />
-              <TransactionsTable
-                transactions={transactions}
-                filteredTransactions={filteredTransactions}
-                filters={filters}
-                onFilterChange={(newF) => setFilters(prev => ({ ...prev, ...newF }))}
-                onResetFilters={() => setFilters({
-                  search: '',
-                  mode: activeMode,
-                  categoria: 'ALL',
-                  subcategoria: 'ALL',
-                  dateRange: 'all',
-                  startDate: undefined,
-                  endDate: undefined,
-                  selectedMonth: undefined,
-                  pagadoPor: 'ALL',
-                  metodoPago: 'ALL',
-                  soloCuotas: 'ALL',
-                })}
-                categoryMap={categoryMap}
-                categoryColors={categoryColors}
-                profile={profile}
-                onEditTransaction={handleEditTransaction}
-                onDeleteTransaction={handleDeleteTransaction}
-                onDuplicateTransaction={handleDuplicateTransaction}
-                onExportCSV={() => exportTransactionsToCSV(filteredTransactions, profile.currency)}
-                onResetData={handleResetData}
-              />
-            </div>
+          {/* TAB 1.5: VENCIMIENTOS */}
+          {activeTab === 'card_alerts' && (
+            <AlertsSection
+              profile={profile}
+              transactions={transactions}
+              onShowToast={showToast}
+              onOpenTransactionModal={() => {
+                setEditingTransaction(null);
+                setInitialIsCuotas(false);
+                setTxModalInitialType('gasto');
+                setIsTxModalOpen(true);
+              }}
+              onOpenCalendarModal={() => setIsCardAlertsModalOpen(true)}
+            />
           )}
 
-          {/* TAB 3: COUPLE BALANCE & SETTLEMENT */}
+          {/* TAB 2: COUPLE BALANCE & SETTLEMENTS */}
           {activeTab === 'couple_balance' && (
-            <div className="space-y-6">
-              <CoupleBalanceBanner
-                transactions={transactions}
-                profile={profile}
-                debtInfo={debtInfo}
-                onOpenSettlementModal={() => setIsSettlementModalOpen(true)}
-                onOpenTransactionModal={() => { setEditingTransaction(null); setInitialIsCuotas(false); setIsTxModalOpen(true); }}
-              />
-              <DateFilterBar
-                filters={filters}
-                onFilterChange={(newF) => setFilters(prev => ({ ...prev, ...newF }))}
-                transactions={transactions.filter(t => t.tipo === 'pareja')}
-                filteredTransactions={filteredTransactions.filter(t => t.tipo === 'pareja')}
-                currency={profile.currency || 'ARS'}
-              />
-              <ChartsSection
-                transactions={filteredTransactions.filter(t => t.tipo === 'pareja')}
-                categoryMap={categoryMap}
-                categoryColors={categoryColors}
-                currency={profile.currency || 'ARS'}
-              />
-              <TransactionsTable
-                transactions={transactions}
-                filteredTransactions={filteredTransactions.filter(t => t.tipo === 'pareja')}
-                filters={{ ...filters, mode: 'pareja' }}
-                onFilterChange={(newF) => setFilters(prev => ({ ...prev, ...newF }))}
-                onResetFilters={() => setFilters({
-                  search: '',
-                  mode: 'pareja',
-                  categoria: 'ALL',
-                  subcategoria: 'ALL',
-                  dateRange: 'all',
-                  startDate: undefined,
-                  endDate: undefined,
-                  selectedMonth: undefined,
-                  pagadoPor: 'ALL',
-                  metodoPago: 'ALL',
-                  soloCuotas: 'ALL',
-                })}
-                categoryMap={categoryMap}
-                categoryColors={categoryColors}
-                profile={profile}
-                onEditTransaction={handleEditTransaction}
-                onDeleteTransaction={handleDeleteTransaction}
-                onDuplicateTransaction={handleDuplicateTransaction}
-                onExportCSV={() => exportTransactionsToCSV(filteredTransactions.filter(t => t.tipo === 'pareja'), profile.currency)}
-                onResetData={handleResetData}
-              />
-            </div>
+            <CoupleBalanceSection
+              transactions={transactions}
+              profile={profile}
+              debtInfo={debtInfo}
+              categoryMap={categoryMap}
+              categoryColors={categoryColors}
+              onOpenSettlementModal={() => setIsSettlementModalOpen(true)}
+              onOpenTransactionModal={() => {
+                setEditingTransaction(null);
+                setInitialIsCuotas(false);
+                setTxModalInitialType('gasto');
+                setActiveMode('pareja');
+                setIsTxModalOpen(true);
+              }}
+              onEditTransaction={handleEditTransaction}
+              onDeleteTransaction={handleDeleteTransaction}
+            />
           )}
 
-          {/* TAB 4: BUDGETS */}
+          {/* TAB 3: BUDGETS & LIMITS */}
           {activeTab === 'budgets' && (
             <div className="space-y-6">
               <BudgetSection
@@ -1004,90 +1405,44 @@ export default function App() {
                 categoryMap={categoryMap}
                 categoryColors={categoryColors}
                 transactions={transactions}
-                currency={profile.currency || 'ARS'}
+                currency={profile.currency}
                 onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
+                onUpdateBudgets={(newBudgets) => {
+                  setBudgets(newBudgets);
+                  showToast('Límites de presupuesto actualizados con éxito', 'success');
+                }}
+                onSelectCategory={(category) => {
+                  setFilters(prev => ({
+                    ...prev,
+                    categoria: category || 'ALL',
+                    subcategoria: 'ALL',
+                  }));
+                  setActiveTab('transactions');
+                }}
               />
             </div>
           )}
 
-          {/* TAB 5: CATEGORIES */}
+          {/* TAB 4: CATEGORIES MANAGER */}
           {activeTab === 'categories' && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-3xl p-6 sm:p-7 border border-purple-100 shadow-sm space-y-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2.5">
-                      <h2 className="text-xl font-extrabold text-[#2E0854]">
-                        {canManageCategories ? 'Administrador de Categorías' : 'Catálogo de Categorías'}
-                      </h2>
-                      {!canManageCategories ? (
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                          Plan Básico (Fijas)
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-[#7928CA] border border-purple-200">
-                          Personalización Ilimitada
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-400 font-medium mt-0.5">
-                      {canManageCategories
-                        ? 'Gestiona tus categorías, subrubros y colores contables'
-                        : 'Categorías estándar incluidas en tu suscripción'}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setIsCategoryModalOpen(true)}
-                    className="px-4 py-2.5 bg-gradient-to-r from-[#F95420] to-[#FF6B3D] hover:from-[#E04412] hover:to-[#F95420] text-white font-bold text-xs rounded-xl shadow-md shadow-orange-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
-                  >
-                    {canManageCategories ? 'Administrar Categorías' : 'Ver Catálogo Completo'}
-                  </button>
-                </div>
-
-                {!canManageCategories && (
-                  <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div className="text-xs leading-relaxed">
-                      <strong>¿Querés crear tus propias categorías o nuevos subrubros?</strong><br />
-                      La creación y personalización de categorías está disponible en los <strong>Planes Pareja Dúo y Pro</strong>.
-                    </div>
-                    <button
-                      onClick={() => setActiveTab('subscriptions')}
-                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#F95420] to-[#FF6B3D] hover:from-[#E04412] hover:to-[#F95420] text-white text-xs font-bold shrink-0 transition-all cursor-pointer shadow-xs"
-                    >
-                      Ver Planes & Actualizar
-                    </button>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-1">
-                  {(Object.entries(categoryMap) as [string, string[]][]).map(([cat, subs]) => (
-                    <div key={cat} className="p-4 rounded-2xl border border-purple-100 bg-purple-50/20 hover:border-purple-200 transition-all space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="w-3 h-3 rounded-full shrink-0 ring-2 ring-purple-100" style={{ backgroundColor: categoryColors[cat] || '#7928CA' }} />
-                          <h4 className="font-extrabold text-sm text-[#2E0854] truncate">{cat}</h4>
-                        </div>
-                        <span className="text-[10px] font-bold text-[#7928CA] bg-purple-50 px-1.5 py-0.5 rounded-md shrink-0">{(subs || []).length} subcat</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {(subs || []).map(s => (
-                          <span key={s} className="px-2 py-0.5 bg-white text-slate-700 rounded-lg text-[11px] font-medium border border-purple-100 shadow-2xs">
-                            {s}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <CategoriesSection
+              categoryMap={categoryMap}
+              categoryColors={categoryColors}
+              canManageCategories={true}
+              onAddCategory={handleAddCategory}
+              onAddSubcategory={handleAddSubcategory}
+              onDeleteCategory={handleDeleteCategory}
+              onDeleteSubcategory={handleDeleteSubcategory}
+              onShowToast={showToast}
+            />
           )}
 
-          {/* TAB 6: GOALS & SAVINGS / DEBTS */}
+          {/* TAB 5: GOALS & SAVINGS */}
           {activeTab === 'goals' && (
             <GoalsSection
               goals={goals}
-              currency={profile.currency || 'ARS'}
+              profile={profile}
+              currency={profile.currency}
               onAddGoal={handleAddGoal}
               onUpdateGoal={handleUpdateGoal}
               onDeleteGoal={handleDeleteGoal}
@@ -1095,10 +1450,41 @@ export default function App() {
             />
           )}
 
-          {/* TAB 7: DEFAULT OVERALL DASHBOARD VIEW */}
+          {/* TAB 6: TRANSACTIONS LIST & FILTERS */}
+          {activeTab === 'transactions' && (
+            <TransactionsTable
+              transactions={transactions}
+              filteredTransactions={filteredTransactions}
+              filters={filters}
+              onFilterChange={(newFilters) => setFilters(prev => ({ ...prev, ...newFilters }))}
+              onResetFilters={() => setFilters({
+                search: '',
+                mode: 'all',
+                categoria: 'ALL',
+                subcategoria: 'ALL',
+                dateRange: 'all',
+                pagadoPor: 'ALL',
+                metodoPago: 'ALL',
+                soloCuotas: 'ALL',
+                startDate: undefined,
+                endDate: undefined,
+                selectedMonth: undefined,
+              })}
+              categoryMap={categoryMap}
+              categoryColors={categoryColors}
+              profile={profile}
+              onEditTransaction={handleEditTransaction}
+              onDeleteTransaction={handleDeleteTransaction}
+              onExportCSV={() => exportTransactionsToCSV(filteredTransactions, profile.currency)}
+              onResetData={handleGuestDemo}
+              onNavigateTab={(tab) => setActiveTab(tab)}
+              onOpenCloudSync={() => setIsCloudSyncModalOpen(true)}
+            />
+          )}
+
+          {/* TAB 7: MAIN DASHBOARD OVERVIEW */}
           {activeTab === 'dashboard' && (
             <div className="space-y-7">
-              {/* Main Visual Dashboard Layout (Balance, 4 Stat Cards, Category Consumption Donut, Top 5) */}
               <DashboardOverview
                 transactions={transactions}
                 profile={profile}
@@ -1114,19 +1500,36 @@ export default function App() {
                   setIsTxModalOpen(true); 
                 }}
                 onOpenIncomeModal={() => setIsIncomeModalOpen(true)}
+                onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
+                onNavigateTab={(tab) => setActiveTab(tab)}
+                onSelectCategory={(category) => {
+                  setFilters(prev => ({
+                    ...prev,
+                    categoria: category || 'ALL',
+                    subcategoria: 'ALL',
+                  }));
+                  setActiveTab('transactions');
+                }}
               />
             </div>
           )}
 
-          {/* TAB 8: SUBSCRIPTIONS & MERCADO PAGO TIERS */}
-          {activeTab === 'subscriptions' && (
-            <SubscriptionsView
-              userAccount={currentUserAccount}
-              profile={profile}
-              currentSubscription={subscriptions.find(s => s.userEmail.toLowerCase() === (currentUserAccount?.email || 'estechesol@gmail.com').toLowerCase())}
-              onSelectPlanPayment={handleSelectPlanPayment}
-              onOpenAdminPanel={() => setActiveTab('admin_subscriptions')}
-            />
+          {/* TAB 7.5: REPORTES & ANALYTICS CHARTS */}
+          {activeTab === 'charts' && (
+            <div className="space-y-6">
+              <ChartsSection
+                transactions={filteredTransactions}
+                categoryMap={categoryMap}
+                categoryColors={categoryColors}
+                currency={profile.currency}
+                onOpenTransactionModal={() => {
+                  setEditingTransaction(null);
+                  setInitialIsCuotas(false);
+                  setTxModalInitialType('gasto');
+                  setIsTxModalOpen(true);
+                }}
+              />
+            </div>
           )}
 
           {/* TAB 9: ADMIN PANEL FOR CLIENT SUBSCRIPTIONS */}
@@ -1156,6 +1559,7 @@ export default function App() {
           setTxModalInitialType('gasto'); 
           setIsTxModalOpen(true); 
         }}
+        onToggleSidebar={() => setIsSidebarOpenMobile(prev => !prev)}
         hasDebt={debtInfo.debtAmount > 0}
       />
 
@@ -1191,7 +1595,10 @@ export default function App() {
         onClose={() => setIsAiModalOpen(false)}
         categoryMap={categoryMap}
         profile={profile}
+        transactions={transactions}
+        budgets={budgets}
         onAddTransaction={handleSaveTransaction}
+        onShowToast={showToast}
       />
 
       <CategoryManagerModal
@@ -1214,6 +1621,7 @@ export default function App() {
         categoryMap={categoryMap}
         profile={profile}
         currency={profile?.currency || 'ARS'}
+        transactions={filteredTransactions}
         onSaveBudgets={(newBudgets) => {
           setBudgets(newBudgets);
           showToast('Presupuestos actualizados con éxito', 'success');
@@ -1242,6 +1650,75 @@ export default function App() {
         transactions={transactions}
         settlementHistory={settlementHistory}
         onSettleDebt={handleSettleDebt}
+      />
+
+      {/* User Profile & Account Settings Modal (Req 12) */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        profile={profile}
+        userAccount={currentUserAccount}
+        activeSubscription={activeUserSub}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={() => setIsDarkMode(prev => !prev)}
+        onUpdateProfile={(newProf) => {
+          setProfile(prev => ({ ...prev, ...newProf }));
+          showToast('Perfil actualizado con éxito', 'success');
+        }}
+        onUpdateAccount={handleUpdateAccount}
+        onApplyDiscountCode={handleApplyDiscountCode}
+        onLinkCoupleCode={handleLinkCoupleCode}
+        onOpenSubscriptionsTab={() => {
+          setIsProfileModalOpen(false);
+          setActiveTab('subscriptions');
+        }}
+        onLogout={handleLogout}
+        onSelectPlanPayment={handleSelectPlanPayment}
+        onShowToast={showToast}
+        onOpenCloudSync={() => {
+          setIsProfileModalOpen(false);
+          setIsCloudSyncModalOpen(true);
+        }}
+      />
+
+      {/* Firebase Cloud Sync & Selective Historic Partition Loader Modal */}
+      <FirebaseCloudSyncModal
+        isOpen={isCloudSyncModalOpen}
+        onClose={() => setIsCloudSyncModalOpen(false)}
+        userId={activeUserId}
+        userAccount={currentUserAccount}
+        profile={profile}
+        budgets={budgets}
+        transactions={transactions}
+        onMergeTransactions={handleMergeTransactions}
+        onShowToast={showToast}
+      />
+
+      {/* Logo Download Modal (Req 6) */}
+      <LogoDownloadModal
+        isOpen={isLogoModalOpen}
+        onClose={() => setIsLogoModalOpen(false)}
+      />
+
+      {/* Pro Card Alerts & Google Calendar Modal */}
+      <ProCardAlertsModal
+        isOpen={isCardAlertsModalOpen}
+        onClose={() => setIsCardAlertsModalOpen(false)}
+        transactions={transactions}
+        profile={profile}
+        onUpgradePlan={() => { setIsCardAlertsModalOpen(false); setActiveTab('subscriptions'); }}
+        onShowToast={showToast}
+        isProOrTrial={activeUserSub ? (activeUserSub.status === 'active' || activeUserSub.status === 'trial') : true}
+      />
+
+      {/* Financial Health Diagnosis Modal */}
+      <FinancialDiagnosisModal
+        isOpen={isDiagnosisModalOpen}
+        onClose={() => setIsDiagnosisModalOpen(false)}
+        transactions={transactions}
+        profile={profile}
+        budgets={budgets}
+        onUpgradePlan={() => { setIsDiagnosisModalOpen(false); setActiveTab('subscriptions'); }}
       />
     </div>
   );

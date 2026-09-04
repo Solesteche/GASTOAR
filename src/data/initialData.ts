@@ -32,13 +32,15 @@ export const DEFAULT_CATEGORY_MAP: CategoryMap = {
     "Expensas Cochera"
   ],
   "Servicios": [
-    "Luz (Edenor / Edesur / Provincial)",
-    "Gas Natural / Garrafa (Metrogas / Naturgy)",
-    "Agua (AySA / Provincial)",
-    "Internet Wi-Fi, Fibra & Cable",
-    "Telefonía Celular (Personal / Movistar / Claro)",
-    "Artículos de Limpieza",
-    "Mantenimiento, Ferretería & Arreglos"
+    "Luz / Electricidad (Edenor, Edesur, Provincial)",
+    "Gas Natural / Garrafa (Metrogas, Naturgy)",
+    "Agua & Cloacas (AySA, Provincial)",
+    "Internet Fibra Óptica & Wi-Fi",
+    "Telefonía Celular & Planes Móviles (Personal, Claro, Movistar)",
+    "Streaming & TV por Cable",
+    "Seguridad, Alarma & Monitoreo",
+    "Artículos de Limpieza del Hogar",
+    "Mantenimiento, Ferretería & Reparaciones"
   ],
   "Transporte & Movilidad": [
     "Carga Tarjeta SUBE (Colectivo, Tren, Subte)",
@@ -53,7 +55,8 @@ export const DEFAULT_CATEGORY_MAP: CategoryMap = {
   "Salud & Cuidado Personal": [
     "Farmacia & Medicamentos",
     "Prepaga / Obra Social (OSDE, Swiss Medical, Galeno)",
-    "Peluquería & Estética"
+    "Peluquería & Estética",
+    "Gimnasio, Club, Pádel & Deportes"
   ],
   "Educación & Formación": [
     "Cuotas Colegio / Jardín",
@@ -62,13 +65,26 @@ export const DEFAULT_CATEGORY_MAP: CategoryMap = {
     "Libros, Manuales & Fotocopias",
     "Útiles Escolares & Librería"
   ],
-  "Entretenimiento, Ocio & Suscripciones": [
-    "Streaming Video (Netflix, Disney+, Max, Prime)",
-    "Streaming Música (Spotify, YouTube Music)",
+  "Entretenimiento, Ocio & Salidas": [
     "Salidas, Cine & Teatro",
     "Recitales, Boliches & Fiestas",
-    "Gimnasio, Club, Pádel & Deportes",
     "Videojuegos & Entretenimiento Digital"
+  ],
+  "Suscripciones": [
+    "Netflix",
+    "Spotify",
+    "YouTube Premium",
+    "Disney+ / Star+",
+    "Amazon Prime Video",
+    "Max (HBO Max)",
+    "Apple TV+ / iCloud",
+    "ChatGPT Plus / OpenAI",
+    "Paramount+",
+    "Crunchyroll",
+    "Mercado Libre (Meli+)",
+    "PlayStation Plus / Xbox Game Pass",
+    "Google One / Drive",
+    "Otras plataformas digitales"
   ],
   "Indumentaria & Calzado": [
     "Ropa Urbana & Casual",
@@ -100,7 +116,8 @@ export const DEFAULT_CATEGORY_COLORS: CategoryColors = {
   "Transporte & Movilidad": "#10b981", // Emerald
   "Salud & Cuidado Personal": "#ec4899", // Pink
   "Educación & Formación": "#6366f1", // Indigo
-  "Entretenimiento, Ocio & Suscripciones": "#8b5cf6", // Violet
+  "Entretenimiento, Ocio & Salidas": "#8b5cf6", // Violet
+  "Suscripciones": "#7928CA", // Purple Accent
   "Indumentaria & Calzado": "#06b6d4", // Cyan
   "Mascotas": "#f97316", // Orange
   "Tecnología, Electro & Bazar": "#14b8a6", // Teal
@@ -115,7 +132,8 @@ export const DEFAULT_BUDGETS: Budgets = {
     "Transporte & Movilidad": 85000,
     "Salud & Cuidado Personal": 95000,
     "Educación & Formación": 65000,
-    "Entretenimiento, Ocio & Suscripciones": 55000,
+    "Entretenimiento, Ocio & Salidas": 55000,
+    "Suscripciones": 60000,
     "Indumentaria & Calzado": 60000,
     "Mascotas": 45000,
     "Tecnología, Electro & Bazar": 40000

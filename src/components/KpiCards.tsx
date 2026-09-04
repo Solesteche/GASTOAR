@@ -42,7 +42,7 @@ interface KpiCardsProps {
 }
 
 export const KpiCards: React.FC<KpiCardsProps> = ({
-  filteredTransactions,
+  filteredTransactions = [],
   profile,
   activeMode,
   debtInfo,
@@ -55,17 +55,18 @@ export const KpiCards: React.FC<KpiCardsProps> = ({
   const partnerName = isUser1 ? profile.user2Name : profile.user1Name;
 
   // Filtered total
-  const totalSpent = filteredTransactions.reduce((acc, tx) => acc + (tx.monto || 0), 0);
-  const avgTicket = filteredTransactions.length > 0 ? totalSpent / filteredTransactions.length : 0;
+  const safeFiltered = filteredTransactions || [];
+  const totalSpent = safeFiltered.reduce((acc, tx) => acc + (tx?.monto || 0), 0);
+  const avgTicket = safeFiltered.length > 0 ? totalSpent / safeFiltered.length : 0;
 
   // Individual vs Couple breakdown in filtered set
-  const individualSpent = filteredTransactions
-    .filter(tx => tx.tipo === 'individual')
-    .reduce((acc, tx) => acc + tx.monto, 0);
+  const individualSpent = safeFiltered
+    .filter(tx => tx?.tipo === 'individual')
+    .reduce((acc, tx) => acc + (tx?.monto || 0), 0);
 
-  const coupleSpent = filteredTransactions
-    .filter(tx => tx.tipo === 'pareja')
-    .reduce((acc, tx) => acc + tx.monto, 0);
+  const coupleSpent = safeFiltered
+    .filter(tx => tx?.tipo === 'pareja')
+    .reduce((acc, tx) => acc + (tx?.monto || 0), 0);
 
   // User Debt state
   const currentUserOwes = isUser1 
@@ -97,7 +98,7 @@ export const KpiCards: React.FC<KpiCardsProps> = ({
           </div>
         </div>
         <div className="mt-4 pt-3 border-t border-purple-50 flex items-center justify-between text-xs text-slate-500 font-medium">
-          <span>{filteredTransactions.length} transacciones</span>
+          <span>{safeFiltered.length} transacciones</span>
           <span className="font-bold text-slate-800">Prom: {formatCurrency(avgTicket, profile.currency)}</span>
         </div>
       </div>

@@ -24,7 +24,8 @@ import {
   History,
   Hourglass,
   CalendarDays,
-  Pin
+  Pin,
+  Bell
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -49,11 +50,17 @@ interface InstallmentsSectionProps {
   profile: CoupleProfile;
   onOpenNewInstallmentModal: () => void;
   onOpenPriorInstallmentsModal?: () => void;
+  onOpenCardAlerts?: () => void;
   onEditTransaction: (tx: Transaction) => void;
   onDeleteTransaction: (id: string) => void;
-  onUpdateInstallmentProgress: (txId: string, delta: number) => void;
-  onCompleteInstallment: (txId: string) => void;
+  onUpdateInstallmentProgress?: (txId: string, delta: number) => void;
+  onCompleteInstallment?: (txId: string) => void;
 }
+
+const P = "#6F2EC5";
+const P_LIGHT = "#F5EFFF";
+const P_MID = "#A77BEE";
+const P_ORANGE = "#F95420";
 
 export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
   transactions,
@@ -182,10 +189,11 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
     let user1MonthlyLoad = 0;
     let user2MonthlyLoad = 0;
 
-    installmentTxs.forEach(tx => {
+    (installmentTxs || []).forEach(tx => {
+      if (!tx) return;
       const totalCuotas = tx.cuotasTotal || 1;
       const currentCuota = tx.cuotaActual || 1;
-      const montoTotal = tx.monto;
+      const montoTotal = tx.monto || 0;
       const cuotaMonto = tx.montoCuota || (montoTotal / totalCuotas);
 
       totalCommitted += montoTotal;
@@ -226,6 +234,8 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
       }
     });
 
+    const percentPaid = totalCommitted > 0 ? Math.min(100, Math.round((totalPaidSoFar / totalCommitted) * 100)) : 0;
+
     return {
       totalCommitted,
       totalPaidSoFar,
@@ -235,14 +245,15 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
       completedPlansCount,
       user1MonthlyLoad,
       user2MonthlyLoad,
+      percentPaid,
     };
   }, [installmentTxs]);
 
   // Unique Cards List
   const cardList = useMemo(() => {
     const set = new Set<string>();
-    installmentTxs.forEach(tx => {
-      if (tx.tarjetaNombre) set.add(tx.tarjetaNombre);
+    (installmentTxs || []).forEach(tx => {
+      if (tx && tx.tarjetaNombre) set.add(tx.tarjetaNombre);
     });
     return Array.from(set);
   }, [installmentTxs]);
@@ -250,11 +261,12 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
   // Cards Breakdown
   const cardsSummary = useMemo(() => {
     const map: { [card: string]: { count: number; total: number; monthly: number; pending: number } } = {};
-    installmentTxs.forEach(tx => {
+    (installmentTxs || []).forEach(tx => {
+      if (!tx) return;
       const card = tx.tarjetaNombre || 'Tarjeta Principal';
       const totalCuotas = tx.cuotasTotal || 1;
       const currentCuota = tx.cuotaActual || 1;
-      const montoTotal = tx.monto;
+      const montoTotal = tx.monto || 0;
       const cuotaMonto = tx.montoCuota || (montoTotal / totalCuotas);
       const isCompleted = currentCuota >= totalCuotas;
       const pending = isCompleted ? 0 : (totalCuotas - currentCuota) * cuotaMonto;
@@ -314,152 +326,222 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
     });
   }, [installmentTxs, filterStatus, filterCard, filterPerson]);
 
+  // Circular progress math (matching Resumen style)
+  const r = 38, cx = 50, cy = 50;
+  const circ = 2 * Math.PI * r;
+  const dash = (metrics.percentPaid / 100) * circ;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 max-w-4xl mx-auto pb-16 font-sans">
       
-      {/* Top Banner & Quick Add */}
-      <div className="bg-gradient-to-br from-[#2E0854] via-[#3B0764] to-[#7928CA] rounded-3xl p-5 sm:p-7 text-white shadow-xl border border-purple-900/50 relative overflow-hidden">
-        {/* Subtle decorative glow */}
-        <div className="absolute top-0 right-0 w-80 h-80 bg-[#F95420]/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-60 h-60 bg-[#7928CA]/30 rounded-full blur-3xl pointer-events-none" />
-        
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
-          <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 text-purple-100 rounded-full text-xs font-bold border border-white/15 backdrop-blur-xs">
-              <CreditCard className="w-3.5 h-3.5 text-[#F95420]" />
-              <span>Gestión Financiera de Tarjetas & Cuotas</span>
-            </div>
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-white">
-              Balance de Gastos en Cuotas
-            </h2>
-            <p className="text-xs sm:text-sm text-purple-100/90 leading-relaxed font-medium">
-              Controla las compras financiadas con tarjeta de crédito, visualiza el compromiso mensual de cada uno y proyecta tus finanzas futuras sin sorpresas.
-            </p>
-          </div>
-
-          {/* CTAs */}
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            {onOpenPriorInstallmentsModal && (
-              <button
-                onClick={onOpenPriorInstallmentsModal}
-                className="px-3.5 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 active:scale-95 text-xs sm:text-sm font-bold rounded-2xl transition-all flex items-center gap-2 shadow-xs cursor-pointer"
-                title="Cargar consumos o deudas en cuotas que compraste antes de usar la app"
-              >
-                <History className="w-4 h-4 text-purple-200" />
-                <span>Cargar Cuotas Anteriores</span>
-              </button>
-            )}
-
-            <button
-              onClick={onOpenNewInstallmentModal}
-              className="px-4 py-2.5 bg-gradient-to-r from-[#F95420] via-[#FF6B3D] to-[#FA541C] hover:from-[#E04412] hover:to-[#F95420] active:scale-95 text-white text-xs sm:text-sm font-bold rounded-2xl shadow-lg shadow-orange-500/25 transition-all flex items-center gap-2 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Nueva Compra en Cuotas</span>
-            </button>
-          </div>
+      {/* 1. Header: Section title + Actions (sin el botón de alertas de calendar) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+        <div>
+          <p className="text-sm text-gray-400">Tarjetas & Financiación</p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Gastos en Cuotas</h1>
         </div>
 
-        {/* Highlight Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 mt-6 pt-6 border-t border-white/15">
-          <div className="bg-white/10 backdrop-blur-xs p-3.5 rounded-2xl border border-white/10">
-            <p className="text-[11px] font-bold text-purple-200 uppercase tracking-wider">Total Financiado</p>
-            <p className="text-lg sm:text-xl font-black text-white mt-1">
-              {formatCurrency(metrics.totalCommitted, currency)}
-            </p>
-            <p className="text-[10px] text-purple-200 mt-0.5 font-medium">En {installmentTxs.length} compras en cuotas</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          {onOpenPriorInstallmentsModal && (
+            <button
+              onClick={onOpenPriorInstallmentsModal}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-purple-50/50 text-slate-700 hover:text-[#6F2EC5] transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+              title="Cargar consumos o deudas en cuotas que compraste antes de usar la app"
+            >
+              <History className="w-3.5 h-3.5 text-slate-500" />
+              <span>Cargar Cuotas Anteriores</span>
+            </button>
+          )}
+
+          <button
+            onClick={onOpenNewInstallmentModal}
+            className="px-4 py-2 rounded-xl text-xs font-bold text-white transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
+            style={{ backgroundColor: P }}
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nueva Compra en Cuotas</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 2. Hero Balance Card (Estilo Resumen: Saldo por pagar & % Amortizado) */}
+      <div className="bg-white rounded-3xl p-5 shadow-sm border border-white">
+        <div className="flex items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold mb-2" style={{ color: P }}>Saldo total por pagar</p>
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-3xl font-bold font-outfit text-gray-900 tracking-tight leading-none">
+                {formatCurrency(metrics.totalPending, currency)}
+              </p>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden mb-2" style={{ backgroundColor: P_LIGHT }}>
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{ 
+                  width: `${Math.min(100, Math.max(5, metrics.percentPaid))}%`, 
+                  background: `linear-gradient(90deg, ${P_MID}, ${P})` 
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <span>Total financiado:{" "}
+                <span className="font-semibold text-gray-700">{formatCurrency(metrics.totalCommitted, currency)}</span>
+              </span>
+              <span>•</span>
+              <span>Pagado:{" "}
+                <span className="font-semibold text-emerald-600">{formatCurrency(metrics.totalPaidSoFar, currency)}</span>
+              </span>
+            </div>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-xs p-3.5 rounded-2xl border border-white/10">
-            <p className="text-[11px] font-bold text-orange-200 uppercase tracking-wider">Saldo por Pagar</p>
-            <p className="text-lg sm:text-xl font-black text-orange-300 mt-1">
-              {formatCurrency(metrics.totalPending, currency)}
-            </p>
-            <p className="text-[10px] text-purple-200 mt-0.5 font-medium">Deuda futura restante</p>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-xs p-3.5 rounded-2xl border border-white/10">
-            <p className="text-[11px] font-bold text-emerald-300 uppercase tracking-wider">Cuota Este Mes</p>
-            <p className="text-lg sm:text-xl font-black text-emerald-300 mt-1">
-              {formatCurrency(metrics.monthlyThisMonth, currency)}
-            </p>
-            <p className="text-[10px] text-purple-200 mt-0.5 font-medium">Carga en resumen actual</p>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-xs p-3.5 rounded-2xl border border-white/10">
-            <p className="text-[11px] font-bold text-purple-200 uppercase tracking-wider">Planes Activos</p>
-            <p className="text-lg sm:text-xl font-black text-white mt-1">
-              {metrics.activePlansCount}{' '}
-              <span className="text-xs font-normal text-purple-200">activos</span>
-            </p>
-            <p className="text-[10px] text-purple-200 mt-0.5 font-medium">{metrics.completedPlansCount} finalizados</p>
+          {/* Circular Progress Gauge (Igual al de Resumen) */}
+          <div className="relative flex-shrink-0" style={{ width: 110, height: 110 }}>
+            <svg width="110" height="110" viewBox="0 0 100 100">
+              <defs>
+                <linearGradient id="installmentCg" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor={P_MID} />
+                  <stop offset="100%" stopColor={P} />
+                </linearGradient>
+              </defs>
+              <circle cx={cx} cy={cy} r={r} fill="none" stroke={P_LIGHT} strokeWidth="7" />
+              <circle
+                cx={cx} cy={cy} r={r} fill="none"
+                stroke="url(#installmentCg)" strokeWidth="7" strokeLinecap="round"
+                strokeDasharray={`${dash} ${circ}`}
+                transform={`rotate(-90 ${cx} ${cy})`}
+                className="transition-all duration-1000 ease-out"
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <p className="text-xl font-bold font-outfit leading-none" style={{ color: P }}>{metrics.percentPaid}%</p>
+              <p className="text-[9px] text-gray-400 text-center mt-0.5 leading-tight">del total<br />amortizado</p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Couple Monthly Responsibility Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* 3. Stat Cards (Estilo Resumen MetricCards) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {/* Cuota Este Mes */}
+        <div className="bg-white rounded-3xl p-4 shadow-sm border border-white">
+          <div className="flex items-start gap-2 mb-2">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base flex-shrink-0" style={{ backgroundColor: P_LIGHT }}>
+              💳
+            </div>
+            <p className="text-xs text-gray-500 leading-tight">Cuota de este mes</p>
+          </div>
+          <p className="text-xl font-bold font-outfit text-gray-900 leading-none mb-0.5">
+            {formatCurrency(metrics.monthlyThisMonth, currency)}
+          </p>
+          <p className="text-xs text-gray-400">Carga en resumen actual</p>
+        </div>
+
+        {/* Saldo por Pagar */}
+        <div className="bg-white rounded-3xl p-4 shadow-sm border border-white">
+          <div className="flex items-start gap-2 mb-2">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base flex-shrink-0" style={{ backgroundColor: P_LIGHT }}>
+              ⏳
+            </div>
+            <p className="text-xs text-gray-500 leading-tight">Saldo pendiente</p>
+          </div>
+          <p className="text-xl font-bold font-outfit text-gray-900 leading-none mb-0.5">
+            {formatCurrency(metrics.totalPending, currency)}
+          </p>
+          <p className="text-xs text-gray-400">Deuda futura restante</p>
+        </div>
+
+        {/* Total Financiado */}
+        <div className="bg-white rounded-3xl p-4 shadow-sm border border-white">
+          <div className="flex items-start gap-2 mb-2">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base flex-shrink-0" style={{ backgroundColor: P_LIGHT }}>
+              🏷️
+            </div>
+            <p className="text-xs text-gray-500 leading-tight">Total financiado</p>
+          </div>
+          <p className="text-xl font-bold font-outfit text-gray-900 leading-none mb-0.5">
+            {formatCurrency(metrics.totalCommitted, currency)}
+          </p>
+          <p className="text-xs text-gray-400">En {installmentTxs.length} {installmentTxs.length === 1 ? 'compra' : 'compras'}</p>
+        </div>
+
+        {/* Planes Activos */}
+        <div className="bg-white rounded-3xl p-4 shadow-sm border border-white">
+          <div className="flex items-start gap-2 mb-2">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base flex-shrink-0" style={{ backgroundColor: P_LIGHT }}>
+              📊
+            </div>
+            <p className="text-xs text-gray-500 leading-tight">Planes de cuotas</p>
+          </div>
+          <p className="text-xl font-bold font-outfit text-gray-900 leading-none mb-0.5">
+            {metrics.activePlansCount} <span className="text-xs font-normal text-gray-400">activos</span>
+          </p>
+          <p className="text-xs text-gray-400">{metrics.completedPlansCount} finalizados</p>
+        </div>
+      </div>
+
+      {/* 4. Couple Monthly Responsibility Cards (Estilo Resumen) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* User 1 Card */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-purple-100/80 shadow-[0_4px_20px_-4px_rgba(121,40,202,0.06)] flex items-center justify-between">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center font-extrabold text-[#7928CA] text-sm">
+        <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-white flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm" style={{ backgroundColor: P_LIGHT, color: P }}>
               {profile.user1Name.charAt(0).toUpperCase()}
             </div>
             <div>
-              <p className="text-xs text-purple-900/60 font-bold uppercase tracking-wider">Compromiso en Cuotas</p>
-              <h4 className="font-extrabold text-[#2E0854] text-base">{profile.user1Name}</h4>
-              <p className="text-[11px] text-slate-500">Individuales + parte proporcional</p>
+              <p className="text-xs text-gray-400 font-medium">Compromiso en Cuotas</p>
+              <h4 className="font-bold text-gray-900 text-sm sm:text-base">{profile.user1Name}</h4>
+              <p className="text-[11px] text-gray-400">Individuales + proporcional</p>
             </div>
           </div>
           <div className="text-right">
-            <span className="text-xs font-semibold text-slate-400">Cuota mensual:</span>
-            <p className="text-lg sm:text-xl font-black text-[#7928CA]">
+            <span className="text-[11px] font-medium text-gray-400">Cuota mensual</span>
+            <p className="text-lg sm:text-xl font-bold font-outfit" style={{ color: P }}>
               {formatCurrency(metrics.user1MonthlyLoad, currency)}
             </p>
           </div>
         </div>
 
         {/* User 2 Card */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-purple-100/80 shadow-[0_4px_20px_-4px_rgba(121,40,202,0.06)] flex items-center justify-between">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center font-extrabold text-[#F95420] text-sm">
+        <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-white flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-2xl bg-orange-50 text-[#F95420] flex items-center justify-center font-bold text-sm">
               {profile.user2Name.charAt(0).toUpperCase()}
             </div>
             <div>
-              <p className="text-xs text-purple-900/60 font-bold uppercase tracking-wider">Compromiso en Cuotas</p>
-              <h4 className="font-extrabold text-[#2E0854] text-base">{profile.user2Name}</h4>
-              <p className="text-[11px] text-slate-500">Individuales + parte proporcional</p>
+              <p className="text-xs text-gray-400 font-medium">Compromiso en Cuotas</p>
+              <h4 className="font-bold text-gray-900 text-sm sm:text-base">{profile.user2Name}</h4>
+              <p className="text-[11px] text-gray-400">Individuales + proporcional</p>
             </div>
           </div>
           <div className="text-right">
-            <span className="text-xs font-semibold text-slate-400">Cuota mensual:</span>
-            <p className="text-lg sm:text-xl font-black text-[#F95420]">
+            <span className="text-[11px] font-medium text-gray-400">Cuota mensual</span>
+            <p className="text-lg sm:text-xl font-bold font-outfit text-[#F95420]">
               {formatCurrency(metrics.user2MonthlyLoad, currency)}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Monthly Projection Timeline Chart */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-purple-100/80 shadow-[0_4px_20px_-4px_rgba(121,40,202,0.06)] space-y-4">
+      {/* 5. Monthly Projection Timeline Chart (Estilo Resumen) */}
+      <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-white space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h3 className="font-extrabold text-[#2E0854] text-base sm:text-lg flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-[#7928CA]" />
+            <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" style={{ color: P }} />
               <span>Proyección de Cuotas por Mes</span>
             </h3>
-            <p className="text-xs text-slate-500">
-              Carga económica proyectada para los próximos {monthlyProjectionData.length} meses según las cuotas pendientes
+            <p className="text-xs text-gray-400 mt-0.5">
+              Carga económica estimada para los próximos {monthlyProjectionData.length} meses según las cuotas pendientes
             </p>
           </div>
 
-          <div className="flex items-center gap-3 text-xs font-bold">
-            <span className="flex items-center gap-1.5 text-[#7928CA]">
-              <span className="w-3 h-3 rounded-full bg-[#7928CA]" />
+          <div className="flex items-center gap-3 text-xs font-semibold">
+            <span className="flex items-center gap-1.5" style={{ color: P }}>
+              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: P }} />
               <span>{profile.user1Name}</span>
             </span>
             <span className="flex items-center gap-1.5 text-[#F95420]">
-              <span className="w-3 h-3 rounded-full bg-[#F95420]" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#F95420]" />
               <span>{profile.user2Name}</span>
             </span>
           </div>
@@ -469,7 +551,7 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
         <div className="h-64 sm:h-72 w-full pt-2">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={monthlyProjectionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5efff" />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
               <XAxis 
                 dataKey="monthLabel" 
                 axisLine={false} 
@@ -484,13 +566,13 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
               />
               <Tooltip 
                 formatter={(val: any, name: any) => [formatCurrency(Number(val), currency), name]}
-                labelStyle={{ fontWeight: 700, color: '#2E0854', marginBottom: '4px' }}
-                contentStyle={{ borderRadius: '1rem', border: '1px solid #ede4f9', boxShadow: '0 10px 15px -3px rgba(121, 40, 202, 0.08)' }}
+                labelStyle={{ fontWeight: 700, color: '#1e293b', marginBottom: '4px' }}
+                contentStyle={{ borderRadius: '1rem', border: '1px solid #f1f5f9', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.05)' }}
               />
               <Bar 
                 dataKey={profile.user1Name} 
                 stackId="a" 
-                fill="#7928CA" 
+                fill={P} 
                 radius={[0, 0, 4, 4]} 
               />
               <Bar 
@@ -504,28 +586,28 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
         </div>
       </div>
 
-      {/* NEW: Cronograma y Detalle Interactivo Mes a Mes */}
+      {/* 6. Cronograma y Detalle Interactivo Mes a Mes (Estilo Resumen) */}
       {monthlyOverviewList.length > 0 && (
-        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-purple-100/80 shadow-[0_4px_20px_-4px_rgba(121,40,202,0.06)] space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-50 pb-4">
+        <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-white space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
               <div className="flex items-center gap-2">
-                <CalendarDays className="w-5 h-5 text-[#7928CA]" />
-                <h3 className="font-extrabold text-[#2E0854] text-base sm:text-lg">
+                <CalendarDays className="w-4 h-4" style={{ color: P }} />
+                <h3 className="font-bold text-gray-900 text-base">
                   ¿Cuánto hay que pagar por mes de cuotas?
                 </h3>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Selecciona un mes para auditar el total exigible, la fecha exacta de vencimiento y el aporte de cada uno
+              <p className="text-xs text-gray-400 mt-0.5">
+                Selecciona un mes para auditar el total exigible, la fecha estimada y el aporte de cada uno
               </p>
             </div>
 
             {/* Total Indicator & Pin for selected month */}
             <div className="flex items-center gap-2 flex-wrap">
               {activeMonthSummary && (
-                <div className="bg-purple-50/80 border border-purple-100 px-4 py-2 rounded-2xl flex items-center gap-3">
-                  <span className="text-xs text-[#2E0854] font-bold">Total a pagar:</span>
-                  <span className="text-base sm:text-lg font-black text-[#7928CA]">
+                <div className="px-3 py-1.5 rounded-xl flex items-center gap-2 text-xs border border-purple-100" style={{ backgroundColor: P_LIGHT }}>
+                  <span className="text-gray-600 font-medium">Total a pagar:</span>
+                  <span className="font-bold font-outfit text-sm" style={{ color: P }}>
                     {formatCurrency(activeMonthSummary.totalAmount, currency)}
                   </span>
                 </div>
@@ -533,10 +615,10 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
 
               {/* Pin month toggle */}
               <label 
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl border cursor-pointer select-none transition-all text-xs font-bold ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border cursor-pointer select-none transition-all text-xs font-semibold ${
                   isMonthPinned
-                    ? 'bg-[#7928CA] text-white border-[#7928CA] shadow-xs'
-                    : 'bg-purple-50/40 border-purple-100 text-[#2E0854] hover:bg-purple-50'
+                    ? 'bg-[#6F2EC5] text-white border-[#6F2EC5] shadow-xs'
+                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                 }`}
                 title="Fijar este mes mientras la casilla esté tildada"
               >
@@ -546,15 +628,15 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
                   onChange={(e) => togglePinMonth(e.target.checked)}
                   className="sr-only"
                 />
-                <Pin className={`w-3.5 h-3.5 ${isMonthPinned ? 'fill-white rotate-45' : 'text-[#7928CA]'}`} />
+                <Pin className={`w-3 h-3 ${isMonthPinned ? 'fill-white rotate-45' : 'text-slate-400'}`} />
                 <span>{isMonthPinned ? 'Mes Fijado' : 'Fijar Mes'}</span>
-                {isMonthPinned && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                {isMonthPinned && <Check className="w-3 h-3 stroke-[3]" />}
               </label>
             </div>
           </div>
 
           {/* Month Selector Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-none">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
             {monthlyOverviewList.map((m, idx) => {
               const isSelected = activeMonthSummary?.monthKey === m.monthKey;
               const isFirst = idx === 0;
@@ -563,21 +645,21 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
                   key={m.monthKey}
                   type="button"
                   onClick={() => setSelectedMonthKey(m.monthKey)}
-                  className={`px-3.5 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all border shrink-0 flex flex-col items-center gap-0.5 cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border shrink-0 flex flex-col items-center gap-0.5 cursor-pointer ${
                     isSelected
-                      ? 'bg-[#7928CA] border-[#7928CA] text-white shadow-md shadow-purple-600/20'
-                      : 'bg-purple-50/30 border-purple-100 text-[#2E0854] hover:bg-purple-50'
+                      ? 'bg-[#6F2EC5] border-[#6F2EC5] text-white shadow-xs'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
                   <span className="flex items-center gap-1">
                     <span>{m.monthLabel}</span>
                     {isFirst && (
-                      <span className={`text-[9px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-purple-100 text-[#7928CA] font-bold'}`}>
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-purple-100 text-[#6F2EC5] font-bold'}`}>
                         Actual
                       </span>
                     )}
                   </span>
-                  <span className={`text-[11px] font-black ${isSelected ? 'text-purple-100' : 'text-[#2E0854]'}`}>
+                  <span className={`text-[11px] font-bold ${isSelected ? 'text-purple-100' : 'text-slate-800'}`}>
                     {formatCurrency(m.totalAmount, currency)}
                   </span>
                 </button>
@@ -587,40 +669,40 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
 
           {/* Selected Month Details Container */}
           {activeMonthSummary && (
-            <div className="space-y-4 pt-1">
+            <div className="space-y-3 pt-1">
               
               {/* Responsibility split cards for this selected month */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3.5 rounded-2xl bg-purple-50/30 border border-purple-100/70 flex items-center justify-between">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-purple-100 text-[#7928CA] flex items-center justify-center font-extrabold text-xs">
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs" style={{ backgroundColor: P_LIGHT, color: P }}>
                       {profile.user1Name.charAt(0)}
                     </div>
                     <div>
-                      <span className="text-[11px] font-bold text-purple-900/60 block uppercase">Paga {profile.user1Name}</span>
-                      <span className="text-xs font-bold text-[#2E0854]">
+                      <span className="text-[10px] font-semibold text-gray-400 block uppercase">Paga {profile.user1Name}</span>
+                      <span className="text-xs font-bold text-gray-800">
                         {activeMonthSummary.monthFullLabel}
                       </span>
                     </div>
                   </div>
-                  <span className="text-sm sm:text-base font-black text-[#7928CA]">
+                  <span className="text-sm font-bold font-outfit" style={{ color: P }}>
                     {formatCurrency(activeMonthSummary.user1Amount, currency)}
                   </span>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-orange-50/30 border border-orange-100/70 flex items-center justify-between">
+                <div className="p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-orange-100 text-[#F95420] flex items-center justify-center font-extrabold text-xs">
+                    <div className="w-8 h-8 rounded-xl bg-orange-100 text-[#F95420] flex items-center justify-center font-bold text-xs">
                       {profile.user2Name.charAt(0)}
                     </div>
                     <div>
-                      <span className="text-[11px] font-bold text-orange-900/60 block uppercase">Paga {profile.user2Name}</span>
-                      <span className="text-xs font-bold text-[#2E0854]">
+                      <span className="text-[10px] font-semibold text-gray-400 block uppercase">Paga {profile.user2Name}</span>
+                      <span className="text-xs font-bold text-gray-800">
                         {activeMonthSummary.monthFullLabel}
                       </span>
                     </div>
                   </div>
-                  <span className="text-sm sm:text-base font-black text-[#F95420]">
+                  <span className="text-sm font-bold font-outfit text-[#F95420]">
                     {formatCurrency(activeMonthSummary.user2Amount, currency)}
                   </span>
                 </div>
@@ -628,48 +710,48 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
 
               {/* List of cuotas due in this specific month */}
               {activeMonthSummary.items.length > 0 ? (
-                <div className="border border-purple-100/80 rounded-2xl overflow-hidden">
-                  <div className="bg-purple-50/50 px-4 py-2.5 text-xs font-bold text-[#2E0854] uppercase tracking-wider flex items-center justify-between border-b border-purple-100">
+                <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                  <div className="bg-slate-50 px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center justify-between border-b border-slate-100">
                     <span>Vencimientos de {activeMonthSummary.monthFullLabel} ({activeMonthSummary.items.length} {activeMonthSummary.items.length === 1 ? 'cuota' : 'cuotas'})</span>
                     <span>Importe</span>
                   </div>
 
-                  <div className="divide-y divide-purple-50">
+                  <div className="divide-y divide-slate-100">
                     {activeMonthSummary.items.map((item, i) => (
-                      <div key={`${item.txId}-${item.cuotaNum}-${i}`} className="p-3.5 sm:p-4 hover:bg-purple-50/20 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div key={`${item.txId}-${item.cuotaNum}-${i}`} className="p-3.5 sm:p-4 hover:bg-slate-50/50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-extrabold text-[#2E0854] text-sm">{item.concepto}</span>
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-[#7928CA] border border-purple-200">
+                            <span className="font-bold text-gray-900 text-sm">{item.concepto}</span>
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-purple-50 text-[#6F2EC5] border border-purple-100">
                               Cuota {item.cuotaNum} de {item.cuotasTotal}
                             </span>
                             <span className={`px-2 py-0.5 rounded-md text-[10px] border ${getCardBadgeStyle(item.tarjetaNombre)}`}>
                               💳 {item.tarjetaNombre}
                             </span>
                             {item.isPaid ? (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 ✓ Pagada
                               </span>
                             ) : item.isNext ? (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-orange-50 text-orange-800 border border-orange-300">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-50 text-orange-800 border border-orange-300">
                                 ⚡ Próximo vencimiento
                               </span>
                             ) : null}
                           </div>
                           
-                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <div className="flex items-center gap-2 text-xs text-gray-400">
                             <span className="flex items-center gap-1">
-                              <Calendar className="w-3.5 h-3.5 text-purple-400" />
-                              <span>Fecha estimada de pago: <strong>{item.dueDateFormatted}</strong></span>
+                              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                              <span>Fecha de pago: <strong className="text-gray-600">{item.dueDateFormatted}</strong></span>
                             </span>
                             <span>•</span>
-                            <span>Titular: <strong>{item.pagadoPor === 'user1' ? profile.user1Name : profile.user2Name}</strong></span>
+                            <span>Titular: <strong className="text-gray-600">{item.pagadoPor === 'user1' ? profile.user1Name : profile.user2Name}</strong></span>
                             <span>({item.tipo === 'pareja' ? 'Compartido' : 'Individual'})</span>
                           </div>
                         </div>
 
                         <div className="text-right shrink-0">
-                          <span className="text-base sm:text-lg font-black text-[#7928CA]">
+                          <span className="text-base font-bold font-outfit" style={{ color: P }}>
                             {formatCurrency(item.amount, currency)}
                           </span>
                         </div>
@@ -678,8 +760,8 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="p-6 text-center bg-purple-50/30 rounded-2xl border border-purple-100">
-                  <p className="text-xs font-semibold text-slate-500">No hay cuotas programadas para {activeMonthSummary.monthFullLabel}</p>
+                <div className="p-6 text-center bg-slate-50/50 rounded-2xl border border-slate-100">
+                  <p className="text-xs font-medium text-gray-400">No hay cuotas programadas para {activeMonthSummary.monthFullLabel}</p>
                 </div>
               )}
 
@@ -689,45 +771,43 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
         </div>
       )}
 
-      {/* Breakdown by Cards / Banks */}
+      {/* 7. Breakdown by Cards / Banks (Estilo Resumen) */}
       {cardList.length > 0 && (
-        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-purple-100/80 shadow-[0_4px_20px_-4px_rgba(121,40,202,0.06)] space-y-4">
+        <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-white space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-extrabold text-[#2E0854] text-base flex items-center gap-2">
-                <CardIcon className="w-5 h-5 text-[#7928CA]" />
+              <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                <CardIcon className="w-4 h-4" style={{ color: P }} />
                 <span>Desglose por Tarjeta de Crédito</span>
               </h3>
-              <p className="text-xs text-slate-500">Total comprometido y vencimiento mensual por plástico</p>
+              <p className="text-xs text-gray-400 mt-0.5">Total comprometido y vencimiento mensual por plástico</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {(Object.entries(cardsSummary) as [string, { count: number; total: number; monthly: number; pending: number }][]).map(([cardName, data]) => (
               <div 
                 key={cardName}
-                className="p-4 rounded-2xl border border-purple-100/70 bg-gradient-to-br from-purple-50/20 to-white hover:border-purple-300 transition-all space-y-3"
+                className="p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:bg-slate-50 hover:border-purple-200 transition-all space-y-2.5"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#2E0854] to-[#7928CA] text-white flex items-center justify-center font-bold text-xs shadow-xs">
-                      💳
-                    </div>
-                    <div>
-                      <h4 className="font-extrabold text-xs sm:text-sm text-[#2E0854]">{cardName}</h4>
-                      <span className="text-[10px] text-slate-400">{data.count} {data.count === 1 ? 'compra' : 'compras'}</span>
-                    </div>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs" style={{ backgroundColor: P_LIGHT, color: P }}>
+                    💳
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs sm:text-sm text-gray-900">{cardName}</h4>
+                    <span className="text-[10px] text-gray-400">{data.count} {data.count === 1 ? 'compra' : 'compras'}</span>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-purple-50 grid grid-cols-2 gap-2 text-xs">
+                <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <span className="text-[10px] text-purple-900/60 font-semibold block">Cuota mensual:</span>
-                    <span className="font-black text-[#7928CA]">{formatCurrency(data.monthly, currency)}</span>
+                    <span className="text-[10px] text-gray-400 font-medium block">Cuota mensual:</span>
+                    <span className="font-bold font-outfit" style={{ color: P }}>{formatCurrency(data.monthly, currency)}</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] text-purple-900/60 font-semibold block">Resta pagar:</span>
-                    <span className="font-black text-[#F95420]">{formatCurrency(data.pending, currency)}</span>
+                    <span className="text-[10px] text-gray-400 font-medium block">Resta pagar:</span>
+                    <span className="font-bold font-outfit text-[#F95420]">{formatCurrency(data.pending, currency)}</span>
                   </div>
                 </div>
               </div>
@@ -736,16 +816,16 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
         </div>
       )}
 
-      {/* Main Installment Purchases List */}
-      <div className="bg-white rounded-3xl shadow-[0_4px_20px_-4px_rgba(121,40,202,0.06)] border border-purple-100/80 overflow-hidden space-y-4">
+      {/* 8. Main Installment Purchases List (Estilo Resumen) */}
+      <div className="bg-white rounded-3xl shadow-sm border border-white overflow-hidden space-y-4">
         {/* Header & Filters */}
-        <div className="p-4 sm:p-5 border-b border-purple-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h3 className="font-extrabold text-[#2E0854] text-base sm:text-lg flex items-center gap-2">
-              <Layers className="w-5 h-5 text-[#7928CA]" />
+            <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+              <Layers className="w-4 h-4" style={{ color: P }} />
               <span>Listado de Compras en Cuotas</span>
             </h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-gray-400 mt-0.5">
               Administra el progreso de cada plan de cuotas y márcalas como pagadas
             </p>
           </div>
@@ -753,11 +833,11 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
           {/* Quick Filter Buttons */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Status Filter */}
-            <div className="bg-purple-50/50 p-1 rounded-xl flex items-center text-xs font-bold border border-purple-100">
+            <div className="bg-slate-100 p-1 rounded-xl flex items-center text-xs font-semibold">
               <button
                 onClick={() => setFilterStatus('active')}
                 className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                  filterStatus === 'active' ? 'bg-[#7928CA] text-white shadow-xs' : 'text-slate-600 hover:text-[#2E0854]'
+                  filterStatus === 'active' ? 'bg-white text-gray-900 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Activos ({metrics.activePlansCount})
@@ -765,7 +845,7 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
               <button
                 onClick={() => setFilterStatus('completed')}
                 className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                  filterStatus === 'completed' ? 'bg-[#7928CA] text-white shadow-xs' : 'text-slate-600 hover:text-[#2E0854]'
+                  filterStatus === 'completed' ? 'bg-white text-gray-900 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Finalizados ({metrics.completedPlansCount})
@@ -773,7 +853,7 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
               <button
                 onClick={() => setFilterStatus('all')}
                 className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                  filterStatus === 'all' ? 'bg-[#7928CA] text-white shadow-xs' : 'text-slate-600 hover:text-[#2E0854]'
+                  filterStatus === 'all' ? 'bg-white text-gray-900 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Todos ({installmentTxs.length})
@@ -785,7 +865,7 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
               <select
                 value={filterCard}
                 onChange={(e) => setFilterCard(e.target.value)}
-                className="px-2.5 py-1.5 bg-purple-50/40 border border-purple-100 rounded-xl text-xs font-bold text-[#2E0854] focus:outline-none"
+                className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none"
               >
                 <option value="ALL">Todas las tarjetas</option>
                 {cardList.map(c => (
@@ -798,7 +878,7 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
             <select
               value={filterPerson}
               onChange={(e) => setFilterPerson(e.target.value)}
-              className="px-2.5 py-1.5 bg-purple-50/40 border border-purple-100 rounded-xl text-xs font-bold text-[#2E0854] focus:outline-none"
+              className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none"
             >
               <option value="ALL">Todos los titulares</option>
               <option value="user1">{profile.user1Name}</option>
@@ -808,7 +888,7 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
         </div>
 
         {/* Installment Items Cards */}
-        <div className="p-4 sm:p-6 space-y-4">
+        <div className="p-4 sm:p-5 space-y-3">
           {filteredInstallmentTxs.length > 0 ? (
             filteredInstallmentTxs.map((tx) => {
               const planDetails = getInstallmentPlanDetails(tx);
@@ -827,8 +907,8 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
                   key={tx.id}
                   className={`p-4 sm:p-5 rounded-2xl border transition-all ${
                     isCompleted 
-                      ? 'bg-purple-50/20 border-purple-100/60 opacity-80' 
-                      : 'bg-white border-purple-100/80 hover:border-purple-300 shadow-xs'
+                      ? 'bg-slate-50/50 border-slate-100 opacity-75' 
+                      : 'bg-white border-slate-100 hover:border-purple-200 shadow-2xs'
                   }`}
                 >
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -836,24 +916,24 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
                     {/* Concept & Details */}
                     <div className="space-y-1.5 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-extrabold text-[#2E0854] text-sm sm:text-base">
+                        <span className="font-bold text-gray-900 text-sm sm:text-base">
                           {tx.concepto}
                         </span>
                         
                         {/* Status Badge */}
                         {isCompleted ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                             <CheckCircle2 className="w-3 h-3" /> Finalizado
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-[#7928CA] border border-purple-200">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 text-[#6F2EC5] border border-purple-100">
                             <Clock className="w-3 h-3" /> En curso
                           </span>
                         )}
 
                         {/* Remaining Months Pill */}
                         {!isCompleted && remainingCuotas > 0 && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-orange-50 text-orange-800 border border-orange-300/80">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-50 text-orange-800 border border-orange-200">
                             <Hourglass className="w-3 h-3 text-[#F95420]" />
                             {remainingCuotas === 1 ? 'Falta 1 mes' : `Faltan ${remainingCuotas} meses`}
                           </span>
@@ -868,64 +948,64 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
 
                         {/* Type Badge */}
                         {tx.tipo === 'pareja' ? (
-                          <span className="px-2 py-0.5 bg-orange-50 text-[#F95420] border border-orange-200 rounded-md text-[10px] font-bold flex items-center gap-1">
+                          <span className="px-2 py-0.5 bg-orange-50 text-[#F95420] border border-orange-200 rounded-md text-[10px] font-semibold flex items-center gap-1">
                             <Users className="w-3 h-3" /> Pareja ({payerName})
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 bg-purple-50 text-[#7928CA] border border-purple-200 rounded-md text-[10px] font-bold flex items-center gap-1">
+                          <span className="px-2 py-0.5 bg-purple-50 text-[#6F2EC5] border border-purple-100 rounded-md text-[10px] font-semibold flex items-center gap-1">
                             <User className="w-3 h-3" /> {payerName}
                           </span>
                         )}
                       </div>
 
                       {tx.descripcion && (
-                        <p className="text-xs text-slate-500">{tx.descripcion}</p>
+                        <p className="text-xs text-gray-500">{tx.descripcion}</p>
                       )}
 
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 pt-1">
-                        <span>Categoría: <strong className="text-[#2E0854]">{tx.categoria}</strong> › {tx.subcategoria}</span>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400 pt-0.5">
+                        <span>Categoría: <strong className="text-gray-700">{tx.categoria}</strong> › {tx.subcategoria}</span>
                         <span>•</span>
                         <span>Fecha de compra: {formatDateEs(tx.fecha)}</span>
                       </div>
                     </div>
 
                     {/* Financial Figures */}
-                    <div className="flex items-center gap-6 shrink-0 text-right">
+                    <div className="flex items-center gap-5 shrink-0 text-right">
                       <div>
-                        <span className="text-[10px] text-purple-900/60 font-bold block uppercase">Cuota Mensual</span>
-                        <span className="text-base sm:text-lg font-black text-[#7928CA]">
+                        <span className="text-[10px] text-gray-400 font-medium block uppercase">Cuota Mensual</span>
+                        <span className="text-base sm:text-lg font-bold font-outfit" style={{ color: P }}>
                           {formatCurrency(cuotaMonto, currency)}
                         </span>
-                        <span className="text-[10px] text-slate-400 block">/ mes</span>
+                        <span className="text-[10px] text-gray-400 block">/ mes</span>
                       </div>
 
                       <div>
-                        <span className="text-[10px] text-purple-900/60 font-bold block uppercase">Total Plan</span>
-                        <span className="text-base sm:text-lg font-black text-[#2E0854]">
+                        <span className="text-[10px] text-gray-400 font-medium block uppercase">Total Plan</span>
+                        <span className="text-base sm:text-lg font-bold font-outfit text-gray-900">
                           {formatCurrency(tx.monto, currency)}
                         </span>
-                        <span className="text-[10px] text-[#F95420] font-bold block">
-                          Debés: {formatCurrency(remainingAmount, currency)}
+                        <span className="text-[10px] text-[#F95420] font-semibold block">
+                          Resta: {formatCurrency(remainingAmount, currency)}
                         </span>
                       </div>
                     </div>
                   </div>
 
                   {/* Dates & Payment Schedule Highlights */}
-                  <div className="mt-3.5 p-3 bg-purple-50/20 border border-purple-100 rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  <div className="mt-3 p-3 bg-slate-50/70 border border-slate-100 rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                     <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-[#7928CA] shrink-0" />
+                      <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
                       <div>
-                        <span className="text-[10px] text-purple-900/60 font-bold uppercase block">1ª Cuota (Inicio)</span>
-                        <span className="font-extrabold text-[#2E0854]">{planDetails.firstDueDateFormatted || 'No definida'}</span>
+                        <span className="text-[10px] text-gray-400 font-medium uppercase block">1ª Cuota (Inicio)</span>
+                        <span className="font-semibold text-gray-800">{planDetails.firstDueDateFormatted || 'No definida'}</span>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-[#F95420] shrink-0" />
                       <div>
-                        <span className="text-[10px] text-orange-800 font-bold uppercase block">Próximo Vencimiento</span>
-                        <span className="font-extrabold text-orange-950">
+                        <span className="text-[10px] text-orange-700 font-medium uppercase block">Próximo Vencimiento</span>
+                        <span className="font-semibold text-orange-950">
                           {isCompleted ? '✓ Todo pagado' : (planDetails.nextDueDateFormatted || 'Inmediato')}
                         </span>
                       </div>
@@ -933,34 +1013,37 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
 
                     <div className="flex items-center gap-2 sm:text-right sm:justify-end">
                       <div>
-                        <span className="text-[10px] text-purple-900/60 font-bold uppercase block">Finalización</span>
-                        <span className="font-extrabold text-[#2E0854]">{planDetails.finalDueDateFormatted || 'No definida'}</span>
+                        <span className="text-[10px] text-gray-400 font-medium uppercase block">Finalización</span>
+                        <span className="font-semibold text-gray-800">{planDetails.finalDueDateFormatted || 'No definida'}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Progress Bar & Interactive Step Controls */}
-                  <div className="mt-3 pt-3 border-t border-purple-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex-1 space-y-1.5 max-w-md">
-                      <div className="flex items-center justify-between text-xs font-bold">
-                        <span className="text-[#2E0854]">
+                  <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex-1 space-y-1 max-w-md">
+                      <div className="flex items-center justify-between text-xs font-semibold">
+                        <span className="text-gray-800">
                           Cuota {currentCuota} de {totalCuotas} ({progressPercent}%)
                         </span>
                         <button
                           type="button"
                           onClick={() => setExpandedScheduleTxId(isScheduleOpen ? null : tx.id)}
-                          className="text-[11px] font-extrabold text-[#7928CA] hover:text-[#2E0854] flex items-center gap-1 transition-colors cursor-pointer"
+                          className="text-[11px] font-bold text-[#6F2EC5] hover:text-[#5b24a3] flex items-center gap-1 transition-colors cursor-pointer"
                         >
                           <span>{isScheduleOpen ? 'Ocultar cronograma' : 'Ver cronograma de pagos'}</span>
                           <ChevronDown className={`w-3 h-3 transition-transform ${isScheduleOpen ? 'rotate-180' : ''}`} />
                         </button>
                       </div>
-                      <div className="w-full h-2.5 bg-purple-50 rounded-full overflow-hidden">
+                      <div className="w-full h-2 rounded-full overflow-hidden" style={{ backgroundColor: P_LIGHT }}>
                         <div 
                           className={`h-full transition-all duration-300 ${
-                            isCompleted ? 'bg-emerald-500' : 'bg-gradient-to-r from-[#7928CA] to-[#9333EA]'
+                            isCompleted ? 'bg-emerald-500' : 'rounded-full'
                           }`}
-                          style={{ width: `${progressPercent}%` }}
+                          style={{ 
+                            width: `${progressPercent}%`,
+                            background: isCompleted ? undefined : `linear-gradient(90deg, ${P_MID}, ${P})`
+                          }}
                         />
                       </div>
                     </div>
@@ -968,18 +1051,19 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
                     {/* Progress Interactive Buttons */}
                     <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
                       <button
-                        onClick={() => onUpdateInstallmentProgress(tx.id, -1)}
-                        disabled={currentCuota <= 1}
-                        className="px-2.5 py-1.5 text-xs font-bold text-slate-600 bg-purple-50/50 hover:bg-purple-100 disabled:opacity-30 rounded-xl transition-all cursor-pointer"
+                        onClick={() => onUpdateInstallmentProgress?.(tx.id, -1)}
+                        disabled={currentCuota <= 1 || !onUpdateInstallmentProgress}
+                        className="px-2.5 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-30 rounded-xl transition-all cursor-pointer"
                         title="Retroceder una cuota"
                       >
                         -1 Cuota
                       </button>
 
                       <button
-                        onClick={() => onUpdateInstallmentProgress(tx.id, 1)}
-                        disabled={currentCuota >= totalCuotas}
-                        className="px-3 py-1.5 text-xs font-bold text-white bg-[#7928CA] hover:bg-[#6820b3] disabled:opacity-30 rounded-xl shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                        onClick={() => onUpdateInstallmentProgress?.(tx.id, 1)}
+                        disabled={currentCuota >= totalCuotas || !onUpdateInstallmentProgress}
+                        className="px-3 py-1.5 text-xs font-bold text-white disabled:opacity-30 rounded-xl shadow-2xs transition-all flex items-center gap-1 cursor-pointer"
+                        style={{ backgroundColor: P }}
                         title="Avanzar una cuota pagada"
                       >
                         <Plus className="w-3 h-3" />
@@ -988,8 +1072,8 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
 
                       {!isCompleted && (
                         <button
-                          onClick={() => onCompleteInstallment(tx.id)}
-                          className="px-2.5 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-all cursor-pointer"
+                          onClick={() => onCompleteInstallment?.(tx.id)}
+                          className="px-2.5 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-all cursor-pointer"
                           title="Marcar todas las cuotas como pagadas"
                         >
                           Liquidar Todo
@@ -998,7 +1082,7 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
 
                       <button
                         onClick={() => onEditTransaction(tx)}
-                        className="p-1.5 text-slate-400 hover:text-[#7928CA] hover:bg-purple-50 rounded-xl transition-colors cursor-pointer"
+                        className="p-1.5 text-slate-400 hover:text-[#6F2EC5] hover:bg-purple-50 rounded-xl transition-colors cursor-pointer"
                         title="Editar plan de cuotas"
                       >
                         <Edit3 className="w-4 h-4" />
@@ -1016,9 +1100,9 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
 
                   {/* Expandable Schedule Breakdown Table */}
                   {isScheduleOpen && (
-                    <div className="mt-4 pt-4 border-t border-purple-50 animate-in fade-in duration-200">
-                      <h5 className="text-xs font-extrabold text-[#2E0854] uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                        <CalendarDays className="w-3.5 h-3.5 text-[#7928CA]" />
+                    <div className="mt-3 pt-3 border-t border-slate-100 animate-in fade-in duration-200">
+                      <h5 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                        <CalendarDays className="w-3.5 h-3.5" style={{ color: P }} />
                         <span>Cronograma Detallado ({totalCuotas} cuotas)</span>
                       </h5>
                       
@@ -1030,24 +1114,24 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
                               sch.isPaid
                                 ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
                                 : sch.isNext
-                                ? 'bg-orange-50 border-orange-300 ring-2 ring-orange-300/50 text-orange-950 shadow-xs'
-                                : 'bg-purple-50/20 border-purple-100 text-slate-700'
+                                ? 'bg-orange-50 border-orange-300 ring-2 ring-orange-300/40 text-orange-950 shadow-2xs'
+                                : 'bg-slate-50/60 border-slate-100 text-slate-700'
                             }`}
                           >
                             <div className="flex items-center justify-between font-bold">
                               <span>Cuota {sch.cuotaNum}/{sch.cuotasTotal}</span>
                               {sch.isPaid ? (
-                                <span className="text-[10px] text-emerald-700 font-extrabold">✓ Pagada</span>
+                                <span className="text-[10px] text-emerald-700 font-bold">✓ Pagada</span>
                               ) : sch.isNext ? (
-                                <span className="text-[10px] text-orange-800 font-extrabold">⚡ Próxima</span>
+                                <span className="text-[10px] text-orange-800 font-bold">⚡ Próxima</span>
                               ) : (
-                                <span className="text-[10px] text-slate-400 font-medium">Futura</span>
+                                <span className="text-[10px] text-slate-400 font-normal">Futura</span>
                               )}
                             </div>
                             <div className="mt-1 text-[11px] text-slate-500 font-medium">
                               📅 {sch.dueDateFormatted}
                             </div>
-                            <div className="mt-1 font-black text-[#7928CA] text-[12px]">
+                            <div className="mt-1 font-bold font-outfit text-[12px]" style={{ color: P }}>
                               {formatCurrency(sch.amount, currency)}
                             </div>
                           </div>
@@ -1061,26 +1145,27 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
             })
           ) : (
             <div className="text-center py-12 space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-purple-50 text-[#7928CA] flex items-center justify-center mx-auto">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto" style={{ backgroundColor: P_LIGHT, color: P }}>
                 <CreditCard className="w-6 h-6" />
               </div>
-              <h4 className="font-extrabold text-[#2E0854] text-sm">No hay compras en cuotas registradas</h4>
-              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+              <h4 className="font-bold text-gray-900 text-sm">No hay compras en cuotas registradas</h4>
+              <p className="text-xs text-gray-400 max-w-sm mx-auto">
                 Registra compras con tarjeta de crédito en 3, 6, 12 o más cuotas o carga tus deudas previas para hacer seguimiento del compromiso mensual.
               </p>
               <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
                 {onOpenPriorInstallmentsModal && (
                   <button
                     onClick={onOpenPriorInstallmentsModal}
-                    className="px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-[#7928CA] border border-purple-200 text-xs font-bold rounded-xl transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-semibold rounded-xl transition-all inline-flex items-center gap-1.5 cursor-pointer"
                   >
-                    <History className="w-3.5 h-3.5 text-[#7928CA]" />
+                    <History className="w-3.5 h-3.5 text-slate-500" />
                     <span>Cargar cuotas anteriores a la app</span>
                   </button>
                 )}
                 <button
                   onClick={onOpenNewInstallmentModal}
-                  className="px-4 py-2 bg-gradient-to-r from-[#F95420] to-[#FF6B3D] hover:from-[#E04412] hover:to-[#F95420] text-white text-xs font-bold rounded-xl shadow-md transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2 text-white text-xs font-semibold rounded-xl shadow-xs transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                  style={{ backgroundColor: P }}
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Nueva compra en cuotas</span>

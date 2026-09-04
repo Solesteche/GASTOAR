@@ -1,256 +1,408 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
+  ChevronLeft, 
+  ChevronRight, 
+  Filter, 
   PieChart, 
   BarChart3, 
-  Layers, 
-  Users, 
-  User, 
-  ArrowUpRight, 
-  TrendingUp,
-  Percent
+  TrendingUp, 
+  Calendar,
+  Layers,
+  ArrowUpRight
 } from 'lucide-react';
-import { CategoryColors, CategoryMap, CoupleProfile, Transaction } from '../types';
-import { formatCurrency } from '../utils/formatters';
+import { CategoryColors, CategoryMap, Transaction } from '../types';
 
 interface ChartsSectionProps {
   transactions: Transaction[];
   categoryMap: CategoryMap;
   categoryColors: CategoryColors;
-  currency: string;
+  currency?: string;
+  onOpenTransactionModal?: () => void;
 }
 
+const MONTH_NAMES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
+
+const CATEGORY_EMOJIS: Record<string, string> = {
+  'Alimentos': '🛒',
+  'Alimentación': '🛒',
+  'Supermercado': '🛒',
+  'Transporte': '🚗',
+  'Movilidad & Transporte': '🚗',
+  'Hogar': '🏠',
+  'Servicios & Hogar': '🏠',
+  'Entretenimiento': '🎬',
+  'Ocio & Suscripciones': '🎬',
+  'Salud': '💊',
+  'Farmacia & Salud': '💊',
+  'Restaurantes': '🍽️',
+  'Educación': '📚',
+  'Otros': '📦',
+  'Otros Gastos': '📦',
+};
+
+const CATEGORY_DEFAULT_COLORS: Record<string, string> = {
+  'Alimentos': '#a855f7',
+  'Alimentación': '#a855f7',
+  'Transporte': '#eab308',
+  'Movilidad & Transporte': '#eab308',
+  'Hogar': '#ef4444',
+  'Servicios & Hogar': '#ef4444',
+  'Entretenimiento': '#ec4899',
+  'Ocio & Suscripciones': '#ec4899',
+  'Otros': '#38bdf8',
+  'Otros Gastos': '#38bdf8',
+};
+
 export const ChartsSection: React.FC<ChartsSectionProps> = ({
-  transactions,
-  categoryMap,
-  categoryColors,
-  currency,
+  transactions = [],
+  categoryMap = {},
+  categoryColors = {},
+  currency = 'ARS',
+  onOpenTransactionModal,
 }) => {
-  const [selectedView, setSelectedView] = useState<'all' | 'individual' | 'pareja'>('all');
+  const [periodTab, setPeriodTab] = useState<'semanal' | 'mensual' | 'anual'>('mensual');
+  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
 
-  const filtered = selectedView === 'all' 
-    ? transactions 
-    : transactions.filter(t => t.tipo === selectedView);
+  const year = selectedDate.getFullYear();
+  const month = selectedDate.getMonth();
+  const pad = (n: number) => n.toString().padStart(2, '0');
 
-  const totalSpent = filtered.reduce((acc, t) => acc + (t.monto || 0), 0);
+  const monthName = MONTH_NAMES[month];
 
-  // Group by Category
-  const categorySums: { [cat: string]: number } = {};
-  filtered.forEach(t => {
-    categorySums[t.categoria] = (categorySums[t.categoria] || 0) + t.monto;
-  });
+  const handlePrev = () => {
+    setSelectedDate(prev => {
+      if (periodTab === 'anual') {
+        return new Date(prev.getFullYear() - 1, prev.getMonth(), 1);
+      }
+      return new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
+    });
+  };
 
-  const sortedCategories = Object.entries(categorySums).sort((a, b) => b[1] - a[1]);
+  const handleNext = () => {
+    setSelectedDate(prev => {
+      if (periodTab === 'anual') {
+        return new Date(prev.getFullYear() + 1, prev.getMonth(), 1);
+      }
+      return new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
+    });
+  };
 
-  // Group by Subcategory
-  const subcategorySums: { [sub: string]: { amount: number; category: string } } = {};
-  filtered.forEach(t => {
-    if (!subcategorySums[t.subcategoria]) {
-      subcategorySums[t.subcategoria] = { amount: 0, category: t.categoria };
+  // Filter expenses based on selected month / year
+  const filteredTxs = useMemo(() => {
+    const monthPrefix = `${year}-${pad(month + 1)}`;
+    const yearPrefix = `${year}-`;
+
+    return (transactions || []).filter(t => {
+      if (!t || !t.fecha || t.tipoTransaccion === 'ingreso') return false;
+      if (periodTab === 'anual') {
+        return t.fecha.startsWith(yearPrefix);
+      }
+      return t.fecha.startsWith(monthPrefix);
+    });
+  }, [transactions, year, month, periodTab]);
+
+  const totalSpent = useMemo(() => {
+    return filteredTxs.reduce((acc, t) => acc + (t.monto || 0), 0);
+  }, [filteredTxs]);
+
+  // Previous period comparison
+  const prevPeriodSpent = useMemo(() => {
+    let pPrefix = '';
+    if (periodTab === 'anual') {
+      pPrefix = `${year - 1}-`;
+    } else {
+      const prevM = month === 0 ? 11 : month - 1;
+      const prevY = month === 0 ? year - 1 : year;
+      pPrefix = `${prevY}-${pad(prevM + 1)}`;
     }
-    subcategorySums[t.subcategoria].amount += t.monto;
-  });
 
-  const sortedSubcategories = Object.entries(subcategorySums).sort((a, b) => b[1].amount - a[1].amount);
-  const maxSubAmount = sortedSubcategories.length > 0 ? sortedSubcategories[0][1].amount : 1;
+    const prevTxs = (transactions || []).filter(t => t && t.fecha && t.tipoTransaccion !== 'ingreso' && t.fecha.startsWith(pPrefix));
+    return prevTxs.reduce((acc, t) => acc + (t.monto || 0), 0);
+  }, [transactions, year, month, periodTab]);
 
-  // Donut SVG calculations
-  let accumulatedAngle = 0;
-  const donutSegments = sortedCategories.map(([cat, amount]) => {
-    const pct = totalSpent > 0 ? amount / totalSpent : 0;
-    const startAngle = accumulatedAngle;
-    accumulatedAngle += pct * 360;
-    const color = categoryColors[cat] || '#6366f1';
+  let diffPct = 0;
+  if (prevPeriodSpent > 0) {
+    diffPct = Math.round(((totalSpent - prevPeriodSpent) / prevPeriodSpent) * 100);
+  }
+
+  // Daily or Monthly Bar Chart data
+  const barChartData = useMemo(() => {
+    if (periodTab === 'anual') {
+      // 12 months
+      return MONTH_NAMES.map((mName, mIdx) => {
+        const p = `${year}-${pad(mIdx + 1)}`;
+        const sum = (transactions || [])
+          .filter(t => t.tipoTransaccion !== 'ingreso' && t.fecha && t.fecha.startsWith(p))
+          .reduce((acc, t) => acc + (t.monto || 0), 0);
+        return { label: mName.slice(0, 3), amount: sum };
+      });
+    }
+
+    // Days in selected month
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const days = [];
+    for (let d = 1; d <= totalDays; d++) {
+      const dStr = `${year}-${pad(month + 1)}-${pad(d)}`;
+      const sum = filteredTxs
+        .filter(t => t.fecha === dStr)
+        .reduce((acc, t) => acc + (t.monto || 0), 0);
+      days.push({ label: String(d), amount: sum });
+    }
+    return days;
+  }, [periodTab, year, month, transactions, filteredTxs]);
+
+  const maxBarAmount = Math.max(1, ...barChartData.map(b => b.amount));
+
+  // Category Breakdown
+  const categorySummary = useMemo(() => {
+    const catMap: Record<string, number> = {};
+    filteredTxs.forEach(t => {
+      const cat = t.categoria || 'Otros';
+      catMap[cat] = (catMap[cat] || 0) + (t.monto || 0);
+    });
+
+    const sorted = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+    const total = sorted.reduce((sum, item) => sum + item[1], 0) || 0;
+
+    return sorted.map(([name, amount]) => {
+      const pct = total > 0 ? Math.round((amount / total) * 100) : 0;
+      const color = categoryColors[name] || CATEGORY_DEFAULT_COLORS[name] || '#a855f7';
+      const emoji = CATEGORY_EMOJIS[name] || '📦';
+      return { name, amount, pct, color, emoji };
+    });
+  }, [filteredTxs, categoryColors]);
+
+  let currentDonutAngle = 0;
+  const donutSegments = categorySummary.map(item => {
+    const start = currentDonutAngle;
+    const sweep = (item.pct / 100) * 360;
+    currentDonutAngle += sweep;
     return {
-      cat,
-      amount,
-      pct: pct * 100,
-      startAngle,
-      endAngle: accumulatedAngle,
-      color,
+      ...item,
+      startAngle: start,
+      endAngle: currentDonutAngle,
+      strokeDasharray: `${(item.pct * 2.83).toFixed(2)} 283`,
+      strokeDashoffset: `-${(start * 2.83 / 360 * 100).toFixed(2)}`,
     };
   });
 
+  const formatNumberWithDots = (val: number) => {
+    return Math.abs(Math.round(val)).toLocaleString('es-AR');
+  };
+
   return (
-    <section className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-      {/* 1. Category Distribution Donut & Breakdown (5 cols) */}
-      <div className="lg:col-span-5 bg-white p-5 rounded-2xl shadow-xs border border-slate-200/80 flex flex-col justify-between">
+    <div className="space-y-6 max-w-5xl mx-auto font-sans pb-12">
+      
+      {/* Header matching Screenshot 4 */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
-              <PieChart className="w-4 h-4 text-indigo-500" />
-              <span>Distribución por Categoría</span>
-            </h2>
-
-            {/* Local View Filter */}
-            <div className="flex bg-slate-100 p-0.5 rounded-lg text-[10px] font-semibold">
-              <button
-                onClick={() => setSelectedView('all')}
-                className={`px-2 py-1 rounded-md transition-all ${
-                  selectedView === 'all' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500'
-                }`}
-              >
-                Todos
-              </button>
-              <button
-                onClick={() => setSelectedView('individual')}
-                className={`px-2 py-1 rounded-md transition-all ${
-                  selectedView === 'individual' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500'
-                }`}
-              >
-                Indiv.
-              </button>
-              <button
-                onClick={() => setSelectedView('pareja')}
-                className={`px-2 py-1 rounded-md transition-all ${
-                  selectedView === 'pareja' ? 'bg-white text-pink-600 shadow-xs' : 'text-slate-500'
-                }`}
-              >
-                Pareja
-              </button>
-            </div>
-          </div>
-
-          {/* Donut Visualization */}
-          <div className="relative flex items-center justify-center my-4">
-            <svg viewBox="0 0 100 100" className="w-44 h-44 -rotate-90 transform">
-              {donutSegments.length > 0 ? (
-                donutSegments.map((seg, i) => {
-                  const strokeDasharray = `${(seg.pct * 2.83).toFixed(2)} 283`;
-                  const strokeDashoffset = `-${(seg.startAngle * 2.83 / 360 * 100).toFixed(2)}`;
-                  return (
-                    <circle
-                      key={i}
-                      cx="50"
-                      cy="50"
-                      r="42"
-                      fill="transparent"
-                      stroke={seg.color}
-                      strokeWidth="12"
-                      strokeDasharray={strokeDasharray}
-                      strokeDashoffset={strokeDashoffset}
-                      className="transition-all duration-500 hover:opacity-85"
-                    />
-                  );
-                })
-              ) : (
-                <circle cx="50" cy="50" r="42" fill="transparent" stroke="#e2e8f0" strokeWidth="12" />
-              )}
-            </svg>
-
-            {/* Inner text */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Total</span>
-              <span className="text-sm sm:text-base font-bold text-slate-900 leading-tight">
-                {formatCurrency(totalSpent, currency)}
-              </span>
-              <span className="text-[10px] text-slate-500">{filtered.length} gastos</span>
-            </div>
-          </div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <span>Reportes</span>
+          </h1>
+          <p className="text-xs text-slate-500 font-medium">Análisis y estadísticas de tus gastos</p>
         </div>
 
-        {/* Category Percentage List */}
-        <div className="mt-4 pt-3 border-t border-slate-100 space-y-2.5 max-h-48 overflow-y-auto pr-1">
-          {sortedCategories.length > 0 ? (
-            sortedCategories.map(([cat, amount]) => {
-              const pct = totalSpent > 0 ? ((amount / totalSpent) * 100).toFixed(1) : '0.0';
-              const color = categoryColors[cat] || '#6366f1';
-              return (
-                <div key={cat} className="flex items-center justify-between text-xs group">
-                  <div className="flex items-center space-x-2 min-w-0 pr-2">
-                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                    <span className="font-medium text-slate-700 truncate">{cat}</span>
+        {/* Period Selector Tabs (Semanal | Mensual | Anual) */}
+        <div className="flex bg-slate-100 p-1 rounded-2xl text-xs font-bold self-start sm:self-auto border border-slate-200/60">
+          <button
+            onClick={() => setPeriodTab('semanal')}
+            className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+              periodTab === 'semanal' ? 'bg-white text-[#7928CA] shadow-xs' : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            Semanal
+          </button>
+          <button
+            onClick={() => setPeriodTab('mensual')}
+            className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+              periodTab === 'mensual' ? 'bg-white text-[#7928CA] shadow-xs' : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            Mensual
+          </button>
+          <button
+            onClick={() => setPeriodTab('anual')}
+            className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+              periodTab === 'anual' ? 'bg-white text-[#7928CA] shadow-xs' : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            Anual
+          </button>
+        </div>
+      </div>
+
+      {/* Date Navigator (< Mayo 2024 >) */}
+      <div className="flex items-center justify-between bg-white p-3 sm:p-4 rounded-2xl border border-purple-100 shadow-2xs">
+        <button
+          onClick={handlePrev}
+          className="p-2 rounded-xl hover:bg-purple-50 text-slate-700 transition-colors cursor-pointer"
+          title="Período anterior"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+
+        <div className="text-center font-black text-sm sm:text-base text-slate-900">
+          {periodTab === 'anual' ? `Año ${year}` : `${monthName} ${year}`}
+        </div>
+
+        <button
+          onClick={handleNext}
+          className="p-2 rounded-xl hover:bg-purple-50 text-slate-700 transition-colors cursor-pointer"
+          title="Período siguiente"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Main Spend Stat Highlight */}
+      <div className="bg-gradient-to-br from-[#1b0633] via-[#260a47] to-[#120324] rounded-[28px] p-6 text-white shadow-xl border border-purple-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+            $ {formatNumberWithDots(totalSpent)},00
+          </div>
+          <p className="text-xs text-purple-200/80 mt-1 font-semibold">
+            Total gastado en {periodTab === 'anual' ? `el año ${year}` : `${monthName.toLowerCase()}`}
+          </p>
+        </div>
+
+        <div>
+          <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${
+            diffPct <= 0 
+              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
+              : 'bg-orange-500/20 text-orange-300 border-orange-500/40'
+          }`}>
+            <span>{diffPct <= 0 ? '▼' : '▲'}</span>
+            <span>{Math.abs(diffPct)}% vs período anterior</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Bar Chart Histogram */}
+      <div className="bg-white rounded-[26px] p-5 sm:p-7 border border-purple-100 shadow-md space-y-4">
+        <h3 className="font-extrabold text-sm sm:text-base text-slate-900">
+          Evolución del gasto
+        </h3>
+
+        <div className="h-48 sm:h-56 flex items-end gap-1 sm:gap-2 pt-4 border-b border-slate-100 overflow-x-auto pb-2 custom-scrollbar">
+          {barChartData.map((bar, i) => {
+            const hPct = Math.max(4, Math.round((bar.amount / maxBarAmount) * 100));
+            return (
+              <div key={i} className="flex-1 min-w-[14px] flex flex-col items-center gap-1.5 group">
+                {/* Tooltip on hover */}
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] bg-slate-900 text-white px-1.5 py-0.5 rounded-md whitespace-nowrap pointer-events-none mb-1 shadow-md">
+                  ${formatNumberWithDots(bar.amount)}
+                </div>
+
+                {/* Vertical Bar */}
+                <div className="w-full bg-purple-50 rounded-t-lg flex items-end h-32 sm:h-40">
+                  <div 
+                    className="w-full rounded-t-lg bg-gradient-to-t from-[#7928CA] to-[#F95420] transition-all duration-500 hover:brightness-110"
+                    style={{ height: `${hPct}%` }}
+                  />
+                </div>
+
+                {/* Label */}
+                <span className="text-[10px] text-slate-400 font-semibold truncate">
+                  {bar.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Por categoría Section */}
+      <div className="bg-white rounded-[26px] p-5 sm:p-7 border border-purple-100 shadow-md">
+        <h3 className="font-extrabold text-sm sm:text-base text-slate-900 mb-4 pb-2 border-b border-purple-50">
+          Por categoría
+        </h3>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+          
+          {/* Donut Chart */}
+          <div className="lg:col-span-5 flex justify-center">
+            <div className="relative w-44 h-44">
+              <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90 transform">
+                {donutSegments.length > 0 ? (
+                  donutSegments.map((seg) => (
+                    <circle
+                      key={seg.name}
+                      cx="50"
+                      cy="50"
+                      r="36"
+                      fill="transparent"
+                      stroke={seg.color}
+                      strokeWidth="13"
+                      strokeDasharray={seg.strokeDasharray}
+                      strokeDashoffset={seg.strokeDashoffset}
+                      className="transition-all duration-300"
+                    />
+                  ))
+                ) : (
+                  <circle cx="50" cy="50" r="36" fill="transparent" stroke="#f1f5f9" strokeWidth="13" />
+                )}
+              </svg>
+
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-2 pointer-events-none">
+                <span className="text-sm sm:text-base font-black text-slate-900 leading-tight">
+                  ${formatNumberWithDots(totalSpent)},00
+                </span>
+                <span className="text-[10px] font-bold text-slate-400 mt-0.5">
+                  Total gastado
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Category List */}
+          <div className="lg:col-span-7 space-y-2.5">
+            {categorySummary.length > 0 ? (
+              categorySummary.map((cat) => (
+                <div 
+                  key={cat.name} 
+                  className="flex items-center justify-between p-2.5 rounded-xl bg-purple-50/20 border border-purple-100/50 text-xs sm:text-sm"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span 
+                      className="w-3 h-3 rounded-full shrink-0 shadow-2xs" 
+                      style={{ backgroundColor: cat.color }} 
+                    />
+                    <span className="text-base">{cat.emoji}</span>
+                    <span className="font-bold text-slate-800 truncate">
+                      {cat.name}
+                    </span>
                   </div>
-                  <div className="flex items-center space-x-2 shrink-0">
-                    <span className="text-slate-500">{formatCurrency(amount, currency)}</span>
-                    <span className="font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
-                      {pct}%
+
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="font-bold text-slate-900">
+                      $ {formatNumberWithDots(cat.amount)},00
+                    </span>
+                    <span 
+                      className="text-xs font-black px-2 py-0.5 rounded-full border"
+                      style={{ 
+                        backgroundColor: `${cat.color}15`,
+                        color: cat.color,
+                        borderColor: `${cat.color}35`
+                      }}
+                    >
+                      {cat.pct}%
                     </span>
                   </div>
                 </div>
-              );
-            })
-          ) : (
-            <p className="text-xs text-slate-400 text-center py-2">No hay gastos para mostrar</p>
-          )}
-        </div>
-      </div>
-
-      {/* 2. Subcategory Detailed Ranking (7 cols) */}
-      <div className="lg:col-span-7 bg-white p-5 rounded-2xl shadow-xs border border-slate-200/80 flex flex-col justify-between">
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-emerald-500" />
-              <span>Desglose por Subcategorías</span>
-            </h2>
-            <span className="text-[11px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg border border-emerald-100">
-              Ranking de Gastos
-            </span>
-          </div>
-
-          {/* Subcategory Horizontal Bars */}
-          <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
-            {sortedSubcategories.length > 0 ? (
-              sortedSubcategories.map(([sub, info]) => {
-                const pct = totalSpent > 0 ? ((info.amount / totalSpent) * 100).toFixed(1) : '0.0';
-                const relativePct = maxSubAmount > 0 ? (info.amount / maxSubAmount) * 100 : 0;
-                const catColor = categoryColors[info.category] || '#10b981';
-
-                return (
-                  <div key={sub} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center space-x-2 min-w-0 pr-2">
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: catColor }} />
-                        <span className="font-semibold text-slate-800 truncate">{sub}</span>
-                        <span className="text-[10px] text-slate-400 truncate hidden sm:inline">({info.category})</span>
-                      </div>
-                      <div className="flex items-center space-x-2 shrink-0">
-                        <span className="font-bold text-slate-900">{formatCurrency(info.amount, currency)}</span>
-                        <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
-                          {pct}%
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${Math.max(relativePct, 3)}%`,
-                          backgroundColor: catColor,
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })
+              ))
             ) : (
-              <p className="text-xs text-slate-400 text-center py-8">No hay transacciones registradas</p>
+              <div className="p-6 text-center bg-purple-50/20 border border-dashed border-purple-200 rounded-2xl text-xs text-slate-400">
+                Sin datos de gastos para este período.
+              </div>
             )}
           </div>
-        </div>
 
-        {/* Quick pill summary tags */}
-        <div className="mt-4 pt-4 border-t border-slate-100">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-            Principales Subrubros
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {sortedSubcategories.slice(0, 5).map(([sub, info]) => {
-              const pct = totalSpent > 0 ? ((info.amount / totalSpent) * 100).toFixed(0) : '0';
-              return (
-                <span
-                  key={sub}
-                  className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-medium flex items-center gap-1.5 shadow-2xs"
-                >
-                  <span>{sub}</span>
-                  <span className="font-bold text-slate-900">{pct}%</span>
-                </span>
-              );
-            })}
-          </div>
         </div>
       </div>
-    </section>
+
+    </div>
   );
 };

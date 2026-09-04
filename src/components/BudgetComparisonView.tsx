@@ -35,11 +35,13 @@ interface BudgetComparisonViewProps {
 type SortField = 'spent' | 'budget' | 'difference' | 'percentage' | 'name';
 type SortDirection = 'asc' | 'desc';
 
+const DEFAULT_BUDGETS: Budgets = { categories: {}, subcategories: {} };
+
 export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
-  budgets,
-  categoryMap,
-  categoryColors,
-  transactions,
+  budgets = DEFAULT_BUDGETS,
+  categoryMap = {},
+  categoryColors = {},
+  transactions = [],
   currency = 'ARS',
 }) => {
   // Date range filters
@@ -125,8 +127,8 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
     monthSet.add(curMonthStr);
     monthSet.add(prevMonthStr);
 
-    transactions.forEach(t => {
-      if (t.fecha && t.fecha.length >= 7) {
+    (transactions || []).forEach(t => {
+      if (t && t.fecha && t.fecha.length >= 7) {
         monthSet.add(t.fecha.slice(0, 7));
       }
     });
@@ -141,7 +143,8 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
 
   // Filter transactions by date range and expense mode
   const filteredTransactions = useMemo(() => {
-    return transactions.filter(t => {
+    return (transactions || []).filter(t => {
+      if (!t) return false;
       // Date filter
       const inDate = isDateInRange(t.fecha, dateRange, startDate, endDate, selectedMonth);
       if (!inDate) return false;
@@ -159,37 +162,40 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
     // 1. Calculate actual spent per category in filtered transactions
     const spentByCategory: Record<string, { total: number; count: number; subcategories: Record<string, number> }> = {};
 
-    filteredTransactions.forEach(tx => {
+    (filteredTransactions || []).forEach(tx => {
+      if (!tx) return;
       if (!spentByCategory[tx.categoria]) {
         spentByCategory[tx.categoria] = { total: 0, count: 0, subcategories: {} };
       }
-      spentByCategory[tx.categoria].total += tx.monto;
+      spentByCategory[tx.categoria].total += (tx.monto || 0);
       spentByCategory[tx.categoria].count += 1;
 
       if (tx.subcategoria) {
         spentByCategory[tx.categoria].subcategories[tx.subcategoria] = 
-          (spentByCategory[tx.categoria].subcategories[tx.subcategoria] || 0) + tx.monto;
+          (spentByCategory[tx.categoria].subcategories[tx.subcategoria] || 0) + (tx.monto || 0);
       }
     });
 
     // 2. Combine all categories (from categoryMap + any present in transactions)
     const allCategories = Array.from(
-      new Set([...Object.keys(categoryMap), ...Object.keys(spentByCategory)])
+      new Set([...Object.keys(categoryMap || {}), ...Object.keys(spentByCategory)])
     );
 
     return allCategories.map(cat => {
-      const budget = budgets.categories[cat] || 0;
+      const budget = budgets?.categories?.[cat] || 0;
       const catSpentData = spentByCategory[cat] || { total: 0, count: 0, subcategories: {} };
       const spent = catSpentData.total;
       const count = catSpentData.count;
       const difference = budget > 0 ? budget - spent : -spent;
       const pct = budget > 0 ? Math.round((spent / budget) * 100) : (spent > 0 ? 100 : 0);
 
+      const alertThreshold = budgets?.alertThresholdPercent || 80;
+
       // Status calculation
       let status: 'exceeded' | 'warning' | 'ok' | 'no_budget' = 'no_budget';
       if (budget > 0) {
         if (pct > 100) status = 'exceeded';
-        else if (pct >= 85) status = 'warning';
+        else if (pct >= alertThreshold) status = 'warning';
         else status = 'ok';
       }
 
@@ -245,7 +251,7 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
       categoriesWithBudget,
       exceededCategories,
       onTrackCategories,
-      txCount: filteredTransactions.length,
+      txCount: (filteredTransactions || []).length,
     };
   }, [comparisonData, filteredTransactions]);
 
@@ -543,18 +549,18 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
             <button
               onClick={() => setExpenseMode('individual')}
               className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                expenseMode === 'individual' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
+                expenseMode === 'individual' ? 'bg-[#7928CA] text-white' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Gastos Individuales
+              Personal
             </button>
             <button
               onClick={() => setExpenseMode('pareja')}
               className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                expenseMode === 'pareja' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
+                expenseMode === 'pareja' ? 'bg-[#F95420] text-white' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Gastos en Pareja
+              Compartido
             </button>
           </div>
 

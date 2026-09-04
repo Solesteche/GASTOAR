@@ -527,24 +527,24 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     onClick={() => setTipo('individual')}
                     className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
                       tipo === 'individual'
-                        ? 'bg-white text-slate-900 shadow-xs font-bold'
+                        ? 'bg-white text-[#7928CA] shadow-xs font-bold'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <User className="w-3.5 h-3.5" />
-                    <span>Ingreso Propio / Individual</span>
+                    <span>Personal</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setTipo('pareja')}
                     className={`py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
                       tipo === 'pareja'
-                        ? 'bg-white text-emerald-800 shadow-xs font-bold'
+                        ? 'bg-white text-[#F95420] shadow-xs font-bold'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <Users className="w-3.5 h-3.5" />
-                    <span>Fondo Común Pareja</span>
+                    <span>Compartido</span>
                   </button>
                 </div>
               </div>
@@ -612,12 +612,12 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     onClick={() => setTipo('individual')}
                     className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
                       tipo === 'individual'
-                        ? 'bg-blue-600 text-white shadow-sm'
+                        ? 'bg-purple-600 text-white shadow-sm'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <User className="w-4 h-4" />
-                    <span>Gasto Individual</span>
+                    <span>Personal</span>
                   </button>
 
                   <button
@@ -625,12 +625,12 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     onClick={() => setTipo('pareja')}
                     className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
                       tipo === 'pareja'
-                        ? 'bg-pink-600 text-white shadow-sm'
+                        ? 'bg-[#F95420] text-white shadow-sm'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <Users className="w-4 h-4" />
-                    <span>En Pareja (Compartido)</span>
+                    <span>Compartido</span>
                   </button>
                 </div>
               </div>

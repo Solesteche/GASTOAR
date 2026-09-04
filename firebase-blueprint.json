@@ -1,0 +1,239 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Información y perfil de cuenta del usuario",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID del usuario correspondiente al UID de autenticación"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Correo electrónico del usuario"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Nombre del usuario principal"
+        },
+        "partnerName": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Nombre de la pareja (opcional)"
+        },
+        "accountType": {
+          "type": "string",
+          "enum": ["individual", "pareja"],
+          "description": "Modalidad de cuenta"
+        },
+        "accountCode": {
+          "type": "string",
+          "maxLength": 20,
+          "description": "Código de cuenta compartida"
+        },
+        "currency": {
+          "type": "string",
+          "maxLength": 10,
+          "description": "Símbolo o código de moneda"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Fecha de creación del perfil"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Fecha de última actualización"
+        }
+      },
+      "required": ["id", "email", "name", "accountType", "currency"]
+    },
+    "UserBudget": {
+      "title": "UserBudget",
+      "description": "Límites y presupuestos mensuales por categoría",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID del usuario propietario"
+        },
+        "alertThresholdPercent": {
+          "type": "number",
+          "description": "Porcentaje para alerta de sobregiro"
+        },
+        "projectionGrowthPercent": {
+          "type": "number",
+          "description": "Porcentaje de inflación o crecimiento proyectado"
+        },
+        "categories": {
+          "type": "object",
+          "description": "Mapa de presupuestos por categoría"
+        },
+        "subcategories": {
+          "type": "object",
+          "description": "Mapa de presupuestos por subcategoría"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Fecha de última modificación"
+        }
+      },
+      "required": ["userId"]
+    },
+    "MonthlyMovement": {
+      "title": "MonthlyMovement",
+      "description": "Contenedor mensual de movimientos para evitar lecturas históricas innecesarias",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID del usuario propietario"
+        },
+        "mesKey": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}$",
+          "description": "Clave del mes en formato AAAA-MM (ej. 2026-09)"
+        },
+        "nombreMes": {
+          "type": "string",
+          "maxLength": 30,
+          "description": "Nombre legible del mes (ej. septiembre 2026)"
+        },
+        "totalGastos": {
+          "type": "number",
+          "description": "Total acumulado de gastos en el mes"
+        },
+        "totalIngresos": {
+          "type": "number",
+          "description": "Total acumulado de ingresos en el mes"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Fecha de última actualización"
+        }
+      },
+      "required": ["userId", "mesKey"]
+    },
+    "MovementItem": {
+      "title": "MovementItem",
+      "description": "Gasto o ingreso individual perteneciente a un mes específico",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "ID único de la transacción"
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID del usuario propietario"
+        },
+        "mesKey": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}$",
+          "description": "Mes al que corresponde (ej. 2026-09)"
+        },
+        "concepto": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Concepto o título del gasto/ingreso"
+        },
+        "descripcion": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Detalle adicional"
+        },
+        "monto": {
+          "type": "number",
+          "description": "Monto de la transacción"
+        },
+        "moneda": {
+          "type": "string",
+          "maxLength": 10,
+          "description": "Moneda"
+        },
+        "categoria": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Categoría asignada"
+        },
+        "subcategoria": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Subcategoría asignada"
+        },
+        "fecha": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "description": "Fecha del movimiento YYYY-MM-DD"
+        },
+        "tipo": {
+          "type": "string",
+          "enum": ["individual", "pareja"],
+          "description": "Tipo de gasto"
+        },
+        "tipoTransaccion": {
+          "type": "string",
+          "enum": ["gasto", "ingreso"],
+          "description": "Gasto o ingreso"
+        },
+        "pagadoPor": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Persona que efectuó o percibió el movimiento"
+        },
+        "metodoPago": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Método de pago"
+        },
+        "esCuotas": {
+          "type": "boolean",
+          "description": "Indica si es un gasto en cuotas"
+        },
+        "cuotasTotal": {
+          "type": "number",
+          "description": "Total de cuotas"
+        },
+        "cuotaActual": {
+          "type": "number",
+          "description": "Número de cuota actual"
+        },
+        "montoCuota": {
+          "type": "number",
+          "description": "Monto de cada cuota"
+        },
+        "tarjetaNombre": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Nombre de la tarjeta utilizada"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Timestamp de creación"
+        }
+      },
+      "required": ["id", "userId", "mesKey", "concepto", "monto", "categoria", "fecha"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Colección raíz de usuarios y configuración de perfil"
+    },
+    "/users/{userId}/presupuestos/{budgetId}": {
+      "schema": "UserBudget",
+      "description": "Subcolección de presupuestos y metas de gasto del usuario"
+    },
+    "/users/{userId}/movimientos/{mesKey}": {
+      "schema": "MonthlyMovement",
+      "description": "Subcolección mensual para particionar gastos e ingresos por mes (ej. septiembre 2026)"
+    },
+    "/users/{userId}/movimientos/{mesKey}/items/{movimientoId}": {
+      "schema": "MovementItem",
+      "description": "Movimientos individuales cargados bajo el mes correspondiente"
+    }
+  }
+}

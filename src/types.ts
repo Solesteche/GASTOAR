@@ -58,16 +58,21 @@ export interface CategoryColors {
 export interface Budgets {
   categories: { [category: string]: number };
   subcategories: { [subcategory: string]: number };
+  alertThresholdPercent?: number; // Percentage (e.g. 70, 80, 85, 90) when warning alert triggers
+  projectionGrowthPercent?: number; // Last applied growth/inflation projection percentage
+  lastProjectedDate?: string;
 }
 
 export interface UserAccount {
   id: string;
   email: string;
   name: string;
+  password?: string;
   partnerName?: string;
   accountType: 'pareja' | 'individual';
   accountCode: string;
   currency: string;
+  selectedPlanId?: SubscriptionPlanId;
   createdAt: number;
 }
 
@@ -142,12 +147,15 @@ export interface SubscriptionPlan {
   id: SubscriptionPlanId;
   name: string;
   badge?: string;
+  badgeText?: string;
   tagline: string;
+  description?: string;
   priceMonthly: number;
   priceAnnual: number;
   currency: string;
   features: string[];
   isPopular?: boolean;
+  highlighted?: boolean;
   isPro?: boolean;
   maxUsers: number;
   hasAiAssistant: boolean;
@@ -172,8 +180,8 @@ export interface UserSubscription {
   mercadopagoPaymentId?: string;
   mercadopagoPreferenceId?: string;
   startDate: string; // YYYY-MM-DD
-  lastPaymentDate: string; // YYYY-MM-DD
-  nextRenewalDate: string; // YYYY-MM-DD
+  lastPaymentDate?: string; // YYYY-MM-DD
+  nextRenewalDate?: string; // YYYY-MM-DD
   trialEndsDate?: string; // YYYY-MM-DD
   trialDaysGranted?: number; // e.g. 15
   createdAt: number;
@@ -195,5 +203,33 @@ export interface MercadoPagoPaymentDetails {
   qrCode?: string;
   qrCodeBase64?: string;
   ticketUrl?: string;
+}
+
+export interface ScoreCategoryBreakdown {
+  score: number;
+  maxScore: number;
+  label: string;
+  description: string;
+  status: 'perfect' | 'good' | 'warning' | 'bad';
+}
+
+export interface DailyFinancialScore {
+  date: string; // YYYY-MM-DD
+  score: number; // 0 to 100
+  rating: 'Excelente' | 'Muy Bueno' | 'Bueno' | 'Regular' | 'Atención';
+  ratingEmoji: string;
+  color: string;
+  dailySpent: number;
+  dailyLimit: number;
+  isWithinLimit: boolean;
+  streakDays: number;
+  breakdown: {
+    limit: ScoreCategoryBreakdown;
+    logging: ScoreCategoryBreakdown;
+    budgetPacing: ScoreCategoryBreakdown;
+    streak: ScoreCategoryBreakdown;
+  };
+  tip: string;
+  unlockedAt?: number;
 }
 

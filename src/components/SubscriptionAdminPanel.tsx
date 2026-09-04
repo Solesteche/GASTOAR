@@ -40,7 +40,7 @@ interface SubscriptionAdminPanelProps {
 }
 
 export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
-  subscriptions,
+  subscriptions = [],
   onUpdateSubscription,
   onAddSubscription,
   onDeleteSubscription,

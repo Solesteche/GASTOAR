@@ -183,10 +183,12 @@ export function getMonthlyInstallmentsOverview(
   }
 
   // Distribute every quota into its target month
-  installmentTxs.forEach(tx => {
+  (installmentTxs || []).forEach(tx => {
+    if (!tx) return;
     const details = getInstallmentPlanDetails(tx);
 
-    details.schedule.forEach(item => {
+    (details?.schedule || []).forEach(item => {
+      if (!item) return;
       // Find matching month
       let monthSummary = monthsMap.get(item.monthKey);
 

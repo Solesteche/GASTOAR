@@ -70,7 +70,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       'Escaneo inteligente ilimitado de tickets y facturas con IA Gemini',
       'Carga de gastos por voz o texto libre en lenguaje natural',
       'Diagnóstico financiero mensual y recomendaciones de ahorro con IA',
-      'Gestión de tarjetas bancarias y alertas de cierre/vencimiento',
+      'Gestión de Vencimientos (Tarjetas, Alquiler, Expensas, Servicios e Impuestos) + Google Calendar 📅',
       'Soporte prioritario directo por WhatsApp 24/7',
       'Acceso anticipado a nuevas funciones exclusivas'
     ]
@@ -81,8 +81,8 @@ export const INITIAL_USER_SUBSCRIPTIONS: UserSubscription[] = [
   {
     id: 'sub-101',
     userId: 'usr-001',
-    userEmail: 'estechesol@gmail.com',
-    userName: 'Sol Esteche',
+    userEmail: 'ejemplo@ejemplo.com',
+    userName: 'Sol',
     partnerName: 'Martín',
     accountCode: 'PAREJA-2026',
     planId: 'pro_ai',
@@ -103,7 +103,7 @@ export const INITIAL_USER_SUBSCRIPTIONS: UserSubscription[] = [
   {
     id: 'sub-102',
     userId: 'usr-002',
-    userEmail: 'lucas.gonzalez@gmail.com',
+    userEmail: 'ejemplo2@ejemplo.com',
     userName: 'Lucas González',
     partnerName: 'Camila',
     accountCode: 'PAIR-8492',
@@ -125,7 +125,7 @@ export const INITIAL_USER_SUBSCRIPTIONS: UserSubscription[] = [
   {
     id: 'sub-103',
     userId: 'usr-003',
-    userEmail: 'mariano.silva@hotmail.com',
+    userEmail: 'ejemplo3@ejemplo.com',
     userName: 'Mariano Silva',
     accountCode: 'IND-3391',
     planId: 'individual',
@@ -145,7 +145,7 @@ export const INITIAL_USER_SUBSCRIPTIONS: UserSubscription[] = [
   {
     id: 'sub-104',
     userId: 'usr-004',
-    userEmail: 'valeria.fernandez@yahoo.com.ar',
+    userEmail: 'ejemplo4@ejemplo.com',
     userName: 'Valeria Fernández',
     partnerName: 'Esteban',
     accountCode: 'PAIR-5512',
@@ -167,7 +167,7 @@ export const INITIAL_USER_SUBSCRIPTIONS: UserSubscription[] = [
   {
     id: 'sub-105',
     userId: 'usr-005',
-    userEmail: 'franco.rodriguez@gmail.com',
+    userEmail: 'ejemplo5@ejemplo.com',
     userName: 'Franco Rodríguez',
     accountCode: 'IND-9021',
     planId: 'individual',
@@ -189,7 +189,7 @@ export const INITIAL_USER_SUBSCRIPTIONS: UserSubscription[] = [
   {
     id: 'sub-106',
     userId: 'usr-006',
-    userEmail: 'sofia.martinez@gmail.com',
+    userEmail: 'ejemplo6@ejemplo.com',
     userName: 'Sofía Martínez',
     partnerName: 'Tomás',
     accountCode: 'PAIR-3109',

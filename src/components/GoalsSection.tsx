@@ -105,7 +105,8 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
     let target = 0;
     let completed = 0;
 
-    goals.forEach(g => {
+    (goals || []).forEach(g => {
+      if (!g) return;
       saved += Number(g.montoActual) || 0;
       target += Number(g.montoObjetivo) || 0;
       if ((g.montoActual >= g.montoObjetivo && g.montoObjetivo > 0) || g.completada) {
@@ -118,7 +119,7 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
       totalSaved: saved,
       totalTarget: target,
       globalProgress: progress,
-      activeCount: goals.length - completed,
+      activeCount: Math.max(0, (goals || []).length - completed),
       completedCount: completed
     };
   }, [goals]);
@@ -256,7 +257,7 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
         {/* New Goal CTA */}
         <button
           onClick={handleOpenCreate}
-          className="px-4 py-2.5 bg-gradient-to-r from-[#F95420] via-[#FF6B3D] to-[#FA541C] hover:from-[#E04412] hover:to-[#F95420] text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md shadow-orange-500/25 transition-all flex items-center justify-center gap-2 self-start sm:self-auto active:scale-95 cursor-pointer"
+          className="px-4 py-2.5 bg-[#6F2EC5] hover:bg-[#5C23A6] text-white font-bold text-xs sm:text-sm rounded-2xl shadow-xs transition-all flex items-center justify-center gap-2 self-start sm:self-auto active:scale-95 cursor-pointer"
         >
           <Plus className="w-4 h-4 stroke-[3]" />
           <span>+ Nueva Caja de Meta</span>

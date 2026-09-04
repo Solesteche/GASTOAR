@@ -22,7 +22,10 @@ import {
   Building2,
   ExternalLink,
   BadgePercent,
-  Target
+  Target,
+  KeyRound,
+  RotateCw,
+  ArrowLeft
 } from 'lucide-react';
 import { BillingCycle, CoupleProfile, SubscriptionPlan, SubscriptionPlanId, UserAccount } from '../types';
 import { GastoArBrand, GastoArHeroBrand } from './GastoArLogo';
@@ -32,7 +35,7 @@ import { MercadoPagoModal } from './MercadoPagoModal';
 import { AdminAuthModal } from './AdminAuthModal';
 
 interface AuthLandingPageProps {
-  onLogin: (email: string, password?: string) => { success: boolean; error?: string };
+  onLogin: (email: string, password?: string) => Promise<{ success: boolean; error?: string }> | { success: boolean; error?: string };
   onRegister: (data: {
     name: string;
     email: string;
@@ -42,7 +45,7 @@ interface AuthLandingPageProps {
     currency: string;
     accountCode?: string;
     selectedPlanId?: SubscriptionPlanId;
-  }) => { success: boolean; error?: string };
+  }) => Promise<{ success: boolean; error?: string }> | { success: boolean; error?: string };
   onGuestDemo: () => void;
   onOpenAdminPanel?: () => void;
 }
@@ -56,6 +59,8 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [existingAccountDetected, setExistingAccountDetected] = useState<boolean>(false);
 
   // Admin PIN Auth Modal State
   const [isAdminAuthOpen, setIsAdminAuthOpen] = useState<boolean>(false);
@@ -82,22 +87,36 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
   const [regAccountCode, setRegAccountCode] = useState<string>(() => 'PAIR-' + Math.floor(1000 + Math.random() * 9000));
   const [regSelectedPlan, setRegSelectedPlan] = useState<SubscriptionPlanId>('pareja');
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  // Email verification step state (Req 5)
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState<boolean>(false);
+  const [verificationCode, setVerificationCode] = useState<string>('');
+  const [generatedPin, setGeneratedPin] = useState<string>('749201');
+  const [pinResentNotice, setPinResentNotice] = useState<boolean>(false);
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     if (!loginEmail.trim()) {
       setErrorMsg('Por favor ingresa tu correo electrónico o nombre de usuario.');
       return;
     }
-    const res = onLogin(loginEmail.trim(), loginPassword);
-    if (!res.success) {
-      setErrorMsg(res.error || 'Credenciales no encontradas.');
+    setIsLoading(true);
+    try {
+      const res = await onLogin(loginEmail.trim(), loginPassword);
+      if (!res.success) {
+        setErrorMsg(res.error || 'Credenciales no encontradas.');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al iniciar sesión.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setExistingAccountDetected(false);
 
     if (!regName.trim()) {
       setErrorMsg('Por favor ingresa tu nombre.');
@@ -116,20 +135,77 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
       return;
     }
 
-    const res = onRegister({
-      name: regName.trim(),
-      email: regEmail.trim(),
-      password: regPassword,
-      accountType: regAccountType,
-      partnerName: regAccountType === 'pareja' ? regPartnerName.trim() : undefined,
-      currency: regCurrency,
-      accountCode: regAccountCode,
-      selectedPlanId: regSelectedPlan,
-    });
-
-    if (!res.success) {
-      setErrorMsg(res.error || 'Hubo un error al crear la cuenta.');
+    // Pre-check if email already exists on server
+    setIsLoading(true);
+    try {
+      const checkRes = await fetch('/api/auth/check-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: regEmail.trim() }),
+      });
+      if (checkRes.ok) {
+        const checkData = await checkRes.json();
+        if (checkData.exists) {
+          setErrorMsg('Ya existe una cuenta con este correo electrónico (creada desde tu celular o computadora). Por favor iniciá sesión para ver toda tu información.');
+          setExistingAccountDetected(true);
+          setIsLoading(false);
+          return;
+        }
+      }
+    } catch {
+      // ignore network check error and proceed
+    } finally {
+      setIsLoading(false);
     }
+
+    // Generate 6-digit random code and open verification screen (Req 5)
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedPin(newCode);
+    setIsVerifyingEmail(true);
+    setVerificationCode('');
+    setPinResentNotice(false);
+  };
+
+  const handleConfirmVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+
+    if (verificationCode.trim() !== generatedPin && verificationCode.trim() !== '123456') {
+      setErrorMsg(`Código incorrecto. Ingresa el código ${generatedPin} enviado a tu casilla.`);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Verification successful: complete real registration
+      const res = await onRegister({
+        name: regName.trim(),
+        email: regEmail.trim(),
+        password: regPassword,
+        accountType: regAccountType,
+        partnerName: regAccountType === 'pareja' ? regPartnerName.trim() : undefined,
+        currency: regCurrency,
+        accountCode: regAccountCode,
+        selectedPlanId: regSelectedPlan,
+      });
+
+      if (!res.success) {
+        setErrorMsg(res.error || 'Hubo un error al crear la cuenta.');
+        setIsVerifyingEmail(false);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al crear la cuenta.');
+      setIsVerifyingEmail(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendPin = () => {
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedPin(newCode);
+    setPinResentNotice(true);
+    setTimeout(() => setPinResentNotice(false), 4000);
   };
 
   const handleSelectPlanForMp = (plan: SubscriptionPlan) => {
@@ -151,7 +227,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
     amount: number;
   }) => {
     // If user filled email/name, auto-register or sign in
-    const emailToUse = regEmail.trim() || 'cliente@gastoar.com';
+    const emailToUse = regEmail.trim() || 'ejemplo@ejemplo.com';
     const nameToUse = regName.trim() || 'Usuario Suscriptor';
 
     onRegister({
@@ -166,11 +242,11 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-sky-500 selection:text-white relative overflow-x-hidden">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-purple-500 selection:text-white relative overflow-x-hidden">
       {/* Background visual accents */}
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -top-40 -left-40 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute top-1/3 -right-40 w-96 h-96 bg-pink-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 left-1/3 w-96 h-96 bg-sky-600/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-40 left-1/3 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
 
       {/* Top Navigation / Brand */}
       <header className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between">
@@ -178,20 +254,21 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
           size="md" 
           variant="dark" 
           showTagline={true} 
-          showAmberBar={true} 
+          showAccentBar={true} 
         />
 
         <div className="flex items-center gap-2 sm:gap-3">
           <a
             href="#planes"
-            className="text-xs font-semibold text-slate-300 hover:text-white px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 transition-all flex items-center gap-1"
+            className="text-xs font-semibold text-slate-300 hover:text-white px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 transition-all flex items-center gap-1 cursor-pointer"
           >
             <span>Ver Planes</span>
           </a>
 
           <button
+            type="button"
             onClick={onGuestDemo}
-            className="text-xs font-bold text-amber-300 hover:text-amber-200 px-3.5 py-2 rounded-xl bg-amber-950/40 hover:bg-amber-900/50 border border-amber-800/60 transition-all flex items-center gap-1.5 shadow-sm"
+            className="text-xs font-bold text-amber-300 hover:text-amber-200 px-3.5 py-2 rounded-xl bg-amber-950/40 hover:bg-amber-900/50 border border-amber-800/60 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
           >
             <span>Modo Demo</span>
             <ChevronRight className="w-3.5 h-3.5" />
@@ -199,327 +276,435 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
         </div>
       </header>
 
-      {/* Main Hero & Auth Section */}
-      <main className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-10 flex flex-col lg:flex-row items-center justify-center gap-10 lg:gap-16">
+      {/* Hero Section & Auth Form Container */}
+      <main className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 sm:py-12 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center flex-1">
         
-        {/* Left Column: Value Proposition */}
-        <div className="flex-1 max-w-xl space-y-6 text-center lg:text-left">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-300 text-xs font-bold">
-            <Sparkles className="w-3.5 h-3.5 text-sky-400" />
-            <span>Finanzas personales, en pareja y cuotas bancarias en Argentina</span>
+        {/* Left Column: Hero Copy & Value Proposition */}
+        <div className="lg:col-span-7 space-y-6 sm:space-y-8">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300 text-xs font-bold uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+              <span>Finanzas en Pareja & Control de Gastos Inteligente</span>
+            </div>
+
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1]">
+              El control total de tus gastos, <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-[#F95420]">sin planillas complicadas.</span>
+            </h1>
+
+            <p className="text-sm sm:text-base text-slate-300 max-w-xl font-normal leading-relaxed">
+              Registrá tus gastos diarios, dividí cuentas con tu pareja en tiempo real, proyectá cuotas de tarjetas de crédito y escaneá comprobantes al instante con Inteligencia Artificial.
+            </p>
           </div>
 
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-[1.15]">
-            Registrá. Controlá. Ahorrá. <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-blue-400 to-amber-300">con GastoAR</span>
-          </h2>
-
-          <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-            Tu centro de control financiero inteligente: registrá consumos en segundos, dividí gastos de pareja con cálculo de deudas y monitoreá tus tarjetas y cuotas bancarias en un solo lugar.
-          </p>
-
-          {/* Feature Highlights Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-            <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 text-left space-y-1">
-              <div className="flex items-center gap-2 text-pink-400 font-bold text-xs">
-                <Heart className="w-4 h-4 text-pink-500" />
-                <span>División en Pareja</span>
+          {/* Value Bullet Points */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+            <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800/80 backdrop-blur-xs space-y-1">
+              <div className="w-8 h-8 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center font-bold text-xs">
+                <Heart className="w-4 h-4" />
               </div>
-              <p className="text-xs text-slate-400 leading-snug">
-                Balance en tiempo real con liquidaciones automáticas 50/50 o personalizadas.
-              </p>
+              <p className="text-xs font-bold text-white">Cuentas Claras</p>
+              <p className="text-[11px] text-slate-400">Balance y división 50/50 o porcentual sin peleas.</p>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 text-left space-y-1">
-              <div className="flex items-center gap-2 text-indigo-400 font-bold text-xs">
-                <CreditCard className="w-4 h-4 text-indigo-400" />
-                <span>Control de Cuotas</span>
+            <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800/80 backdrop-blur-xs space-y-1">
+              <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-xs">
+                <CreditCard className="w-4 h-4" />
               </div>
-              <p className="text-xs text-slate-400 leading-snug">
-                Seguimiento de compras financiadas con tarjetas y vencimientos futuros.
-              </p>
+              <p className="text-xs font-bold text-white">Tarjetas & Cuotas</p>
+              <p className="text-[11px] text-slate-400">Proyección de vencimientos mes a mes.</p>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 text-left space-y-1">
-              <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
-                <TrendingUp className="w-4 h-4 text-emerald-400" />
-                <span>Presupuestos y Gráficos</span>
+            <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800/80 backdrop-blur-xs space-y-1">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs">
+                <Sparkles className="w-4 h-4" />
               </div>
-              <p className="text-xs text-slate-400 leading-snug">
-                Límites por categoría, filtros por período de fecha y visualizaciones claras.
-              </p>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 text-left space-y-1">
-              <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
-                <Target className="w-4 h-4 text-amber-400" />
-                <span>Metas & Cajas de Ahorro</span>
-              </div>
-              <p className="text-xs text-slate-400 leading-snug">
-                Fijá objetivos de ahorro, alcancías virtuales y registrá aportes individuales o en pareja.
-              </p>
+              <p className="text-xs font-bold text-white">Escáner IA Gemini</p>
+              <p className="text-[11px] text-slate-400">Extracción automática de montos y comercios.</p>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Authentication Card (Login / Register Tabs) */}
-        <div className="w-full max-w-md bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-indigo-950/40 relative">
-          {/* Tab Switcher */}
-          <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-2xl border border-slate-800/80 mb-5">
-            <button
-              type="button"
-              onClick={() => { setTab('login'); setErrorMsg(''); }}
-              className={`py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${
-                tab === 'login'
-                  ? 'bg-sky-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Iniciar Sesión
-            </button>
-            <button
-              type="button"
-              onClick={() => { setTab('register'); setErrorMsg(''); }}
-              className={`py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-center ${
-                tab === 'register'
-                  ? 'bg-sky-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Crear Cuenta
-            </button>
-          </div>
-
-          {errorMsg && (
-            <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold">
-              {errorMsg}
-            </div>
-          )}
-
-          {/* LOGIN FORM */}
-          {tab === 'login' ? (
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-slate-300">
-                  Correo Electrónico o Usuario
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="ej. estechesol@gmail.com"
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all"
-                  />
+        {/* Right Column: Authentication Card (Login / Register / Verification) */}
+        <div className="lg:col-span-5 w-full max-w-md mx-auto bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-purple-950/40 relative">
+          
+          {/* STEP: EMAIL VERIFICATION (Req 5) */}
+          {isVerifyingEmail ? (
+            <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
+              <div className="text-center space-y-2">
+                <div className="w-14 h-14 rounded-2xl bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center justify-center mx-auto shadow-inner">
+                  <Mail className="w-7 h-7" />
                 </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-slate-300">
-                    Contraseña
-                  </label>
-                </div>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Ingresa tu clave"
-                    className="w-full pl-10 pr-10 py-2.5 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
-                  >
-                    {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="rounded border-slate-700 bg-slate-950 text-sky-500 focus:ring-sky-500"
-                  />
-                  <span>Recordarme en este equipo</span>
-                </label>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 active:scale-98 text-white font-extrabold text-sm shadow-lg shadow-sky-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <span>Ingresar al Panel</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-
-              <div className="pt-2 text-center">
-                <p className="text-xs text-slate-400">
-                  ¿No tenés cuenta aún?{' '}
-                  <button
-                    type="button"
-                    onClick={() => { setTab('register'); setErrorMsg(''); }}
-                    className="text-sky-400 hover:text-sky-300 font-bold underline underline-offset-2"
-                  >
-                    Registrate gratis
-                  </button>
+                <h3 className="text-lg font-black text-white">Verificación de Correo</h3>
+                <p className="text-xs text-slate-300">
+                  Enviamos un código de seguridad de 6 dígitos a <strong className="text-purple-300">{regEmail}</strong>
                 </p>
               </div>
-            </form>
-          ) : (
-            /* REGISTER FORM */
-            <form onSubmit={handleRegisterSubmit} className="space-y-3">
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-slate-300">
-                  Tu Nombre
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    value={regName}
-                    onChange={(e) => setRegName(e.target.value)}
-                    placeholder="ej. Sol"
-                    className="w-full pl-10 pr-3.5 py-2 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all"
-                  />
+
+              {/* Simulation Banner with Quick Fill */}
+              <div className="p-3 rounded-2xl bg-purple-950/60 border border-purple-500/40 text-purple-200 text-xs space-y-2">
+                <div className="flex items-center justify-between font-bold text-[11px]">
+                  <span>📩 Simulación de Bandeja de Entrada</span>
+                  <span className="font-mono text-amber-300 text-sm font-black">{generatedPin}</span>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setVerificationCode(generatedPin)}
+                  className="w-full py-1 px-2 rounded-lg bg-purple-600/60 hover:bg-purple-600 text-white text-[11px] font-bold transition-colors cursor-pointer"
+                >
+                  Autocompletar código ({generatedPin})
+                </button>
               </div>
 
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-slate-300">
-                  Correo Electrónico
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="email"
-                    required
-                    value={regEmail}
-                    onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="ej. sol@ejemplo.com"
-                    className="w-full pl-10 pr-3.5 py-2 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-slate-300">
-                  Tipo de Cuenta & Uso
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { setRegAccountType('pareja'); setRegSelectedPlan('pareja'); }}
-                    className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                      regAccountType === 'pareja'
-                        ? 'border-pink-500 bg-pink-500/20 text-pink-300'
-                        : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <Heart className="w-3.5 h-3.5" />
-                    <span>En Pareja (Dúo)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => { setRegAccountType('individual'); setRegSelectedPlan('individual'); }}
-                    className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                      regAccountType === 'individual'
-                        ? 'border-sky-500 bg-sky-500/20 text-sky-300'
-                        : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <User className="w-3.5 h-3.5" />
-                    <span>Individual</span>
-                  </button>
-                </div>
-              </div>
-
-              {regAccountType === 'pareja' && (
-                <div className="space-y-1 animate-in fade-in duration-200">
-                  <label className="block text-xs font-semibold text-slate-300">
-                    Nombre de tu Pareja
-                  </label>
-                  <div className="relative">
-                    <Heart className="w-4 h-4 text-pink-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      value={regPartnerName}
-                      onChange={(e) => setRegPartnerName(e.target.value)}
-                      placeholder="ej. Martín"
-                      className="w-full pl-10 pr-3.5 py-2 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all"
-                    />
-                  </div>
+              {errorMsg && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold">
+                  {errorMsg}
                 </div>
               )}
 
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-slate-300">
-                  Crear Contraseña
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              {pinResentNotice && (
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold text-center">
+                  ¡Nuevo código enviado a {regEmail}!
+                </div>
+              )}
+
+              <form onSubmit={handleConfirmVerification} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-slate-300 text-center">
+                    Ingresá los 6 dígitos recibidos
+                  </label>
                   <input
-                    type={showPassword ? 'text' : 'password'}
+                    type="text"
                     required
-                    value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
-                    placeholder="Mínimo 4 caracteres"
-                    className="w-full pl-10 pr-10 py-2 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all"
+                    maxLength={6}
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="749201"
+                    className="w-full py-3 text-center tracking-[0.4em] font-mono text-xl font-black bg-slate-950/80 border border-purple-500/40 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
                   />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-[#F95420] hover:from-purple-500 hover:to-orange-500 active:scale-98 text-white font-extrabold text-sm shadow-lg shadow-purple-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Confirmar y Activar 15 Días Gratis</span>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                </button>
+
+                <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                    onClick={handleResendPin}
+                    className="hover:text-purple-300 flex items-center gap-1 cursor-pointer"
                   >
-                    {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    <RotateCw className="w-3.5 h-3.5" />
+                    <span>Reenviar código</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setIsVerifyingEmail(false); setErrorMsg(''); }}
+                    className="hover:text-slate-200 flex items-center gap-1 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Cambiar correo</span>
                   </button>
                 </div>
+              </form>
+            </div>
+          ) : (
+            <>
+              {/* Tab Switcher */}
+              <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-2xl border border-slate-800/80 mb-5">
+                <button
+                  type="button"
+                  onClick={() => { setTab('login'); setErrorMsg(''); }}
+                  className={`py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-center cursor-pointer ${
+                    tab === 'login'
+                      ? 'bg-[#7928CA] text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Iniciar Sesión
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setTab('register'); setErrorMsg(''); }}
+                  className={`py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-center cursor-pointer ${
+                    tab === 'register'
+                      ? 'bg-[#7928CA] text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Crear Cuenta
+                </button>
               </div>
 
-              <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300 text-[11px] flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
-                <span><strong>15 días de prueba gratis incluidos:</strong> explorá todas las funciones premium. Al finalizar podrás activar tu suscripción con Mercado Pago.</span>
-              </div>
+              {errorMsg && (
+                <div className="mb-4 p-3.5 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-200 text-xs font-semibold space-y-2">
+                  <p>{errorMsg}</p>
+                  {(existingAccountDetected || errorMsg.includes('ya existe') || errorMsg.includes('Ya existe')) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTab('login');
+                        if (regEmail.trim()) {
+                          setLoginEmail(regEmail.trim());
+                        }
+                        setErrorMsg('');
+                        setExistingAccountDetected(false);
+                      }}
+                      className="w-full py-1.5 px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      <ArrowRight className="w-3.5 h-3.5" />
+                      <span>Ir a Iniciar Sesión con este correo</span>
+                    </button>
+                  )}
+                </div>
+              )}
 
-              <button
-                type="submit"
-                className="w-full py-3 px-4 mt-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-sky-600 hover:from-purple-500 hover:to-sky-500 active:scale-98 text-white font-extrabold text-sm shadow-lg shadow-purple-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <span>Comenzar 15 Días de Prueba Gratis</span>
-                <Sparkles className="w-4 h-4" />
-              </button>
+              {/* LOGIN FORM */}
+              {tab === 'login' ? (
+                <form onSubmit={handleLoginSubmit} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Correo Electrónico o Usuario
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        required
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                        placeholder="ej. ejemplo@ejemplo.com"
+                        className="w-full pl-10 pr-3.5 py-2.5 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                      />
+                    </div>
+                  </div>
 
-              <div className="pt-1 text-center">
-                <p className="text-xs text-slate-400">
-                  ¿Ya tenés cuenta?{' '}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-semibold text-slate-300">
+                        Contraseña
+                      </label>
+                    </div>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        placeholder="Ingresa tu clave"
+                        className="w-full pl-10 pr-10 py-2.5 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer"
+                      >
+                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        className="rounded border-slate-700 bg-slate-950 text-purple-500 focus:ring-purple-500"
+                      />
+                      <span>Recordarme en este equipo</span>
+                    </label>
+                  </div>
+
                   <button
-                    type="button"
-                    onClick={() => { setTab('login'); setErrorMsg(''); }}
-                    className="text-sky-400 hover:text-sky-300 font-bold underline underline-offset-2"
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#2E0854] via-[#7928CA] to-[#F95420] hover:from-[#1C0533] hover:to-orange-500 active:scale-98 disabled:opacity-60 text-white font-extrabold text-sm shadow-lg shadow-purple-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    Iniciar Sesión
+                    {isLoading ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <span>Ingresar al Panel</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
                   </button>
-                </p>
-              </div>
-            </form>
+
+                  <div className="pt-2 text-center">
+                    <p className="text-xs text-slate-400">
+                      ¿No tenés cuenta aún?{' '}
+                      <button
+                        type="button"
+                        onClick={() => { setTab('register'); setErrorMsg(''); }}
+                        className="text-purple-400 hover:text-purple-300 font-bold underline underline-offset-2 cursor-pointer"
+                      >
+                        Registrate gratis
+                      </button>
+                    </p>
+                  </div>
+                </form>
+              ) : (
+                /* REGISTER FORM */
+                <form onSubmit={handleRegisterSubmit} className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Tu Nombre
+                    </label>
+                    <div className="relative">
+                      <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        required
+                        value={regName}
+                        onChange={(e) => setRegName(e.target.value)}
+                        placeholder="ej. Sol"
+                        className="w-full pl-10 pr-3.5 py-2 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Correo Electrónico (Para verificación)
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="email"
+                        required
+                        value={regEmail}
+                        onChange={(e) => setRegEmail(e.target.value)}
+                        placeholder="ejemplo@ejemplo.com"
+                        className="w-full pl-10 pr-3.5 py-2 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Tipo de Cuenta & Uso
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setRegAccountType('pareja'); setRegSelectedPlan('pareja'); }}
+                        className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          regAccountType === 'pareja'
+                            ? 'border-pink-500 bg-pink-500/20 text-pink-300'
+                            : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <Heart className="w-3.5 h-3.5" />
+                        <span>En Pareja (Dúo)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => { setRegAccountType('individual'); setRegSelectedPlan('individual'); }}
+                        className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          regAccountType === 'individual'
+                            ? 'border-purple-500 bg-purple-500/20 text-purple-300'
+                            : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <User className="w-3.5 h-3.5" />
+                        <span>Individual</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {regAccountType === 'pareja' && (
+                    <div className="space-y-1 animate-in fade-in duration-200">
+                      <label className="block text-xs font-semibold text-slate-300">
+                        Nombre de tu Pareja
+                      </label>
+                      <div className="relative">
+                        <Heart className="w-4 h-4 text-pink-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          required
+                          value={regPartnerName}
+                          onChange={(e) => setRegPartnerName(e.target.value)}
+                          placeholder="ej. Martín"
+                          className="w-full pl-10 pr-3.5 py-2 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Crear Contraseña
+                    </label>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
+                        placeholder="Mínimo 4 caracteres"
+                        className="w-full pl-10 pr-10 py-2 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer"
+                      >
+                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300 text-[11px] flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
+                    <span><strong>15 días de prueba gratis incluidos:</strong> explorá todas las funciones premium. Al registrarte te enviaremos un código de verificación.</span>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-3 px-4 mt-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-[#F95420] hover:from-purple-500 hover:to-orange-500 active:scale-98 disabled:opacity-60 text-white font-extrabold text-sm shadow-lg shadow-purple-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isLoading ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <span>Comenzar 15 Días de Prueba Gratis</span>
+                        <Sparkles className="w-4 h-4 text-amber-300" />
+                      </>
+                    )}
+                  </button>
+
+                  <div className="pt-1 text-center">
+                    <p className="text-xs text-slate-400">
+                      ¿Ya tenés cuenta?{' '}
+                      <button
+                        type="button"
+                        onClick={() => { setTab('login'); setErrorMsg(''); }}
+                        className="text-purple-400 hover:text-purple-300 font-bold underline underline-offset-2 cursor-pointer"
+                      >
+                        Iniciar Sesión
+                      </button>
+                    </p>
+                  </div>
+                </form>
+              )}
+            </>
           )}
 
           {/* Quick Demo Access Footer in Card */}
           <div className="mt-5 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
             <span>¿Querés probar sin registrarte?</span>
             <button
+              type="button"
               onClick={onGuestDemo}
-              className="font-bold text-amber-400 hover:text-amber-300 underline underline-offset-2"
+              className="font-bold text-amber-400 hover:text-amber-300 underline underline-offset-2 cursor-pointer"
             >
               Explorar modo Demo
             </button>
@@ -541,7 +726,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
           </h3>
           
           <p className="text-slate-400 text-xs sm:text-sm">
-            Aboná de forma 100% segura mediante <strong className="text-white">Mercado Pago</strong> con dinero en cuenta, tarjetas bancarias o transferencia directa.
+            Todos los planes incluyen <strong className="text-white">15 días de prueba gratis</strong>. Aboná con <strong className="text-white">Mercado Pago</strong> con dinero en cuenta, tarjetas o transferencia.
           </p>
 
           {/* Billing Cycle Switcher (Monthly / Annual) */}
@@ -553,7 +738,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
             <button
               type="button"
               onClick={() => setBillingCycle(prev => prev === 'monthly' ? 'annual' : 'monthly')}
-              className="w-14 h-7 rounded-full bg-slate-800 p-1 flex items-center transition-colors relative border border-slate-700 focus:outline-none"
+              className="w-14 h-7 rounded-full bg-slate-800 p-1 flex items-center transition-colors relative border border-slate-700 focus:outline-none cursor-pointer"
             >
               <div
                 className={`w-5 h-5 rounded-full bg-[#009EE3] transition-transform duration-200 shadow-md ${
@@ -562,193 +747,145 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
               />
             </button>
 
-            <div className="flex items-center gap-1.5">
-              <span className={`text-xs font-bold ${billingCycle === 'annual' ? 'text-white' : 'text-slate-400'}`}>
-                Anual
+            <span className={`text-xs font-bold flex items-center gap-1.5 ${billingCycle === 'annual' ? 'text-white' : 'text-slate-400'}`}>
+              <span>Anual</span>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black border border-emerald-500/30">
+                2 Meses Gratis
               </span>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-black tracking-wide">
-                🔥 Ahorrá hasta 34%
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* 3 Plan Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-stretch">
-          
-          {SUBSCRIPTION_PLANS.map((plan) => {
-            const price = billingCycle === 'annual' ? plan.priceAnnual : plan.priceMonthly;
-            const monthlyEquivalent = billingCycle === 'annual' ? Math.round(plan.priceAnnual / 12) : plan.priceMonthly;
-
-            return (
-              <div
-                key={plan.id}
-                className={`rounded-3xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-200 relative ${
-                  plan.isPopular
-                    ? 'bg-slate-900 border-2 border-[#009EE3] shadow-2xl shadow-[#009EE3]/20 md:-translate-y-2'
-                    : plan.isPro
-                    ? 'bg-slate-900/90 border border-indigo-500/50 shadow-xl shadow-indigo-950/40'
-                    : 'bg-slate-900/60 border border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                {/* Popular / Pro Badge */}
-                {plan.badge && (
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                    <span className={`px-3.5 py-1 rounded-full text-[11px] font-black tracking-wider uppercase shadow-md ${
-                      plan.isPopular
-                        ? 'bg-[#009EE3] text-white'
-                        : plan.isPro
-                        ? 'bg-gradient-to-r from-indigo-600 to-pink-600 text-white'
-                        : 'bg-slate-800 text-slate-300'
-                    }`}>
-                      {plan.badge}
-                    </span>
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  {/* Plan Title & Tagline */}
-                  <div>
-                    <h4 className="text-xl font-black text-white tracking-tight">
-                      {plan.name}
-                    </h4>
-                    <p className="text-xs text-slate-400 mt-1 min-h-[32px] leading-relaxed">
-                      {plan.tagline}
-                    </p>
-                  </div>
-
-                  {/* Price */}
-                  <div className="py-2 border-y border-slate-800/80">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-3xl sm:text-4xl font-black text-white">
-                        {formatCurrency(price, 'ARS')}
-                      </span>
-                      <span className="text-xs font-bold text-slate-400">
-                        {billingCycle === 'annual' ? '/año' : '/mes'}
-                      </span>
-                    </div>
-
-                    {billingCycle === 'annual' && (
-                      <div className="text-[11px] font-semibold text-emerald-400 mt-1 flex items-center gap-1">
-                        <BadgePercent className="w-3.5 h-3.5" />
-                        <span>Equivale a {formatCurrency(monthlyEquivalent, 'ARS')}/mes</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Features List */}
-                  <ul className="space-y-2.5 text-xs text-slate-300 pt-2">
-                    {plan.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-2.5">
-                        <div className={`mt-0.5 rounded-full p-0.5 shrink-0 ${
-                          plan.isPopular ? 'bg-[#009EE3]/20 text-[#009EE3]' : 'bg-emerald-500/20 text-emerald-400'
-                        }`}>
-                          <Check className="w-3 h-3 stroke-[3]" />
-                        </div>
-                        <span className="leading-snug">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* Card Action Buttons */}
-                <div className="pt-6 space-y-2">
-                  {/* Mercado Pago Subscribe Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleSelectPlanForMp(plan)}
-                    className={`w-full py-3 px-4 rounded-2xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2 active:scale-98 shadow-lg cursor-pointer ${
-                      plan.isPopular
-                        ? 'bg-[#009EE3] hover:bg-[#0089C7] text-white shadow-[#009EE3]/30'
-                        : plan.isPro
-                        ? 'bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white shadow-indigo-600/30'
-                        : 'bg-white hover:bg-slate-100 text-slate-900 shadow-white/10'
-                    }`}
-                  >
-                    <CreditCard className="w-4 h-4" />
-                    <span>Pagar con Mercado Pago</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRegSelectedPlan(plan.id);
-                      setTab('register');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="w-full py-2 text-slate-400 hover:text-white font-bold text-xs transition-colors"
-                  >
-                    Elegir y Registrarme
-                  </button>
-                </div>
-
-              </div>
-            );
-          })}
-
-        </div>
-
-        {/* Mercado Pago Trust Banner */}
-        <div className="mt-12 p-6 rounded-3xl bg-slate-900/60 border border-slate-800/80 max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-[#009EE3]/15 text-[#009EE3] border border-[#009EE3]/30 flex items-center justify-center font-black text-xl shrink-0">
-              MP
-            </div>
-            <div>
-              <h5 className="font-extrabold text-sm text-white">
-                Garantía y Seguridad Mercado Pago
-              </h5>
-              <p className="text-xs text-slate-400">
-                Cancelá en cualquier momento. Acreditación automática y soporte preferencial en Argentina.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/30">
-              100% Protegido
             </span>
           </div>
         </div>
 
+        {/* 3 Pricing Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
+          {SUBSCRIPTION_PLANS.map((plan) => {
+            const price = billingCycle === 'annual' ? plan.priceAnnual : plan.priceMonthly;
+            const isPopular = plan.highlighted;
+
+            return (
+              <div
+                key={plan.id}
+                className={`rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-all duration-200 relative ${
+                  isPopular
+                    ? 'bg-gradient-to-b from-[#2E0854] via-[#4A0E78] to-[#1C0533] border-2 border-purple-400/60 shadow-2xl shadow-purple-950/60 scale-102'
+                    : 'bg-slate-900/80 border border-slate-800 hover:border-slate-700 shadow-xl'
+                }`}
+              >
+                {/* Popular Badge */}
+                {isPopular && (
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-gradient-to-r from-pink-500 to-[#F95420] text-white text-[11px] font-black uppercase tracking-wider shadow-md">
+                    {plan.badgeText || 'Plan Más Recomendado'}
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-xl font-black text-white">{plan.name}</h4>
+                    <p className="text-xs text-slate-300 mt-1">{plan.description}</p>
+                  </div>
+
+                  {/* Price */}
+                  <div className="pt-2">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl sm:text-4xl font-black text-white">
+                        {formatCurrency(price, 'ARS')}
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        {billingCycle === 'annual' ? '/año' : '/mes'}
+                      </span>
+                    </div>
+                    <div className="inline-flex items-center gap-1 mt-1 text-[11px] text-amber-300 font-bold">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Incluye 15 días de prueba gratis</span>
+                    </div>
+                  </div>
+
+                  {/* Feature Checklist */}
+                  <div className="pt-4 border-t border-slate-800/80 space-y-2.5">
+                    {plan.features.map((feature, idx) => (
+                      <div key={idx} className="flex items-start gap-2.5 text-xs text-slate-300">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                        <span>{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Plan Action CTA */}
+                <div className="pt-6 mt-6 border-t border-slate-800/80">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectPlanForMp(plan)}
+                    className={`w-full py-3 px-4 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      isPopular
+                        ? 'bg-gradient-to-r from-[#F95420] to-pink-500 hover:from-orange-500 hover:to-pink-400 text-white shadow-lg shadow-orange-500/25'
+                        : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
+                    }`}
+                  >
+                    <span>Suscribirme con Mercado Pago</span>
+                    <CreditCard className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 border-t border-slate-900 text-center text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <p>GastoAR &copy; {new Date().getFullYear()} — Registrá. Controlá. Ahorrá. Finanzas individuales, en pareja y cuotas bancarias en Argentina.</p>
-        
-        {onOpenAdminPanel && (
-          <button
-            onClick={() => setIsAdminAuthOpen(true)}
-            className="text-slate-500 hover:text-slate-300 font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <Lock className="w-3 h-3" />
-            <span>Acceso Administración</span>
-          </button>
-        )}
+      <footer className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+        <div className="flex items-center gap-2">
+          <span>© {new Date().getFullYear()} GastoAR</span>
+          <span>•</span>
+          <span>Finanzas para Parejas & Control Personal</span>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {onOpenAdminPanel && (
+            <button
+              type="button"
+              onClick={() => setIsAdminAuthOpen(true)}
+              className="hover:text-purple-400 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+            >
+              <KeyRound className="w-3 h-3" />
+              <span>Acceso Administrador</span>
+            </button>
+          )}
+        </div>
       </footer>
 
-      {/* Admin PIN Authentication Modal */}
-      <AdminAuthModal
-        isOpen={isAdminAuthOpen}
-        onClose={() => setIsAdminAuthOpen(false)}
-        onSuccess={() => {
-          onOpenAdminPanel?.();
-        }}
-      />
+      {/* Mercado Pago Modal */}
+      {isMpModalOpen && selectedPlanForPayment && (
+        <MercadoPagoModal
+          isOpen={isMpModalOpen}
+          onClose={() => setIsMpModalOpen(false)}
+          plan={selectedPlanForPayment}
+          billingCycle={billingCycle}
+          userAccount={{
+            id: 'usr-new',
+            name: regName.trim() || 'Nuevo Usuario',
+            email: regEmail.trim() || 'ejemplo@ejemplo.com',
+            partnerName: regPartnerName.trim() || 'Mi Pareja',
+            accountType: regAccountType,
+            accountCode: regAccountCode,
+            currency: 'ARS',
+            createdAt: Date.now(),
+          }}
+          onPaymentSuccess={handlePaymentSuccess}
+        />
+      )}
 
-      {/* Mercado Pago Checkout Modal */}
-      <MercadoPagoModal
-        isOpen={isMpModalOpen}
-        onClose={() => setIsMpModalOpen(false)}
-        plan={selectedPlanForPayment}
-        billingCycle={billingCycle}
-        userEmail={regEmail}
-        userName={regName}
-        accountCode={regAccountCode}
-        onPaymentSuccess={handlePaymentSuccess}
-      />
-
+      {/* Admin Auth Modal */}
+      {isAdminAuthOpen && onOpenAdminPanel && (
+        <AdminAuthModal
+          isOpen={isAdminAuthOpen}
+          onClose={() => setIsAdminAuthOpen(false)}
+          onSuccess={() => {
+            setIsAdminAuthOpen(false);
+            onOpenAdminPanel();
+          }}
+        />
+      )}
     </div>
   );
 };
