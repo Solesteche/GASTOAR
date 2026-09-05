@@ -16,7 +16,9 @@ app.use(express.json({ limit: "25mb" }));
 // PERSISTENT CLOUD DATABASE (CROSS-DEVICE SYNC)
 // ==========================================
 
-const DB_FILE = path.join(process.cwd(), "data_storage", "gastoar_db.json");
+const DB_FILE = process.env.VERCEL
+  ? path.join("/tmp", "gastoar_db.json")
+  : path.join(process.cwd(), "data_storage", "gastoar_db.json");
 
 interface UserRecord {
   id: string;
@@ -154,7 +156,7 @@ app.post("/api/auth/register", (req, res) => {
 
     // Check if account already exists
     if (db.users[cleanEmail]) {
-      return res.status(409).json({
+      return res.status(200).json({
         success: false,
         error: "Ya existe una cuenta registrada con este correo electrónico. Por favor seleccioná 'Iniciar Sesión' para acceder a tus datos.",
         existingUser: true,
@@ -253,17 +255,19 @@ app.post("/api/auth/login", (req, res) => {
     }
 
     if (!matchedUser) {
-      return res.status(404).json({
+      return res.status(200).json({
         success: false,
-        error: "No se encontró ninguna cuenta con este correo o usuario. Registrate para comenzar.",
+        notFound: true,
+        error: "No se encontró ninguna cuenta con este correo o usuario. Registrate para comenzar o ingresá en Modo Demo.",
       });
     }
 
     // Check password if configured
     if (matchedUser.password && password) {
       if (matchedUser.password !== password) {
-        return res.status(401).json({
+        return res.status(200).json({
           success: false,
+          invalidPassword: true,
           error: "Contraseña incorrecta. Por favor verificala e intentalo de nuevo.",
         });
       }
@@ -724,16 +728,23 @@ app.post("/api/mercadopago/webhook", async (req, res) => {
   }
 });
 
+// Handle unmatched API routes with JSON 404 instead of HTML SPA fallback
+app.all("/api/*", (_req, res) => {
+  res.status(404).json({ success: false, error: "Ruta de API no encontrada." });
+});
+
 // Start Express Server with Vite middleware
 async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
+  const distPath = path.join(process.cwd(), "dist");
+  const isProduction = process.env.NODE_ENV === "production" || fs.existsSync(path.join(distPath, "index.html"));
+
+  if (!isProduction) {
     const vite = await createViteServer({
       server: { middlewareMode: true, host: "0.0.0.0", port: PORT },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (_req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
@@ -745,4 +756,9 @@ async function startServer() {
   });
 }
 
-startServer();
+// Only listen when not in a serverless environment like Vercel
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;

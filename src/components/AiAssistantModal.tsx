@@ -103,6 +103,13 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
         }),
       });
 
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || !contentType.includes('application/json')) {
+        throw new Error(response.status === 404
+          ? 'El servicio de IA requiere el servidor backend activo en Vercel.'
+          : 'Respuesta inesperada del servidor al procesar el comprobante.');
+      }
+
       const data = await response.json();
       if (data.success && data.data) {
         setParsedResult(data.data);
@@ -139,6 +146,13 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
         }),
       });
 
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || !contentType.includes('application/json')) {
+        throw new Error(response.status === 404
+          ? 'El servicio de IA requiere el servidor backend activo en Vercel.'
+          : 'Respuesta inesperada al procesar el texto.');
+      }
+
       const data = await response.json();
       if (data.success && data.data) {
         setParsedResult(data.data);
@@ -173,6 +187,13 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
           currency: profile.currency || 'ARS',
         }),
       });
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || !contentType.includes('application/json')) {
+        throw new Error(response.status === 404
+          ? 'El servicio de IA requiere el servidor backend activo en Vercel.'
+          : 'Respuesta inesperada al generar la asesoría.');
+      }
 
       const data = await response.json();
       if (data.success && data.advice) {

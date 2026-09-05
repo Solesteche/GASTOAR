@@ -74,6 +74,7 @@ export interface UserAccount {
   currency: string;
   selectedPlanId?: SubscriptionPlanId;
   createdAt: number;
+  updatedAt?: number;
 }
 
 export interface SettlementRecord {

@@ -104,7 +104,8 @@ import {
   saveMovementToFirestore,
   deleteMovementFromFirestore,
   syncBudgetsToFirestore,
-  syncUserProfileToFirestore
+  syncUserProfileToFirestore,
+  signInWithGoogle
 } from './lib/firebase';
 import { 
   BillingCycle,
@@ -450,7 +451,8 @@ export default function App() {
         const emailParam = encodeURIComponent(currentUserAccount.email);
         const codeParam = encodeURIComponent(currentUserAccount.accountCode || profile.accountCode || '');
         const res = await fetch(`/api/sync/load?email=${emailParam}&accountCode=${codeParam}`);
-        if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
           const json = await res.json();
           if (json.success && json.data) {
             const data = json.data;
@@ -929,7 +931,8 @@ export default function App() {
     // Try loading shared partner data from cloud immediately
     try {
       const res = await fetch(`/api/sync/load?accountCode=${encodeURIComponent(cleanCode)}`);
-      if (res.ok) {
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
         const json = await res.json();
         if (json.success && json.data) {
           if (Array.isArray(json.data.transactions)) setTransactions(json.data.transactions);
@@ -994,63 +997,110 @@ export default function App() {
   const handleLogin = async (email: string, password?: string): Promise<{ success: boolean; error?: string }> => {
     try {
       setCloudSyncStatus('syncing');
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password }),
-      });
+      const cleanInput = email.trim();
+      const cleanEmail = cleanInput.toLowerCase();
 
-      const json = await res.json();
-      if (!res.ok || !json.success) {
+      let json: any = null;
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanInput, password }),
+        });
+
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          json = await res.json();
+        } else {
+          console.warn('Non-JSON response from /api/auth/login:', res.status);
+        }
+      } catch (fetchErr) {
+        console.warn('Network call to /api/auth/login failed:', fetchErr);
+      }
+
+      if (json && json.success && json.account) {
+        const acc: UserAccount = json.account;
+        setCurrentUserAccount(acc);
+        localStorage.setItem('control_gastos_account_v1', JSON.stringify(acc));
+
+        if (json.data) {
+          const data = json.data;
+          if (Array.isArray(data.transactions)) setTransactions(data.transactions);
+          if (data.categoryMap) setCategoryMap(data.categoryMap);
+          if (data.categoryColors) setCategoryColors(data.categoryColors);
+          if (data.budgets) setBudgets(data.budgets);
+          if (data.profile) setProfile(data.profile);
+          if (Array.isArray(data.settlementHistory)) setSettlementHistory(data.settlementHistory);
+          if (Array.isArray(data.goals)) setGoals(data.goals);
+          if (Array.isArray(data.subscriptions) && data.subscriptions.length > 0) setSubscriptions(data.subscriptions);
+        } else {
+          setProfile(prev => ({
+            ...prev,
+            user1Name: acc.name,
+            user2Name: acc.partnerName || prev.user2Name,
+            currency: acc.currency || prev.currency,
+            accountCode: acc.accountCode || prev.accountCode,
+          }));
+        }
+
+        setIsAdmin(false);
+        setIsDemoMode(false);
+        localStorage.setItem('control_gastos_is_admin', 'false');
+        localStorage.setItem('control_gastos_is_demo', 'false');
+        setIsAuthenticated(true);
+        localStorage.setItem('control_gastos_is_authenticated', 'true');
+        setCloudSyncStatus('synced');
+        isInitialCloudLoadDone.current = true;
+
+        // Sync profile to Firestore in background
+        if (acc.id) {
+          syncUserProfileToFirestore(acc.id, acc).catch(() => {});
+        }
+
+        showToast('¡Sesión iniciada con éxito! Información sincronizada desde la nube ☁️', 'success');
+        return { success: true };
+      }
+
+      // If server returned structured error (e.g. invalid password or user not found)
+      if (json && !json.success && json.error) {
         setCloudSyncStatus('offline');
-        return {
-          success: false,
-          error: json.error || 'No se encontró la cuenta o la contraseña es incorrecta.',
-        };
+        // Check local storage before failing if account exists locally
+        const savedAccountStr = localStorage.getItem('control_gastos_account_v1');
+        if (savedAccountStr) {
+          try {
+            const savedAccount: UserAccount = JSON.parse(savedAccountStr);
+            if (
+              savedAccount.email.toLowerCase() === cleanEmail ||
+              savedAccount.name.toLowerCase() === cleanEmail ||
+              savedAccount.accountCode.toUpperCase() === cleanInput.toUpperCase()
+            ) {
+              if (savedAccount.password && password && savedAccount.password !== password) {
+                return { success: false, error: 'Contraseña incorrecta. Por favor verificala.' };
+              }
+              setCurrentUserAccount(savedAccount);
+              setIsAuthenticated(true);
+              localStorage.setItem('control_gastos_is_authenticated', 'true');
+              showToast('¡Sesión iniciada con tu cuenta guardada localmente!', 'success');
+              return { success: true };
+            }
+          } catch {}
+        }
+        return { success: false, error: json.error };
       }
 
-      const acc: UserAccount = json.account;
-      setCurrentUserAccount(acc);
-      localStorage.setItem('control_gastos_account_v1', JSON.stringify(acc));
-
-      if (json.data) {
-        const data = json.data;
-        if (Array.isArray(data.transactions)) setTransactions(data.transactions);
-        if (data.categoryMap) setCategoryMap(data.categoryMap);
-        if (data.categoryColors) setCategoryColors(data.categoryColors);
-        if (data.budgets) setBudgets(data.budgets);
-        if (data.profile) setProfile(data.profile);
-        if (Array.isArray(data.settlementHistory)) setSettlementHistory(data.settlementHistory);
-        if (Array.isArray(data.goals)) setGoals(data.goals);
-        if (Array.isArray(data.subscriptions) && data.subscriptions.length > 0) setSubscriptions(data.subscriptions);
-      } else {
-        setProfile(prev => ({
-          ...prev,
-          user1Name: acc.name,
-          user2Name: acc.partnerName || prev.user2Name,
-          currency: acc.currency || prev.currency,
-          accountCode: acc.accountCode || prev.accountCode,
-        }));
-      }
-
-      setIsAdmin(false);
-      setIsDemoMode(false);
-      localStorage.setItem('control_gastos_is_admin', 'false');
-      localStorage.setItem('control_gastos_is_demo', 'false');
-      setIsAuthenticated(true);
-      localStorage.setItem('control_gastos_is_authenticated', 'true');
-      setCloudSyncStatus('synced');
-      isInitialCloudLoadDone.current = true;
-      showToast('¡Sesión iniciada con éxito! Información sincronizada desde la nube ☁️', 'success');
-      return { success: true };
-    } catch (err: any) {
-      console.error('Error logging in:', err);
-      // Fallback local login if server offline
+      // Fallback local login if server offline or returned non-JSON
       const savedAccountStr = localStorage.getItem('control_gastos_account_v1');
       if (savedAccountStr) {
         try {
           const savedAccount: UserAccount = JSON.parse(savedAccountStr);
-          if (savedAccount.email.toLowerCase() === email.toLowerCase() || savedAccount.name.toLowerCase() === email.toLowerCase()) {
+          if (
+            savedAccount.email.toLowerCase() === cleanEmail ||
+            savedAccount.name.toLowerCase() === cleanEmail ||
+            savedAccount.accountCode.toUpperCase() === cleanInput.toUpperCase()
+          ) {
+            if (savedAccount.password && password && savedAccount.password !== password) {
+              return { success: false, error: 'Contraseña incorrecta. Por favor verificala.' };
+            }
             setCurrentUserAccount(savedAccount);
             setIsAuthenticated(true);
             localStorage.setItem('control_gastos_is_authenticated', 'true');
@@ -1059,7 +1109,14 @@ export default function App() {
           }
         } catch {}
       }
-      return { success: false, error: 'No se pudo conectar al servidor. Verificá tu conexión a internet.' };
+
+      return {
+        success: false,
+        error: 'No se encontró ninguna cuenta con este correo o usuario. Seleccioná "Crear Cuenta" o ingresá en "Modo Demo".',
+      };
+    } catch (err: any) {
+      console.error('Error logging in:', err);
+      return { success: false, error: 'No se pudo conectar al servidor. Podés ingresar en Modo Demo.' };
     }
   };
 
@@ -1111,9 +1168,11 @@ export default function App() {
         defaultSplit: data.accountType === 'individual' ? '100_user1' : '50_50',
       };
 
+      const cleanEmail = data.email.trim().toLowerCase();
+
       const payload = {
         name: data.name.trim(),
-        email: data.email.trim(),
+        email: cleanEmail,
         password: data.password,
         accountType: data.accountType,
         partnerName: data.partnerName,
@@ -1132,14 +1191,25 @@ export default function App() {
         },
       };
 
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      let json: any = null;
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
 
-      const json = await res.json();
-      if (!res.ok || !json.success) {
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          json = await res.json();
+        } else {
+          console.warn('Non-JSON response from /api/auth/register:', res.status);
+        }
+      } catch (fetchErr) {
+        console.warn('Network call to /api/auth/register failed:', fetchErr);
+      }
+
+      if (json && !json.success && json.error) {
         setCloudSyncStatus('offline');
         return {
           success: false,
@@ -1147,7 +1217,20 @@ export default function App() {
         };
       }
 
-      const newAcc: UserAccount = json.account;
+      const newAcc: UserAccount = (json && json.account) ? json.account : {
+        id: `acc-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        email: cleanEmail,
+        name: data.name.trim(),
+        password: data.password,
+        accountType: data.accountType,
+        partnerName: data.partnerName ? data.partnerName.trim() : undefined,
+        currency: data.currency || 'ARS',
+        accountCode: initialSub.accountCode,
+        selectedPlanId: chosenPlan.id,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
       setCurrentUserAccount(newAcc);
       localStorage.setItem('control_gastos_account_v1', JSON.stringify(newAcc));
 
@@ -1171,11 +1254,91 @@ export default function App() {
       setCloudSyncStatus('synced');
       isInitialCloudLoadDone.current = true;
       setActiveTab('dashboard');
+
+      // Sync profile to Firestore
+      if (newAcc.id) {
+        syncUserProfileToFirestore(newAcc.id, newAcc).catch(() => {});
+      }
+
       showToast('¡Cuenta creada y sincronizada en la nube con 15 días de prueba gratis! ☁️', 'success');
       return { success: true };
     } catch (err: any) {
       console.error('Error registering:', err);
-      return { success: false, error: 'Error al conectar con el servidor para registrar la cuenta.' };
+      return { success: false, error: 'Error al registrar la cuenta. Podés ingresar en Modo Demo.' };
+    }
+  };
+
+  const handleGoogleLogin = async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      setCloudSyncStatus('syncing');
+      const user = await signInWithGoogle();
+      if (!user || !user.email) {
+        return { success: false, error: 'No se pudo completar el inicio de sesión con Google.' };
+      }
+
+      const email = user.email.toLowerCase();
+      const name = user.displayName || email.split('@')[0];
+      const accountCode = 'PAIR-' + Math.floor(1000 + Math.random() * 9000);
+
+      const acc: UserAccount = {
+        id: user.uid,
+        email,
+        name,
+        accountType: 'individual',
+        accountCode,
+        currency: 'ARS',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      // Try server sync
+      try {
+        await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: acc.name,
+            email: acc.email,
+            accountType: acc.accountType,
+            currency: acc.currency,
+            accountCode: acc.accountCode,
+            initialData: {
+              transactions: [],
+              categoryMap: DEFAULT_CATEGORY_MAP,
+              categoryColors: DEFAULT_CATEGORY_COLORS,
+              budgets: { categories: {}, subcategories: {} },
+              profile: { ...DEFAULT_COUPLE_PROFILE, user1Name: acc.name, accountCode: acc.accountCode },
+              settlementHistory: [],
+              goals: [],
+              subscriptions: [],
+            },
+          }),
+        });
+      } catch {}
+
+      // Save locally
+      setCurrentUserAccount(acc);
+      localStorage.setItem('control_gastos_account_v1', JSON.stringify(acc));
+
+      setIsAdmin(false);
+      setIsDemoMode(false);
+      localStorage.setItem('control_gastos_is_admin', 'false');
+      localStorage.setItem('control_gastos_is_demo', 'false');
+
+      setIsAuthenticated(true);
+      localStorage.setItem('control_gastos_is_authenticated', 'true');
+      setCloudSyncStatus('synced');
+      isInitialCloudLoadDone.current = true;
+      setActiveTab('dashboard');
+
+      // Sync profile to Firestore
+      syncUserProfileToFirestore(user.uid, acc).catch(() => {});
+
+      showToast(`¡Bienvenido/a, ${name}! Sesión iniciada con Google ☁️`, 'success');
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error with Google Sign In:', err);
+      return { success: false, error: err.message || 'Error al conectar con Google.' };
     }
   };
 
@@ -1257,6 +1420,7 @@ export default function App() {
         <AuthLandingPage
           onLogin={handleLogin}
           onRegister={handleRegister}
+          onGoogleLogin={handleGoogleLogin}
           onGuestDemo={handleGuestDemo}
           onOpenAdminPanel={handleOpenAdminPanel}
         />
