@@ -105,7 +105,11 @@ import {
   deleteMovementFromFirestore,
   syncBudgetsToFirestore,
   syncUserProfileToFirestore,
-  signInWithGoogle
+  signInWithGoogle,
+  registerWithEmailFirebase,
+  loginWithEmailFirebase,
+  getAppStateFromFirestore,
+  syncAppStateToFirestore
 } from './lib/firebase';
 import { 
   BillingCycle,
@@ -448,14 +452,8 @@ export default function App() {
           }
         }
 
-        const emailParam = encodeURIComponent(currentUserAccount.email);
-        const codeParam = encodeURIComponent(currentUserAccount.accountCode || profile.accountCode || '');
-        const res = await fetch(`/api/sync/load?email=${emailParam}&accountCode=${codeParam}`);
-        const contentType = res.headers.get('content-type') || '';
-        if (res.ok && contentType.includes('application/json')) {
-          const json = await res.json();
-          if (json.success && json.data) {
-            const data = json.data;
+        const data: any = await getAppStateFromFirestore(activeUserId);
+        if (data) {
             if (Array.isArray(data.transactions) && data.transactions.length > 0) {
               setTransactions(prev => {
                 const map = new Map<string, Transaction>();
@@ -485,14 +483,9 @@ export default function App() {
             if (Array.isArray(data.subscriptions) && data.subscriptions.length > 0) {
               setSubscriptions(data.subscriptions);
             }
-            if (json.account) {
-              setCurrentUserAccount(json.account);
-              localStorage.setItem('control_gastos_account_v1', JSON.stringify(json.account));
-            }
             setCloudSyncStatus('synced');
-          } else {
-            setCloudSyncStatus('synced');
-          }
+        } else {
+          setCloudSyncStatus('synced');
         }
       } catch (err) {
         console.warn('Could not sync cloud data on load:', err);
@@ -513,29 +506,11 @@ export default function App() {
     const timer = setTimeout(async () => {
       try {
         setCloudSyncStatus('syncing');
-        const res = await fetch('/api/sync/save', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: currentUserAccount.email,
-            accountCode: profile.accountCode || currentUserAccount.accountCode,
-            data: {
-              transactions,
-              categoryMap,
-              categoryColors,
-              budgets,
-              profile,
-              settlementHistory,
-              goals,
-              subscriptions,
-            },
-          }),
+        await syncAppStateToFirestore(activeUserId, {
+          transactions, categoryMap, categoryColors, budgets, profile,
+          settlementHistory, goals, subscriptions,
         });
-        if (res.ok) {
-          setCloudSyncStatus('synced');
-        } else {
-          setCloudSyncStatus('error');
-        }
+        setCloudSyncStatus('synced');
       } catch {
         setCloudSyncStatus('offline');
       }
@@ -1000,6 +975,41 @@ export default function App() {
       const cleanInput = email.trim();
       const cleanEmail = cleanInput.toLowerCase();
 
+      // Firebase Auth es la fuente de verdad para cuentas nuevas. A diferencia
+      // del archivo temporal de Vercel, funciona igual desde cualquier equipo.
+      try {
+        const firebaseUser = await loginWithEmailFirebase(cleanEmail, password || '');
+        const savedProfile = await getUserProfileFromFirestore(firebaseUser.uid);
+        const now = Date.now();
+        const acc: UserAccount = savedProfile || {
+          id: firebaseUser.uid,
+          email: firebaseUser.email || cleanEmail,
+          name: firebaseUser.displayName || cleanEmail.split('@')[0],
+          accountType: 'individual',
+          accountCode: `PAIR-${Math.floor(1000 + Math.random() * 9000)}`,
+          currency: 'ARS',
+          createdAt: now,
+        };
+        setCurrentUserAccount(acc);
+        localStorage.setItem('control_gastos_account_v1', JSON.stringify(acc));
+        setIsAdmin(false);
+        setIsDemoMode(false);
+        setIsAuthenticated(true);
+        localStorage.setItem('control_gastos_is_authenticated', 'true');
+        localStorage.setItem('control_gastos_is_admin', 'false');
+        localStorage.setItem('control_gastos_is_demo', 'false');
+        setCloudSyncStatus('synced');
+        isInitialCloudLoadDone.current = false;
+        showToast('¡Sesión iniciada! Tus datos se están sincronizando desde la nube ☁️', 'success');
+        return { success: true };
+      } catch (firebaseError: any) {
+        // Se conserva el camino heredado sólo para cuentas creadas antes de la
+        // migración; las cuentas nuevas no dependen de él.
+        if (!['auth/user-not-found', 'auth/invalid-credential'].includes(firebaseError?.code)) {
+          return { success: false, error: 'No se pudo iniciar sesión. Revisá el correo y la contraseña.' };
+        }
+      }
+
       let json: any = null;
       try {
         const res = await fetch('/api/auth/login', {
@@ -1137,30 +1147,9 @@ export default function App() {
       setCloudSyncStatus('syncing');
 
       const cleanEmail = data.email.trim().toLowerCase();
-
-      // 1. Prevent duplicate registration: check local registry first
-      try {
-        const knownStr = localStorage.getItem('control_gastos_known_accounts_v1');
-        if (knownStr) {
-          const known = JSON.parse(knownStr);
-          if (known[cleanEmail]) {
-            return {
-              success: false,
-              error: 'Ya existe una cuenta registrada con este correo electrónico. Por favor seleccioná "Iniciar Sesión" para acceder.',
-            };
-          }
-        }
-        const savedAccountStr = localStorage.getItem('control_gastos_account_v1');
-        if (savedAccountStr) {
-          const saved = JSON.parse(savedAccountStr);
-          if (saved.email && saved.email.toLowerCase() === cleanEmail) {
-            return {
-              success: false,
-              error: 'Ya existe una cuenta registrada con este correo electrónico. Por favor seleccioná "Iniciar Sesión" para acceder.',
-            };
-          }
-        }
-      } catch {}
+      if (!data.password) {
+        return { success: false, error: 'Ingresá una contraseña para crear tu cuenta.' };
+      }
 
       const today = new Date();
       const trialEnd = new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000);
@@ -1197,6 +1186,16 @@ export default function App() {
         defaultSplit: data.accountType === 'individual' ? '100_user1' : '50_50',
       };
 
+      let firebaseUser;
+      try {
+        firebaseUser = await registerWithEmailFirebase(cleanEmail, data.password, data.name.trim(), data.lastName?.trim());
+      } catch (firebaseError: any) {
+        if (firebaseError?.code === 'auth/email-already-in-use') {
+          return { success: false, error: 'Ya existe una cuenta con este correo. Elegí “Iniciar sesión”.' };
+        }
+        return { success: false, error: 'No se pudo crear la cuenta. Intentá nuevamente.' };
+      }
+
       const payload = {
         name: data.name.trim(),
         lastName: data.lastName ? data.lastName.trim() : undefined,
@@ -1220,40 +1219,12 @@ export default function App() {
         },
       };
 
-      let json: any = null;
-      try {
-        const res = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-
-        const contentType = res.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-          json = await res.json();
-        } else {
-          console.warn('Non-JSON response from /api/auth/register:', res.status);
-        }
-      } catch (fetchErr) {
-        console.warn('Network call to /api/auth/register failed:', fetchErr);
-      }
-
-      // If server explicitly reported user already exists or returned failure
-      if (json && (!json.success || json.existingUser)) {
-        setCloudSyncStatus('offline');
-        return {
-          success: false,
-          error: json.error || 'Ya existe una cuenta con este correo electrónico. Por favor seleccioná "Iniciar Sesión".',
-        };
-      }
-
-      const newAcc: UserAccount = (json && json.account) ? json.account : {
-        id: `acc-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      const newAcc: UserAccount = {
+        id: firebaseUser.uid,
         email: cleanEmail,
         name: data.name.trim(),
         lastName: data.lastName ? data.lastName.trim() : undefined,
         phone: data.phone ? data.phone.trim() : undefined,
-        password: data.password,
         accountType: data.accountType,
         partnerName: data.partnerName ? data.partnerName.trim() : undefined,
         currency: data.currency || 'ARS',
@@ -1261,8 +1232,11 @@ export default function App() {
         selectedPlanId: chosenPlan.id,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        emailVerified: Boolean(data.emailVerified),
+        emailVerified: firebaseUser.emailVerified,
       };
+
+      await syncUserProfileToFirestore(firebaseUser.uid, newAcc);
+      await syncAppStateToFirestore(firebaseUser.uid, payload.initialData);
 
       setCurrentUserAccount(newAcc);
       localStorage.setItem('control_gastos_account_v1', JSON.stringify(newAcc));
@@ -1765,12 +1739,7 @@ export default function App() {
           else if (tab === 'couple_balance') setActiveTab('couple_balance');
           else setActiveTab(tab);
         }}
-        onOpenTransactionModal={() => { 
-          setEditingTransaction(null); 
-          setInitialIsCuotas(false); 
-          setTxModalInitialType('gasto'); 
-          setIsTxModalOpen(true); 
-        }}
+        onOpenVoiceExpense={() => setIsAiModalOpen(true)}
         onToggleSidebar={() => setIsSidebarOpenMobile(prev => !prev)}
         hasDebt={debtInfo.debtAmount > 0}
       />

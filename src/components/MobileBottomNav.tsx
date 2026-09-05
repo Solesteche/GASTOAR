@@ -3,7 +3,6 @@ import {
   Home,
   LayoutDashboard, 
   Receipt, 
-  Plus, 
   BarChart3,
   MoreHorizontal,
   Menu,
@@ -22,7 +21,7 @@ import {
 interface MobileBottomNavProps {
   activeTab: string;
   onSelectTab: (tab: any) => void;
-  onOpenTransactionModal: () => void;
+  onOpenVoiceExpense: () => void;
   onToggleSidebar?: () => void;
   hasDebt: boolean;
 }
@@ -30,7 +29,7 @@ interface MobileBottomNavProps {
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   activeTab,
   onSelectTab,
-  onOpenTransactionModal,
+  onOpenVoiceExpense,
   onToggleSidebar,
   hasDebt,
 }) => {
@@ -191,13 +190,15 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             <span className="text-[10px] mt-0.5 font-bold">Movimientos</span>
           </button>
 
-          {/* 3. Center Floating (+) Add Button */}
+          {/* 3. Center Floating Voice Expense Button */}
           <button
-            onClick={onOpenTransactionModal}
+            onClick={onOpenVoiceExpense}
             className="flex flex-col items-center justify-center -mt-5 bg-gradient-to-tr from-[#E04412] via-[#F95420] to-[#FF7A45] hover:from-[#D03808] hover:to-[#F95420] text-white w-12 h-12 rounded-full shadow-lg shadow-orange-500/35 active:scale-95 transition-transform border-2 border-white cursor-pointer"
-            title="Agregar Gasto"
+            title="Registra un gasto por voz"
+            aria-label="Registra un gasto por voz"
           >
-            <Plus className="w-6 h-6 stroke-[3]" />
+            <Mic className="w-5 h-5 stroke-[2.8]" />
+            <span className="text-[9px] leading-none font-extrabold">Registra</span>
           </button>
 
           {/* 4. Vencimientos */}

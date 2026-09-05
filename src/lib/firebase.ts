@@ -22,7 +22,8 @@ import {
   collection, 
   getDocFromServer,
   query,
-  orderBy
+  orderBy,
+  serverTimestamp
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Budgets, Transaction, UserAccount } from '../types';
@@ -216,6 +217,34 @@ export async function getBudgetsFromFirestore(userId: string): Promise<Budgets |
       };
     }
     return null;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, path);
+  }
+}
+
+/**
+ * Estado que no forma parte de un movimiento individual. Mantenerlo en
+ * Firestore evita que un dispositivo nuevo dependa de localStorage o de la
+ * carpeta temporal de un servidor serverless.
+ */
+export async function syncAppStateToFirestore(userId: string, state: Record<string, unknown>): Promise<void> {
+  const path = `users/${userId}/estado/actual`;
+  try {
+    await setDoc(doc(db, 'users', userId, 'estado', 'actual'), {
+      ...state,
+      userId,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, path);
+  }
+}
+
+export async function getAppStateFromFirestore(userId: string): Promise<Record<string, unknown> | null> {
+  const path = `users/${userId}/estado/actual`;
+  try {
+    const snap = await getDoc(doc(db, 'users', userId, 'estado', 'actual'));
+    return snap.exists() ? snap.data() : null;
   } catch (err) {
     handleFirestoreError(err, OperationType.GET, path);
   }

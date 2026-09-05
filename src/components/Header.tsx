@@ -7,7 +7,8 @@ import {
   ArrowUpRight, 
   LogOut,
   HelpCircle,
-  Mic
+  Mic,
+  Download
 } from 'lucide-react';
 import { CoupleProfile, ExpenseMode } from '../types';
 import { GastoArBrand } from './GastoArLogo';
@@ -45,6 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenCloudSync,
 }) => {
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
 
   const isUser1 = profile?.currentUser === 'user1';
@@ -60,6 +62,22 @@ export const Header: React.FC<HeaderProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const captureInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+    };
+    window.addEventListener('beforeinstallprompt', captureInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', captureInstallPrompt);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    await installPrompt.userChoice;
+    setInstallPrompt(null);
+  };
 
   const handleOpenGasto = () => {
     setShowAddMenu(false);
@@ -170,6 +188,18 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Side: Quick Action Buttons & Profile Initial */}
         <div className="flex items-center gap-2 sm:gap-3">
+
+          {installPrompt && (
+            <button
+              type="button"
+              onClick={handleInstallApp}
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#2E0854] font-bold text-xs transition-all flex items-center gap-1.5 border border-purple-200/80 cursor-pointer shadow-2xs"
+              title="Instalar GastoAR en este dispositivo"
+            >
+              <Download className="w-3.5 h-3.5 text-[#7928CA]" />
+              <span className="hidden sm:inline">Instalar</span>
+            </button>
+          )}
           
           {/* Voice Expense Button with Smart AI Categorization */}
           {onOpenAiModal && (
@@ -177,7 +207,7 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={onOpenAiModal}
               title="Registrar gastos por voz o audios con IA"
-              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#2E0854] font-bold text-xs transition-all flex items-center gap-1.5 border border-purple-200/80 cursor-pointer shadow-2xs"
+              className="hidden md:flex px-2.5 sm:px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#2E0854] font-bold text-xs transition-all items-center gap-1.5 border border-purple-200/80 cursor-pointer shadow-2xs"
             >
               <Mic className="w-3.5 h-3.5 text-[#7928CA]" />
               <span className="hidden sm:inline">Gasto por Voz</span>
