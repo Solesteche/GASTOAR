@@ -67,6 +67,8 @@ export interface UserAccount {
   id: string;
   email: string;
   name: string;
+  lastName?: string;
+  phone?: string;
   password?: string;
   partnerName?: string;
   accountType: 'pareja' | 'individual';
@@ -75,6 +77,7 @@ export interface UserAccount {
   selectedPlanId?: SubscriptionPlanId;
   createdAt: number;
   updatedAt?: number;
+  emailVerified?: boolean;
 }
 
 export interface SettlementRecord {

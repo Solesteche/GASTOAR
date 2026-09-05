@@ -37,7 +37,9 @@ service cloud.firestore {
              data.email is string && data.email.size() <= 120 &&
              data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
              data.accountType in ['individual', 'pareja'] &&
-             data.currency is string && data.currency.size() <= 10;
+             data.currency is string && data.currency.size() <= 10 &&
+             (!('lastName' in data) || (data.lastName is string && data.lastName.size() <= 100)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 30));
     }
 
     function isValidBudget(data, userId) {

@@ -5,6 +5,11 @@ import {
   signInWithPopup, 
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  updateProfile,
   User as FirebaseUser
 } from 'firebase/auth';
 import { 
@@ -141,6 +146,8 @@ export async function syncUserProfileToFirestore(userId: string, account: UserAc
       id: userId,
       email: account.email || auth.currentUser?.email || '',
       name: account.name || 'Usuario',
+      lastName: account.lastName || '',
+      phone: account.phone || '',
       partnerName: account.partnerName || '',
       accountType: account.accountType || 'individual',
       accountCode: account.accountCode || '',
@@ -325,6 +332,70 @@ export async function getAvailableMonthsFromFirestore(userId: string): Promise<{
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, collectionPath);
   }
+}
+
+/**
+ * Registro con Correo y Contraseña mediante Firebase Auth
+ * Crea la cuenta en Firebase Auth y despacha automáticamente el correo de verificación.
+ */
+export async function registerWithEmailFirebase(
+  email: string, 
+  pass: string, 
+  name: string,
+  lastName?: string
+): Promise<FirebaseUser> {
+  const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+  const fullName = `${name} ${lastName || ''}`.trim();
+  if (fullName) {
+    try {
+      await updateProfile(userCredential.user, { displayName: fullName });
+    } catch (e) {
+      console.warn('Could not update displayName:', e);
+    }
+  }
+
+  // Envía el correo de verificación oficial de Firebase
+  try {
+    await sendEmailVerification(userCredential.user);
+  } catch (err) {
+    console.warn('Error sending verification email via Firebase Auth:', err);
+  }
+
+  return userCredential.user;
+}
+
+/**
+ * Reenviar correo de verificación oficial de Firebase
+ */
+export async function sendVerificationEmailFirebase(): Promise<void> {
+  if (!auth.currentUser) {
+    throw new Error('No hay una sesión activa de Firebase para enviar la verificación.');
+  }
+  await sendEmailVerification(auth.currentUser);
+}
+
+/**
+ * Iniciar sesión con Correo y Contraseña mediante Firebase Auth
+ */
+export async function loginWithEmailFirebase(email: string, pass: string): Promise<FirebaseUser> {
+  const userCredential = await signInWithEmailAndPassword(auth, email, pass);
+  return userCredential.user;
+}
+
+/**
+ * Recarga y verifica el estado de verificación de correo en Firebase
+ */
+export async function checkEmailVerifiedFirebase(): Promise<boolean> {
+  if (!auth.currentUser) return false;
+  await auth.currentUser.reload();
+  return Boolean(auth.currentUser.emailVerified);
+}
+
+/**
+ * Enviar correo de restablecimiento de contraseña mediante Firebase
+ */
+export async function sendPasswordResetFirebase(email: string): Promise<void> {
+  await sendPasswordResetEmail(auth, email);
 }
 
 /**

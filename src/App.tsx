@@ -1122,16 +1122,45 @@ export default function App() {
 
   const handleRegister = async (data: {
     name: string;
+    lastName?: string;
+    phone?: string;
     email: string;
     password?: string;
     accountType: 'pareja' | 'individual';
     partnerName?: string;
-    currency: string;
+    currency?: string;
     accountCode?: string;
     selectedPlanId?: SubscriptionPlanId;
+    emailVerified?: boolean;
   }): Promise<{ success: boolean; error?: string }> => {
     try {
       setCloudSyncStatus('syncing');
+
+      const cleanEmail = data.email.trim().toLowerCase();
+
+      // 1. Prevent duplicate registration: check local registry first
+      try {
+        const knownStr = localStorage.getItem('control_gastos_known_accounts_v1');
+        if (knownStr) {
+          const known = JSON.parse(knownStr);
+          if (known[cleanEmail]) {
+            return {
+              success: false,
+              error: 'Ya existe una cuenta registrada con este correo electrónico. Por favor seleccioná "Iniciar Sesión" para acceder.',
+            };
+          }
+        }
+        const savedAccountStr = localStorage.getItem('control_gastos_account_v1');
+        if (savedAccountStr) {
+          const saved = JSON.parse(savedAccountStr);
+          if (saved.email && saved.email.toLowerCase() === cleanEmail) {
+            return {
+              success: false,
+              error: 'Ya existe una cuenta registrada con este correo electrónico. Por favor seleccioná "Iniciar Sesión" para acceder.',
+            };
+          }
+        }
+      } catch {}
 
       const today = new Date();
       const trialEnd = new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000);
@@ -1140,8 +1169,8 @@ export default function App() {
       const initialSub: UserSubscription = {
         id: 'sub-' + Date.now(),
         userId: 'usr-' + Date.now(),
-        userEmail: data.email.trim().toLowerCase(),
-        userName: data.name.trim(),
+        userEmail: cleanEmail,
+        userName: `${data.name.trim()}${data.lastName ? ' ' + data.lastName.trim() : ''}`,
         partnerName: data.partnerName ? data.partnerName.trim() : undefined,
         accountCode: data.accountCode || ('PAIR-' + Math.floor(1000 + Math.random() * 9000)),
         planId: chosenPlan.id,
@@ -1168,10 +1197,10 @@ export default function App() {
         defaultSplit: data.accountType === 'individual' ? '100_user1' : '50_50',
       };
 
-      const cleanEmail = data.email.trim().toLowerCase();
-
       const payload = {
         name: data.name.trim(),
+        lastName: data.lastName ? data.lastName.trim() : undefined,
+        phone: data.phone ? data.phone.trim() : undefined,
         email: cleanEmail,
         password: data.password,
         accountType: data.accountType,
@@ -1209,11 +1238,12 @@ export default function App() {
         console.warn('Network call to /api/auth/register failed:', fetchErr);
       }
 
-      if (json && !json.success && json.error) {
+      // If server explicitly reported user already exists or returned failure
+      if (json && (!json.success || json.existingUser)) {
         setCloudSyncStatus('offline');
         return {
           success: false,
-          error: json.error || 'Ya existe una cuenta con este correo. Por favor seleccioná "Iniciar Sesión".',
+          error: json.error || 'Ya existe una cuenta con este correo electrónico. Por favor seleccioná "Iniciar Sesión".',
         };
       }
 
@@ -1221,6 +1251,8 @@ export default function App() {
         id: `acc-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         email: cleanEmail,
         name: data.name.trim(),
+        lastName: data.lastName ? data.lastName.trim() : undefined,
+        phone: data.phone ? data.phone.trim() : undefined,
         password: data.password,
         accountType: data.accountType,
         partnerName: data.partnerName ? data.partnerName.trim() : undefined,
@@ -1229,10 +1261,26 @@ export default function App() {
         selectedPlanId: chosenPlan.id,
         createdAt: Date.now(),
         updatedAt: Date.now(),
+        emailVerified: Boolean(data.emailVerified),
       };
 
       setCurrentUserAccount(newAcc);
       localStorage.setItem('control_gastos_account_v1', JSON.stringify(newAcc));
+
+      // Update local registry of known accounts to prevent duplicate creation
+      try {
+        const knownStr = localStorage.getItem('control_gastos_known_accounts_v1');
+        const known = knownStr ? JSON.parse(knownStr) : {};
+        known[cleanEmail] = {
+          email: cleanEmail,
+          name: data.name.trim(),
+          lastName: data.lastName ? data.lastName.trim() : '',
+          phone: data.phone ? data.phone.trim() : '',
+          accountCode: initialSub.accountCode,
+          createdAt: Date.now(),
+        };
+        localStorage.setItem('control_gastos_known_accounts_v1', JSON.stringify(known));
+      } catch {}
 
       // Reset application state to clean initial registration state
       setTransactions([]);

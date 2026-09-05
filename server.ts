@@ -24,6 +24,8 @@ interface UserRecord {
   id: string;
   email: string;
   name: string;
+  lastName?: string;
+  phone?: string;
   password?: string;
   partnerName?: string;
   accountType: 'pareja' | 'individual';
@@ -134,6 +136,8 @@ app.post("/api/auth/register", (req, res) => {
   try {
     const {
       name,
+      lastName,
+      phone,
       email,
       password,
       accountType = "pareja",
@@ -154,9 +158,9 @@ app.post("/api/auth/register", (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
     const db = getDb();
 
-    // Check if account already exists
+    // Check if account already exists (prevent duplicate user creation)
     if (db.users[cleanEmail]) {
-      return res.status(200).json({
+      return res.status(409).json({
         success: false,
         error: "Ya existe una cuenta registrada con este correo electrónico. Por favor seleccioná 'Iniciar Sesión' para acceder a tus datos.",
         existingUser: true,
@@ -173,6 +177,8 @@ app.post("/api/auth/register", (req, res) => {
       id: `acc-${now}-${Math.floor(Math.random() * 1000)}`,
       email: cleanEmail,
       name: name.trim(),
+      lastName: lastName ? String(lastName).trim() : undefined,
+      phone: phone ? String(phone).trim() : undefined,
       password: password || undefined,
       partnerName: partnerName ? partnerName.trim() : undefined,
       accountType: accountType === "individual" ? "individual" : "pareja",

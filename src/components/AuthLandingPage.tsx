@@ -26,7 +26,8 @@ import {
   KeyRound,
   RotateCw,
   ArrowLeft,
-  UserPlus
+  UserPlus,
+  Phone
 } from 'lucide-react';
 import { BillingCycle, CoupleProfile, SubscriptionPlan, SubscriptionPlanId, UserAccount } from '../types';
 import { GastoArBrand, GastoArHeroBrand } from './GastoArLogo';
@@ -34,11 +35,18 @@ import { SUBSCRIPTION_PLANS } from '../data/subscriptionPlans';
 import { formatCurrency } from '../utils/formatters';
 import { MercadoPagoModal } from './MercadoPagoModal';
 import { AdminAuthModal } from './AdminAuthModal';
+import { 
+  registerWithEmailFirebase, 
+  sendVerificationEmailFirebase, 
+  checkEmailVerifiedFirebase 
+} from '../lib/firebase';
 
 interface AuthLandingPageProps {
   onLogin: (email: string, password?: string) => Promise<{ success: boolean; error?: string }> | { success: boolean; error?: string };
   onRegister: (data: {
     name: string;
+    lastName?: string;
+    phone?: string;
     email: string;
     password?: string;
     accountType: 'pareja' | 'individual';
@@ -46,6 +54,7 @@ interface AuthLandingPageProps {
     currency: string;
     accountCode?: string;
     selectedPlanId?: SubscriptionPlanId;
+    emailVerified?: boolean;
   }) => Promise<{ success: boolean; error?: string }> | { success: boolean; error?: string };
   onGoogleLogin?: () => Promise<{ success: boolean; error?: string }>;
   onGuestDemo: () => void;
@@ -82,6 +91,8 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
 
   // Register form state
   const [regName, setRegName] = useState<string>('');
+  const [regLastName, setRegLastName] = useState<string>('');
+  const [regPhone, setRegPhone] = useState<string>('');
   const [regEmail, setRegEmail] = useState<string>('');
   const [regPassword, setRegPassword] = useState<string>('');
   const [regAccountType, setRegAccountType] = useState<'pareja' | 'individual'>('pareja');
@@ -90,10 +101,10 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
   const [regAccountCode, setRegAccountCode] = useState<string>(() => 'PAIR-' + Math.floor(1000 + Math.random() * 9000));
   const [regSelectedPlan, setRegSelectedPlan] = useState<SubscriptionPlanId>('pareja');
 
-  // Email verification step state (Req 5)
+  // Email verification step state (Firebase Auth Integration)
   const [isVerifyingEmail, setIsVerifyingEmail] = useState<boolean>(false);
-  const [verificationCode, setVerificationCode] = useState<string>('');
-  const [generatedPin, setGeneratedPin] = useState<string>('749201');
+  const [isCheckingEmailVerified, setIsCheckingEmailVerified] = useState<boolean>(false);
+  const [verificationFeedback, setVerificationFeedback] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
   const [pinResentNotice, setPinResentNotice] = useState<boolean>(false);
 
   const handleGoogleSignIn = async () => {
@@ -136,30 +147,50 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
     e.preventDefault();
     setErrorMsg('');
     setExistingAccountDetected(false);
+    setVerificationFeedback(null);
 
     if (!regName.trim()) {
-      setErrorMsg('Por favor ingresa tu nombre.');
+      setErrorMsg('Por favor ingresá tu nombre.');
+      return;
+    }
+    if (!regLastName.trim()) {
+      setErrorMsg('Por favor ingresá tu apellido.');
+      return;
+    }
+    if (!regPhone.trim()) {
+      setErrorMsg('Por favor ingresá tu número de celular.');
       return;
     }
     if (!regEmail.trim() || !regEmail.includes('@')) {
-      setErrorMsg('Por favor ingresa un correo electrónico válido.');
+      setErrorMsg('Por favor ingresá un correo electrónico válido.');
       return;
     }
-    if (regPassword.length < 4) {
-      setErrorMsg('La contraseña debe contener al menos 4 caracteres.');
+    if (regPassword.length < 6) {
+      setErrorMsg('La contraseña debe tener al menos 6 caracteres (requisito de seguridad de Firebase).');
       return;
     }
     if (regAccountType === 'pareja' && !regPartnerName.trim()) {
-      setErrorMsg('Por favor ingresa el nombre de tu pareja para vincular la cuenta.');
+      setErrorMsg('Por favor ingresá el nombre de tu pareja para vincular la cuenta.');
       return;
     }
 
-    // Quick check local storage first
+    const cleanEmail = regEmail.trim().toLowerCase();
+
+    // 1. Prevent duplicate registration: Quick check local storage first
     try {
+      const knownStr = localStorage.getItem('control_gastos_known_accounts_v1');
+      if (knownStr) {
+        const known: Record<string, any> = JSON.parse(knownStr);
+        if (known[cleanEmail]) {
+          setErrorMsg('Ya existe una cuenta con este correo electrónico registrada en este dispositivo. Por favor iniciá sesión para ingresar.');
+          setExistingAccountDetected(true);
+          return;
+        }
+      }
       const savedStr = localStorage.getItem('control_gastos_account_v1');
       if (savedStr) {
         const saved = JSON.parse(savedStr);
-        if (saved.email && saved.email.toLowerCase() === regEmail.trim().toLowerCase()) {
+        if (saved.email && saved.email.toLowerCase() === cleanEmail) {
           setErrorMsg('Ya existe una cuenta con este correo electrónico registrada en este dispositivo. Por favor iniciá sesión para ingresar.');
           setExistingAccountDetected(true);
           return;
@@ -167,19 +198,19 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
       }
     } catch {}
 
-    // Pre-check if email already exists on server
+    // 2. Pre-check if email already exists on server
     setIsLoading(true);
     try {
       const checkRes = await fetch('/api/auth/check-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: regEmail.trim() }),
+        body: JSON.stringify({ email: cleanEmail }),
       });
       const contentType = checkRes.headers.get('content-type') || '';
       if (checkRes.ok && contentType.includes('application/json')) {
         const checkData = await checkRes.json();
         if (checkData.exists) {
-          setErrorMsg('Ya existe una cuenta con este correo electrónico (creada desde tu celular o computadora). Por favor iniciá sesión para ver toda tu información.');
+          setErrorMsg('Ya existe una cuenta registrada con este correo electrónico. Por favor seleccioná "Iniciar Sesión" para acceder.');
           setExistingAccountDetected(true);
           setIsLoading(false);
           return;
@@ -187,32 +218,105 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
       }
     } catch {
       // ignore network check error and proceed
+    }
+
+    // 3. Register user in Firebase Auth and dispatch real email verification
+    try {
+      await registerWithEmailFirebase(
+        cleanEmail,
+        regPassword,
+        regName.trim(),
+        regLastName.trim()
+      );
+      setIsVerifyingEmail(true);
+      setVerificationFeedback({
+        type: 'info',
+        message: `Se envió un correo de verificación oficial a ${cleanEmail}. Abrí tu casilla para confirmarlo.`,
+      });
+    } catch (fbErr: any) {
+      console.warn('Firebase Auth registration result:', fbErr);
+      const errCode = fbErr?.code || '';
+      if (errCode === 'auth/email-already-in-use') {
+        setErrorMsg('Ya existe un usuario registrado en Firebase con este correo electrónico. Por favor seleccioná "Iniciar Sesión".');
+        setExistingAccountDetected(true);
+        setIsLoading(false);
+        return;
+      } else if (errCode === 'auth/weak-password') {
+        setErrorMsg('La contraseña debe contener al menos 6 caracteres.');
+        setIsLoading(false);
+        return;
+      } else if (errCode === 'auth/invalid-email') {
+        setErrorMsg('El formato del correo electrónico ingresado no es válido.');
+        setIsLoading(false);
+        return;
+      } else {
+        // Fallback or network-related notice: proceed to verification screen
+        setIsVerifyingEmail(true);
+      }
     } finally {
       setIsLoading(false);
     }
-
-    // Generate 6-digit random code and open verification screen (Req 5)
-    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedPin(newCode);
-    setIsVerifyingEmail(true);
-    setVerificationCode('');
-    setPinResentNotice(false);
   };
 
-  const handleConfirmVerification = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCheckEmailVerified = async () => {
+    setIsCheckingEmailVerified(true);
+    setVerificationFeedback(null);
     setErrorMsg('');
-
-    if (verificationCode.trim() !== generatedPin && verificationCode.trim() !== '123456') {
-      setErrorMsg(`Código incorrecto. Ingresa el código ${generatedPin} enviado a tu casilla.`);
-      return;
-    }
-
-    setIsLoading(true);
     try {
-      // Verification successful: complete real registration
+      const isVerified = await checkEmailVerifiedFirebase();
+      if (isVerified) {
+        setVerificationFeedback({
+          type: 'success',
+          message: '¡Excelente! Correo verificado con éxito.',
+        });
+        setTimeout(async () => {
+          await completeRegistration(true);
+        }, 800);
+      } else {
+        setVerificationFeedback({
+          type: 'info',
+          message: 'Tu correo aún figura pendiente. Si hiciste clic en el enlace, aguardá unos segundos y volvé a verificar, o podés ingresar ahora.',
+        });
+      }
+    } catch {
+      setVerificationFeedback({
+        type: 'info',
+        message: 'No se pudo comprobar en Firebase. Podés ingresar directamente a la app.',
+      });
+    } finally {
+      setIsCheckingEmailVerified(false);
+    }
+  };
+
+  const handleResendFirebaseEmail = async () => {
+    setIsLoading(true);
+    setVerificationFeedback(null);
+    try {
+      await sendVerificationEmailFirebase();
+      setPinResentNotice(true);
+      setVerificationFeedback({
+        type: 'success',
+        message: `¡Correo de verificación reenviado a ${regEmail}! Revisá tu bandeja de entrada o spam.`,
+      });
+      setTimeout(() => setPinResentNotice(false), 5000);
+    } catch {
+      setVerificationFeedback({
+        type: 'error',
+        message: 'No pudimos reenviar el correo en este momento. Podés ingresar directamente.',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const completeRegistration = async (isVerified: boolean = false) => {
+    setIsLoading(true);
+    setErrorMsg('');
+    try {
       const res = await onRegister({
         name: regName.trim(),
+        lastName: regLastName.trim(),
+        phone: regPhone.trim(),
         email: regEmail.trim(),
         password: regPassword,
         accountType: regAccountType,
@@ -220,25 +324,17 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
         currency: regCurrency,
         accountCode: regAccountCode,
         selectedPlanId: regSelectedPlan,
+        emailVerified: isVerified,
       });
 
       if (!res.success) {
         setErrorMsg(res.error || 'Hubo un error al crear la cuenta.');
-        setIsVerifyingEmail(false);
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al crear la cuenta.');
-      setIsVerifyingEmail(false);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleResendPin = () => {
-    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedPin(newCode);
-    setPinResentNotice(true);
-    setTimeout(() => setPinResentNotice(false), 4000);
   };
 
   const handleSelectPlanForMp = (plan: SubscriptionPlan) => {
@@ -265,6 +361,8 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
 
     onRegister({
       name: nameToUse,
+      lastName: regLastName.trim() || undefined,
+      phone: regPhone.trim() || undefined,
       email: emailToUse,
       accountType: details.planId === 'individual' ? 'individual' : 'pareja',
       partnerName: details.planId === 'individual' ? undefined : (regPartnerName.trim() || 'Mi Pareja'),
@@ -360,33 +458,48 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
         {/* Right Column: Authentication Card (Login / Register / Verification) */}
         <div className="lg:col-span-5 w-full max-w-md mx-auto bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-purple-950/40 relative">
           
-          {/* STEP: EMAIL VERIFICATION (Req 5) */}
+          {/* STEP: EMAIL VERIFICATION (Firebase Auth Native Flow) */}
           {isVerifyingEmail ? (
             <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
               <div className="text-center space-y-2">
-                <div className="w-14 h-14 rounded-2xl bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center justify-center mx-auto shadow-inner">
-                  <Mail className="w-7 h-7" />
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-500/20 to-indigo-500/30 text-purple-300 border border-purple-500/40 flex items-center justify-center mx-auto shadow-inner">
+                  <Mail className="w-7 h-7 text-purple-300 animate-pulse" />
                 </div>
-                <h3 className="text-lg font-black text-white">Verificación de Correo</h3>
+                <h3 className="text-lg font-black text-white">Verificá tu Correo con Firebase</h3>
                 <p className="text-xs text-slate-300">
-                  Enviamos un código de seguridad de 6 dígitos a <strong className="text-purple-300">{regEmail}</strong>
+                  Enviamos un correo de verificación oficial a:
                 </p>
+                <div className="inline-block px-3 py-1 rounded-full bg-purple-950/60 border border-purple-500/40 text-purple-200 font-mono text-xs font-bold">
+                  {regEmail}
+                </div>
               </div>
 
-              {/* Simulation Banner with Quick Fill */}
-              <div className="p-3 rounded-2xl bg-purple-950/60 border border-purple-500/40 text-purple-200 text-xs space-y-2">
-                <div className="flex items-center justify-between font-bold text-[11px]">
-                  <span>📩 Simulación de Bandeja de Entrada</span>
-                  <span className="font-mono text-amber-300 text-sm font-black">{generatedPin}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setVerificationCode(generatedPin)}
-                  className="w-full py-1 px-2 rounded-lg bg-purple-600/60 hover:bg-purple-600 text-white text-[11px] font-bold transition-colors cursor-pointer"
-                >
-                  Autocompletar código ({generatedPin})
-                </button>
+              {/* Instructions Card */}
+              <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-purple-500/30 text-xs space-y-2.5">
+                <p className="font-bold text-slate-200 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span>Pasos para confirmar tu cuenta:</span>
+                </p>
+                <ol className="space-y-1.5 text-slate-300 list-decimal list-inside pl-1 text-[11px] leading-relaxed">
+                  <li>Abrí tu aplicación de correo o bandeja de entrada.</li>
+                  <li>Buscá el correo enviado por <strong>Firebase / GastoAr</strong>.</li>
+                  <li>Revisá también tu carpeta de <em>Spam / Correo no deseado</em>.</li>
+                  <li>Hacé clic en el botón o enlace para <strong>confirmar tu dirección</strong>.</li>
+                </ol>
               </div>
+
+              {/* Verification Feedback Banner */}
+              {verificationFeedback && (
+                <div className={`p-3 rounded-xl border text-xs font-semibold ${
+                  verificationFeedback.type === 'success'
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                    : verificationFeedback.type === 'error'
+                    ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                    : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-200'
+                }`}>
+                  {verificationFeedback.message}
+                </div>
+              )}
 
               {errorMsg && (
                 <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold">
@@ -394,56 +507,59 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
                 </div>
               )}
 
-              {pinResentNotice && (
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold text-center">
-                  ¡Nuevo código enviado a {regEmail}!
-                </div>
-              )}
-
-              <form onSubmit={handleConfirmVerification} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-slate-300 text-center">
-                    Ingresá los 6 dígitos recibidos
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-                    placeholder="749201"
-                    className="w-full py-3 text-center tracking-[0.4em] font-mono text-xl font-black bg-slate-950/80 border border-purple-500/40 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-                  />
-                </div>
-
+              <div className="space-y-2.5 pt-1">
+                {/* Button 1: Check if verified and enter */}
                 <button
-                  type="submit"
-                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-[#F95420] hover:from-purple-500 hover:to-orange-500 active:scale-98 text-white font-extrabold text-sm shadow-lg shadow-purple-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  type="button"
+                  onClick={handleCheckEmailVerified}
+                  disabled={isCheckingEmailVerified || isLoading}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-[#F95420] hover:from-purple-500 hover:to-orange-500 active:scale-98 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-purple-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  <span>Confirmar y Activar 15 Días Gratis</span>
-                  <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                  {isCheckingEmailVerified ? (
+                    <>
+                      <RotateCw className="w-4 h-4 animate-spin text-purple-200" />
+                      <span>Comprobando en Firebase...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Ya confirmé en mi correo e Ingresar</span>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                    </>
+                  )}
                 </button>
 
-                <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleResendPin}
-                    className="hover:text-purple-300 flex items-center gap-1 cursor-pointer"
-                  >
-                    <RotateCw className="w-3.5 h-3.5" />
-                    <span>Reenviar código</span>
-                  </button>
+                {/* Button 2: Direct enter fallback */}
+                <button
+                  type="button"
+                  onClick={() => completeRegistration(false)}
+                  disabled={isLoading}
+                  className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs border border-slate-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <span>Ingresar a la aplicación ahora (15 días gratis)</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-purple-400" />
+                </button>
+              </div>
 
-                  <button
-                    type="button"
-                    onClick={() => { setIsVerifyingEmail(false); setErrorMsg(''); }}
-                    className="hover:text-slate-200 flex items-center gap-1 cursor-pointer"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                    <span>Cambiar correo</span>
-                  </button>
-                </div>
-              </form>
+              <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={handleResendFirebaseEmail}
+                  disabled={isLoading}
+                  className="hover:text-purple-300 flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+                  <span>Reenviar correo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setIsVerifyingEmail(false); setErrorMsg(''); setVerificationFeedback(null); }}
+                  className="hover:text-slate-200 flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Modificar datos</span>
+                </button>
+              </div>
             </div>
           ) : (
             <>
@@ -651,18 +767,56 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
               ) : (
                 /* REGISTER FORM */
                 <form onSubmit={handleRegisterSubmit} className="space-y-3">
+                  {/* Name and Last Name Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-slate-300">
+                        Tu Nombre
+                      </label>
+                      <div className="relative">
+                        <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          required
+                          value={regName}
+                          onChange={(e) => setRegName(e.target.value)}
+                          placeholder="ej. Sol"
+                          className="w-full pl-10 pr-3.5 py-2 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-slate-300">
+                        Tu Apellido
+                      </label>
+                      <div className="relative">
+                        <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          required
+                          value={regLastName}
+                          onChange={(e) => setRegLastName(e.target.value)}
+                          placeholder="ej. Gómez"
+                          className="w-full pl-10 pr-3.5 py-2 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Phone Number */}
                   <div className="space-y-1">
                     <label className="block text-xs font-semibold text-slate-300">
-                      Tu Nombre
+                      Número de Celular
                     </label>
                     <div className="relative">
-                      <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <Phone className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
-                        type="text"
+                        type="tel"
                         required
-                        value={regName}
-                        onChange={(e) => setRegName(e.target.value)}
-                        placeholder="ej. Sol"
+                        value={regPhone}
+                        onChange={(e) => setRegPhone(e.target.value)}
+                        placeholder="ej. +54 9 11 2345-6789"
                         className="w-full pl-10 pr-3.5 py-2 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
                       />
                     </div>
@@ -748,7 +902,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
                         required
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
-                        placeholder="Mínimo 4 caracteres"
+                        placeholder="Mínimo 6 caracteres"
                         className="w-full pl-10 pr-10 py-2 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
                       />
                       <button
@@ -763,7 +917,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
 
                   <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300 text-[11px] flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
-                    <span><strong>15 días de prueba gratis incluidos:</strong> explorá todas las funciones premium. Al registrarte te enviaremos un código de verificación.</span>
+                    <span><strong>15 días de prueba gratis incluidos:</strong> explorá todas las funciones premium. Al registrarte te enviaremos un correo oficial de verificación de Firebase.</span>
                   </div>
 
                   <button

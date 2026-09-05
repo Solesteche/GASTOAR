@@ -19,6 +19,16 @@
           "maxLength": 100,
           "description": "Nombre del usuario principal"
         },
+        "lastName": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Apellido del usuario"
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 30,
+          "description": "Número de celular o WhatsApp"
+        },
         "partnerName": {
           "type": "string",
           "maxLength": 100,
