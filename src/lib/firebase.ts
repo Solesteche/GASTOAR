@@ -366,12 +366,25 @@ export async function registerWithEmailFirebase(
 
 /**
  * Reenviar correo de verificación oficial de Firebase
+ * Si no hay sesión activa pero se proveen email y pass, recupera la sesión primero.
  */
-export async function sendVerificationEmailFirebase(): Promise<void> {
-  if (!auth.currentUser) {
-    throw new Error('No hay una sesión activa de Firebase para enviar la verificación.');
+export async function sendVerificationEmailFirebase(email?: string, pass?: string): Promise<boolean> {
+  let user = auth.currentUser;
+  if (!user && email && pass) {
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, pass);
+      user = cred.user;
+    } catch (loginErr) {
+      console.warn('Could not auto-login to resend verification:', loginErr);
+    }
   }
-  await sendEmailVerification(auth.currentUser);
+
+  if (user) {
+    await sendEmailVerification(user);
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -385,10 +398,21 @@ export async function loginWithEmailFirebase(email: string, pass: string): Promi
 /**
  * Recarga y verifica el estado de verificación de correo en Firebase
  */
-export async function checkEmailVerifiedFirebase(): Promise<boolean> {
-  if (!auth.currentUser) return false;
-  await auth.currentUser.reload();
-  return Boolean(auth.currentUser.emailVerified);
+export async function checkEmailVerifiedFirebase(email?: string, pass?: string): Promise<boolean> {
+  let user = auth.currentUser;
+  if (!user && email && pass) {
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, pass);
+      user = cred.user;
+    } catch {}
+  }
+  if (!user) return false;
+  try {
+    await user.reload();
+    return Boolean(user.emailVerified);
+  } catch {
+    return false;
+  }
 }
 
 /**

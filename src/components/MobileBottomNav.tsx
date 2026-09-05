@@ -15,7 +15,8 @@ import {
   Sliders,
   Bell,
   CalendarClock,
-  X
+  X,
+  Mic
 } from 'lucide-react';
 
 interface MobileBottomNavProps {
@@ -155,9 +156,9 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 className="p-3 rounded-2xl border bg-purple-50/60 border-purple-200/80 text-purple-900 flex flex-col items-center gap-1.5 transition-all cursor-pointer"
               >
                 <div className="w-9 h-9 rounded-xl bg-[#6F2EC5] text-white flex items-center justify-center shadow-xs">
-                  <Sparkles className="w-4.5 h-4.5" />
+                  <Mic className="w-4.5 h-4.5" />
                 </div>
-                <span>IA Tickets</span>
+                <span>Gasto por Voz</span>
               </button>
             </div>
           </div>

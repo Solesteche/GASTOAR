@@ -727,40 +727,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           {/* SETTINGS: DARK MODE ONLY (LOGO DOWNLOAD OPTION REMOVED AS REQUESTED)     */}
           {/* ========================================================================= */}
           <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-purple-900/40">
-            <h4 className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider">
-              Nube & Base de Datos (Firebase Firestore)
-            </h4>
-
-            {/* Cloud Sync Card */}
-            {onOpenCloudSync && (
-              <button
-                type="button"
-                onClick={onOpenCloudSync}
-                className="w-full p-3.5 rounded-2xl border border-purple-200 dark:border-purple-800/60 bg-purple-50/50 dark:bg-[#15062a] hover:bg-purple-100/50 dark:hover:bg-[#1e093c] flex items-center justify-between text-left transition-all cursor-pointer shadow-xs"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-[#2E0854] text-white">
-                    <Cloud className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                      <span>Sincronización en Firebase</span>
-                      <span className="text-[9px] font-bold px-1.5 py-0.2 bg-emerald-100 text-emerald-700 rounded-full">
-                        Estructura Mensual
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-slate-500 dark:text-purple-300">
-                      usuarios ↓ presupuestos ↓ movimientos (por mes) · Previene pérdida de datos
-                    </div>
-                  </div>
-                </div>
-                <div className="text-purple-700 dark:text-purple-400 font-bold text-xs flex items-center gap-1">
-                  <span>Abrir</span>
-                  <ChevronRight className="w-4 h-4" />
-                </div>
-              </button>
-            )}
-
             <h4 className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider pt-2">
               Preferencias & Opciones de Aplicación
             </h4>

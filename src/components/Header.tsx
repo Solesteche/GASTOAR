@@ -7,9 +7,7 @@ import {
   ArrowUpRight, 
   LogOut,
   HelpCircle,
-  Camera,
-  Image as ImageIcon,
-  Cloud
+  Mic
 } from 'lucide-react';
 import { CoupleProfile, ExpenseMode } from '../types';
 import { GastoArBrand } from './GastoArLogo';
@@ -173,29 +171,16 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Right Side: Quick Action Buttons & Profile Initial */}
         <div className="flex items-center gap-2 sm:gap-3">
           
-          {/* AI Advisor / Tickets Button with Camera & Gallery permissions info (Req 10) */}
+          {/* Voice Expense Button with Smart AI Categorization */}
           {onOpenAiModal && (
             <button
               type="button"
               onClick={onOpenAiModal}
-              title="Escanear Tickets y Comprobantes con IA (Cámara / Galería)"
+              title="Registrar gastos por voz o audios con IA"
               className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#2E0854] font-bold text-xs transition-all flex items-center gap-1.5 border border-purple-200/80 cursor-pointer shadow-2xs"
             >
-              <Sparkles className="w-3.5 h-3.5 text-[#7928CA] animate-pulse" />
-              <span className="hidden sm:inline">IA Tickets</span>
-            </button>
-          )}
-
-          {/* Firebase Cloud Sync Status & Quick Action */}
-          {onOpenCloudSync && (
-            <button
-              type="button"
-              onClick={onOpenCloudSync}
-              title="Sincronización en la Nube con Firebase Firestore (usuarios → presupuestos → movimientos por mes)"
-              className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#2E0854] font-bold text-xs transition-all flex items-center gap-1.5 border border-purple-200/80 cursor-pointer shadow-2xs"
-            >
-              <Cloud className={`w-3.5 h-3.5 ${cloudSyncStatus === 'syncing' ? 'animate-bounce text-[#F95420]' : 'text-[#7928CA]'}`} />
-              <span className="hidden sm:inline">Firebase</span>
+              <Mic className="w-3.5 h-3.5 text-[#7928CA]" />
+              <span className="hidden sm:inline">Gasto por Voz</span>
             </button>
           )}
 

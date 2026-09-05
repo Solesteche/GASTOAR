@@ -1,6 +1,6 @@
 {
   "name": "GastoAR - Registrá. Controlá. Ahorrá.",
   "description": "GastoAR: Gestión inteligente de finanzas personales, gastos compartidos en pareja, presupuestos y control de cuotas bancarias en Argentina.",
-  "requestFramePermissions": ["camera"],
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

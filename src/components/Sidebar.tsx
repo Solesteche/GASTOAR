@@ -24,7 +24,8 @@ import {
   AlertCircle,
   Bell,
   ArrowUpRight,
-  CalendarClock
+  CalendarClock,
+  Mic
 } from 'lucide-react';
 import { CoupleProfile, ExpenseMode } from '../types';
 import { GastoArBrand, GastoArIcon } from './GastoArLogo';
@@ -97,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'budgets', label: 'Presupuestos & Límites', icon: Sliders, badge: null },
     { id: 'goals', label: 'Metas & Cajas', icon: Target, badge: 'Ahorro' },
     { id: 'categories', label: 'Categorías & Subcat', icon: FolderPlus, badge: null },
-    { id: 'ai', label: 'Asistente IA (Tickets)', icon: Sparkles, badge: 'Gemini', isModal: true },
+    { id: 'ai', label: 'Gasto por Voz', icon: Mic, badge: 'IA', isModal: true },
   ];
 
   const adminItem = { id: 'admin_subscriptions', label: 'Panel Admin Clientes', icon: ShieldCheck, badge: 'Admin' };

@@ -263,7 +263,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
     setVerificationFeedback(null);
     setErrorMsg('');
     try {
-      const isVerified = await checkEmailVerifiedFirebase();
+      const isVerified = await checkEmailVerifiedFirebase(regEmail.trim(), regPassword);
       if (isVerified) {
         setVerificationFeedback({
           type: 'success',
@@ -271,17 +271,17 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
         });
         setTimeout(async () => {
           await completeRegistration(true);
-        }, 800);
+        }, 600);
       } else {
         setVerificationFeedback({
           type: 'info',
-          message: 'Tu correo aún figura pendiente. Si hiciste clic en el enlace, aguardá unos segundos y volvé a verificar, o podés ingresar ahora.',
+          message: 'Tu cuenta ya está activada con tus 15 días gratis. Si no recibiste el correo o deseas entrar ya mismo, podés hacer clic abajo en "Ingresar a GastoAR ahora".',
         });
       }
     } catch {
       setVerificationFeedback({
         type: 'info',
-        message: 'No se pudo comprobar en Firebase. Podés ingresar directamente a la app.',
+        message: 'Cuenta lista para usar. Podés ingresar directamente con tus 15 días de prueba gratis.',
       });
     } finally {
       setIsCheckingEmailVerified(false);
@@ -292,17 +292,25 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
     setIsLoading(true);
     setVerificationFeedback(null);
     try {
-      await sendVerificationEmailFirebase();
-      setPinResentNotice(true);
+      const sent = await sendVerificationEmailFirebase(regEmail.trim(), regPassword);
+      if (sent) {
+        setPinResentNotice(true);
+        setVerificationFeedback({
+          type: 'success',
+          message: `¡Correo de verificación reenviado a ${regEmail}! Revisá tu bandeja de entrada o spam.`,
+        });
+        setTimeout(() => setPinResentNotice(false), 5000);
+      } else {
+        setVerificationFeedback({
+          type: 'info',
+          message: 'Tu cuenta está lista y habilitada. Podés ingresar directamente para comenzar tus 15 días de prueba gratis.',
+        });
+      }
+    } catch (err: any) {
+      console.warn('Resend verification error:', err);
       setVerificationFeedback({
-        type: 'success',
-        message: `¡Correo de verificación reenviado a ${regEmail}! Revisá tu bandeja de entrada o spam.`,
-      });
-      setTimeout(() => setPinResentNotice(false), 5000);
-    } catch {
-      setVerificationFeedback({
-        type: 'error',
-        message: 'No pudimos reenviar el correo en este momento. Podés ingresar directamente.',
+        type: 'info',
+        message: 'Tu cuenta ya se encuentra registrada con tus 15 días de prueba gratis. Hacé clic abajo en "Ingresar a GastoAR ahora" para comenzar.',
       });
     } finally {
       setIsLoading(false);
@@ -508,35 +516,35 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
               )}
 
               <div className="space-y-2.5 pt-1">
-                {/* Button 1: Check if verified and enter */}
-                <button
-                  type="button"
-                  onClick={handleCheckEmailVerified}
-                  disabled={isCheckingEmailVerified || isLoading}
-                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-[#F95420] hover:from-purple-500 hover:to-orange-500 active:scale-98 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-purple-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  {isCheckingEmailVerified ? (
-                    <>
-                      <RotateCw className="w-4 h-4 animate-spin text-purple-200" />
-                      <span>Comprobando en Firebase...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Ya confirmé en mi correo e Ingresar</span>
-                      <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                    </>
-                  )}
-                </button>
-
-                {/* Button 2: Direct enter fallback */}
+                {/* Button 1: Immediate access with 15 days free trial */}
                 <button
                   type="button"
                   onClick={() => completeRegistration(false)}
                   disabled={isLoading}
-                  className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs border border-slate-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-[#F95420] hover:from-purple-500 hover:to-orange-500 active:scale-98 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-purple-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  <span>Ingresar a la aplicación ahora (15 días gratis)</span>
-                  <ArrowRight className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Ingresar a GastoAR ahora (15 días gratis)</span>
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                </button>
+
+                {/* Button 2: Check if verified and enter */}
+                <button
+                  type="button"
+                  onClick={handleCheckEmailVerified}
+                  disabled={isCheckingEmailVerified || isLoading}
+                  className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white font-bold text-xs border border-purple-500/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isCheckingEmailVerified ? (
+                    <>
+                      <RotateCw className="w-4 h-4 animate-spin text-purple-300" />
+                      <span>Comprobando en Firebase...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <span>Ya confirmé en mi correo</span>
+                    </>
+                  )}
                 </button>
               </div>
 

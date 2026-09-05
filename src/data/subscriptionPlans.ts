@@ -53,7 +53,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'pro_ai',
     name: 'Plan Pro & Asistente IA',
-    tagline: 'Máxima potencia con escaneo inteligente de tickets con IA Gemini y asesoría. ¡15 días de prueba gratis!',
+    tagline: 'Máxima potencia con registro inteligente de gastos por voz con IA y categorización automática. ¡15 días gratis!',
     badge: 'Potencia Total 🚀 (15 Días Gratis)',
     priceMonthly: 12500,
     priceAnnual: 99000, // Equivale a $8.250/mes (-34%)
@@ -64,12 +64,11 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     hasCoupleSync: true,
     hasInstallmentManager: true,
     features: [
-      '✨ 15 días de prueba GRATIS con IA y escáner ilimitado',
+      '✨ 15 días de prueba GRATIS con registro por voz ilimitado',
       'Todo lo incluido en el Plan Parejas Dúo',
       'Creación y personalización total de categorías y subrubros',
-      'Escaneo inteligente ilimitado de tickets y facturas con IA Gemini',
-      'Carga de gastos por voz o texto libre en lenguaje natural',
-      'Diagnóstico financiero mensual y recomendaciones de ahorro con IA',
+      'Registro ultra-rápido de gastos por voz o audios de WhatsApp con IA',
+      'Categorización inteligente automática (ej: "Gasté 50000 en Coto" → Alimentación Supermercado)',
       'Gestión de Vencimientos (Tarjetas, Alquiler, Expensas, Servicios e Impuestos) + Google Calendar 📅',
       'Soporte prioritario directo por WhatsApp 24/7',
       'Acceso anticipado a nuevas funciones exclusivas'

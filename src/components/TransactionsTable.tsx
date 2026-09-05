@@ -35,8 +35,7 @@ import {
   ArrowUpDown,
   CalendarRange,
   Users,
-  LayoutGrid,
-  Cloud
+  LayoutGrid
 } from 'lucide-react';
 import { 
   CategoryColors, 
@@ -537,22 +536,6 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                     </button>
                   ))}
                 </div>
-
-                {onOpenCloudSync && (
-                  <div className="pt-1.5 border-t border-purple-100 mt-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsDateMenuOpen(false);
-                        onOpenCloudSync();
-                      }}
-                      className="w-full py-1.5 px-2.5 bg-purple-50 hover:bg-purple-100 text-[#5B21B6] rounded-xl font-bold text-[11px] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <Cloud className="w-3.5 h-3.5" />
-                      <span>Cargar mes histórico desde Firebase</span>
-                    </button>
-                  </div>
-                )}
               </div>
             )}
           </div>
