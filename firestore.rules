@@ -74,6 +74,15 @@ service cloud.firestore {
         allow delete: if isValidId(userId) && isValidId(budgetId) && isOwner(userId);
       }
 
+      // Estado de la aplicación: categorías, perfil, metas y suscripciones.
+      // Cada usuario sólo puede leer y escribir su propio documento.
+      match /estado/{stateId} {
+        allow get, list: if isValidId(userId) && isOwner(userId);
+        allow create, update: if isValidId(userId) && isValidId(stateId) &&
+          isOwner(userId) && request.resource.data.userId == userId;
+        allow delete: if false;
+      }
+
       // Subcollection: Movimientos particionados por mes (evita descargar el histórico entero)
       match /movimientos/{mesKey} {
         allow get, list: if isValidId(userId) && isValidMesKey(mesKey) && isOwner(userId);
