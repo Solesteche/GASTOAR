@@ -1,12 +1,10 @@
 {
-  "name": "GastoAR - Registrá. Controlá. Ahorrá.",
+  "name": "GastoAR - Control de Gastos",
   "short_name": "GastoAR",
-  "description": "Gestión de gastos personales y compartidos.",
-  "lang": "es-AR",
+  "description": "Gestión inteligente de finanzas personales, gastos en pareja y control de cuotas bancarias en Argentina.",
   "start_url": "/",
-  "scope": "/",
   "display": "standalone",
-  "background_color": "#2E0854",
+  "background_color": "#FAF8FC",
   "theme_color": "#7928CA",
   "icons": [
     {
@@ -20,6 +18,11 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
   ]
 }

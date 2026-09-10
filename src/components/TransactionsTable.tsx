@@ -35,7 +35,8 @@ import {
   ArrowUpDown,
   CalendarRange,
   Users,
-  LayoutGrid
+  LayoutGrid,
+  Mic
 } from 'lucide-react';
 import { 
   CategoryColors, 
@@ -807,6 +808,16 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                           <span>Cuota {tx.cuotaActual || 1}/{tx.cuotasTotal || 1}</span>
                         </span>
                       )}
+
+                      {tx.inputMethod === 'audio' && (
+                        <span 
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200"
+                          title={tx.audioTranscription ? `Audio: "${tx.audioTranscription}"` : 'Cargado por voz'}
+                        >
+                          <Mic className="w-2.5 h-2.5 text-purple-600" />
+                          <span>Voz</span>
+                        </span>
+                      )}
                     </div>
 
                     {/* Date and Payer separated by bullet (Visible on mobile and desktop) */}
@@ -845,8 +856,36 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                     {payerInitial}
                   </div>
 
+                  {/* Direct Action buttons: Edit & Delete */}
+                  <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(tx);
+                      }}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-[#6F2EC5] hover:bg-purple-50 transition-colors cursor-pointer"
+                      title="Editar movimiento"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`¿Estás seguro de que querés borrar el movimiento "${tx.concepto}" por $${Math.abs(tx.monto).toLocaleString('es-AR')}?`)) {
+                          handleDelete(tx.id);
+                        }
+                      }}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                      title="Borrar movimiento"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
                   {/* Chevron Right */}
-                  <div className="text-slate-300 group-hover:text-[#6F2EC5] transition-colors">
+                  <div className="text-slate-300 group-hover:text-[#6F2EC5] transition-colors hidden sm:block">
                     <ChevronRight className="w-4 h-4" />
                   </div>
 

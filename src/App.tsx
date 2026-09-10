@@ -145,6 +145,7 @@ import {
   exportTransactionsToCSV,
   isDateInRange 
 } from './utils/formatters';
+import { recordLearnedPreference } from './utils/learnedPreferences';
 
 export default function App() {
   // Authentication State
@@ -193,6 +194,7 @@ export default function App() {
 
   // Application State
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
     const saved = localStorage.getItem('control_gastos_tx_v5');
     if (saved) {
       try {
@@ -205,7 +207,7 @@ export default function App() {
         });
       } catch {}
     }
-    return DEFAULT_TRANSACTIONS;
+    return isDemo ? DEFAULT_TRANSACTIONS : [];
   });
 
   const [categoryMap, setCategoryMap] = useState<CategoryMap>(() => {
@@ -265,6 +267,7 @@ export default function App() {
   });
 
   const [budgets, setBudgets] = useState<Budgets>(() => {
+    const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
     const saved = localStorage.getItem('control_gastos_budgets_v5');
     if (saved) {
       try {
@@ -275,7 +278,7 @@ export default function App() {
         return parsed;
       } catch {}
     }
-    return DEFAULT_BUDGETS;
+    return isDemo ? DEFAULT_BUDGETS : { categories: {}, subcategories: {} };
   });
 
   const [profile, setProfile] = useState<CoupleProfile>(() => {
@@ -295,11 +298,12 @@ export default function App() {
   });
 
   const [goals, setGoals] = useState<Goal[]>(() => {
+    const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
     const saved = localStorage.getItem('control_gastos_goals_v1');
     if (saved) {
       try { return JSON.parse(saved); } catch {}
     }
-    return DEFAULT_GOALS;
+    return isDemo ? DEFAULT_GOALS : [];
   });
 
   // UI States
@@ -717,6 +721,21 @@ export default function App() {
       showToast(isIncome ? '¡Ingreso registrado con éxito!' : '¡Gasto registrado con éxito!', 'success');
     }
 
+    // Automatically update learned preferences whenever an expense is created or edited
+    if (savedTx.tipoTransaccion === 'gasto' && savedTx.concepto && savedTx.categoria && savedTx.concepto !== 'Gasto por voz') {
+      try {
+        recordLearnedPreference(
+          savedTx.concepto,
+          savedTx.categoria,
+          savedTx.subcategoria || 'General',
+          savedTx.metodoPago,
+          'auto_learned'
+        );
+      } catch (err) {
+        console.warn('Could not record learned preference:', err);
+      }
+    }
+
     // Persist to Firebase Firestore under users/{userId}/movimientos/{mesKey}/items/{txId}
     if (activeUserId && !isDemoMode) {
       saveMovementToFirestore(activeUserId, savedTx).catch(err => {
@@ -839,7 +858,7 @@ export default function App() {
   };
 
   // Goals Handlers
-  const handleAddGoal = (goalData: Omit<Goal, 'id' | 'createdAt'>) => {
+  const handleAddGoal = (goalData: Omit<Goal, 'id' | 'createdAt'>): Goal => {
     const newGoal: Goal = {
       ...goalData,
       id: 'goal-' + Date.now(),
@@ -847,6 +866,7 @@ export default function App() {
     };
     setGoals(prev => [newGoal, ...prev]);
     showToast(`Caja de meta "${newGoal.nombre}" creada con éxito`, 'success');
+    return newGoal;
   };
 
   const handleUpdateGoal = (id: string, updated: Partial<Goal>) => {
@@ -1266,6 +1286,15 @@ export default function App() {
       setProfile(cleanProfile);
       setSubscriptions([initialSub]);
 
+      // Clear all demo/previous local storage keys for clean slate
+      localStorage.setItem('control_gastos_tx_v5', JSON.stringify([]));
+      localStorage.setItem('control_gastos_budgets_v5', JSON.stringify({ categories: {}, subcategories: {} }));
+      localStorage.setItem('control_gastos_goals_v1', JSON.stringify([]));
+      localStorage.setItem('control_gastos_settlements_v3', JSON.stringify([]));
+      localStorage.setItem('gastoar_vencimientos_alerts_v4', JSON.stringify([]));
+      localStorage.setItem('gastoar_vencimientos_alerts_v3', JSON.stringify([]));
+      localStorage.setItem('gastoar_card_alerts_v2', JSON.stringify([]));
+
       setIsAdmin(false);
       setIsDemoMode(false);
       localStorage.setItem('control_gastos_is_admin', 'false');
@@ -1341,6 +1370,19 @@ export default function App() {
       // Save locally
       setCurrentUserAccount(acc);
       localStorage.setItem('control_gastos_account_v1', JSON.stringify(acc));
+
+      // Reset state for new session
+      setTransactions([]);
+      setGoals([]);
+      setSettlementHistory([]);
+      setBudgets({ categories: {}, subcategories: {} });
+      localStorage.setItem('control_gastos_tx_v5', JSON.stringify([]));
+      localStorage.setItem('control_gastos_budgets_v5', JSON.stringify({ categories: {}, subcategories: {} }));
+      localStorage.setItem('control_gastos_goals_v1', JSON.stringify([]));
+      localStorage.setItem('control_gastos_settlements_v3', JSON.stringify([]));
+      localStorage.setItem('gastoar_vencimientos_alerts_v4', JSON.stringify([]));
+      localStorage.setItem('gastoar_vencimientos_alerts_v3', JSON.stringify([]));
+      localStorage.setItem('gastoar_card_alerts_v2', JSON.stringify([]));
 
       setIsAdmin(false);
       setIsDemoMode(false);
@@ -1496,6 +1538,7 @@ export default function App() {
         isAdmin={isAdmin}
         isDemoMode={isDemoMode}
         onExitDemo={handleExitDemo}
+        isDarkMode={isDarkMode}
       />
 
       {/* Main Content Area */}
@@ -1522,6 +1565,7 @@ export default function App() {
           onExitDemo={handleExitDemo}
           cloudSyncStatus={cloudSyncStatus}
           onOpenCloudSync={() => setIsCloudSyncModalOpen(true)}
+          isDarkMode={isDarkMode}
         />
 
         {/* Dashboard Main Container */}
@@ -1551,6 +1595,7 @@ export default function App() {
             <AlertsSection
               profile={profile}
               transactions={transactions}
+              isDemoMode={isDemoMode}
               onShowToast={showToast}
               onOpenTransactionModal={() => {
                 setEditingTransaction(null);
@@ -1677,6 +1722,7 @@ export default function App() {
                 categoryColors={categoryColors}
                 categoryMap={categoryMap}
                 budgets={budgets}
+                isDemoMode={isDemoMode}
                 activeMode={activeMode}
                 onModeChange={handleModeChange}
                 onOpenTransactionModal={() => { 
@@ -1749,6 +1795,7 @@ export default function App() {
         isOpen={isTxModalOpen}
         onClose={() => { setIsTxModalOpen(false); setEditingTransaction(null); setInitialIsCuotas(false); }}
         onSave={handleSaveTransaction}
+        onDelete={handleDeleteTransaction}
         editingTransaction={editingTransaction}
         categoryMap={categoryMap}
         profile={profile}
@@ -1778,6 +1825,9 @@ export default function App() {
         profile={profile}
         transactions={transactions}
         budgets={budgets}
+        goals={goals}
+        onAddGoal={handleAddGoal}
+        onAddGoalContribution={handleAddContribution}
         onAddTransaction={handleSaveTransaction}
         onShowToast={showToast}
       />
@@ -1887,6 +1937,7 @@ export default function App() {
         onClose={() => setIsCardAlertsModalOpen(false)}
         transactions={transactions}
         profile={profile}
+        isDemoMode={isDemoMode}
         onUpgradePlan={() => { setIsCardAlertsModalOpen(false); setActiveTab('subscriptions'); }}
         onShowToast={showToast}
         isProOrTrial={activeUserSub ? (activeUserSub.status === 'active' || activeUserSub.status === 'trial') : true}

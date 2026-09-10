@@ -10,59 +10,63 @@ interface GastoArLogoProps {
 }
 
 /**
- * GastoAR Icon - Opción 1:
- * Modern circular gradient badge (Cyan-Blue into Deep Violet/Purple)
- * featuring the stylized 'G' and coin/financial smile glyph.
+ * GastoAR Icon - Oficial:
+ * Logo oficial con gradiente violeta/fucsia a naranja cálido,
+ * 'G' estilizada con carita sonriente blanca.
  */
 export const GastoArIcon: React.FC<{ size?: number | string; className?: string }> = ({ 
   size = 40,
   className = ''
 }) => {
   const pixelSize = typeof size === 'number' ? `${size}px` : size;
+  const radius = typeof size === 'number' ? `${Math.round(size * 0.28)}px` : '28%';
 
   return (
     <div 
-      className={`relative shrink-0 flex items-center justify-center select-none shadow-md ${className}`}
+      className={`relative shrink-0 flex items-center justify-center select-none overflow-hidden shadow-md group ${className}`}
       style={{
         width: pixelSize,
         height: pixelSize,
-        borderRadius: typeof size === 'number' ? `${Math.round(size * 0.32)}px` : '30%',
-        background: 'linear-gradient(135deg, #00d2ff 0%, #7928ca 52%, #ff0080 100%)',
-        boxShadow: '0 4px 16px -2px rgba(121, 40, 202, 0.4), 0 2px 6px -1px rgba(0, 210, 255, 0.25)',
+        borderRadius: radius,
+        background: 'linear-gradient(135deg, #4A0E78 0%, #7E22CE 30%, #D946EF 60%, #F97316 100%)',
+        boxShadow: '0 4px 16px -2px rgba(168, 85, 247, 0.45), 0 2px 8px -1px rgba(249, 115, 22, 0.35)',
       }}
     >
-      {/* SVG Icon recreating Opción 1 circular stylized G glyph */}
+      <img
+        src="/logo.png"
+        alt="GastoAR Logo"
+        className="w-full h-full object-cover select-none pointer-events-none"
+        referrerPolicy="no-referrer"
+        onError={(e) => {
+          (e.currentTarget as HTMLElement).style.display = 'none';
+        }}
+      />
+      {/* SVG vector fallback with exact geometry */}
       <svg 
         viewBox="0 0 100 100" 
         fill="none" 
         xmlns="http://www.w3.org/2000/svg"
-        className="w-[74%] h-[74%]"
+        className="w-[74%] h-[74%] absolute inset-0 m-auto -z-10"
       >
-        {/* Outer Circular 'G' track */}
+        {/* Outer Circular 'G' track with horizontal spur */}
         <path
-          d="M 68 32 A 28 28 0 1 0 74 62 L 54 62 L 54 50 L 75 50"
+          d="M 68 30 A 28 28 0 1 0 78 50 L 63 50"
           stroke="#FFFFFF"
           strokeWidth="11"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
 
-        {/* Center Dollar / Coin Sign '$' */}
-        <line
-          x1="50"
-          y1="34"
-          x2="50"
-          y2="66"
-          stroke="#FFFFFF"
-          strokeWidth="4"
-          strokeLinecap="round"
-        />
+        {/* Center dot */}
+        <circle cx="51" cy="41" r="5" fill="#FFFFFF" />
+
+        {/* Center smiling mouth curve */}
         <path
-          d="M 54 41 C 54 38 46 38 46 43 C 46 48 54 48 54 53 C 54 58 46 58 46 55"
+          d="M 44 56.5 Q 51 63.5 58 56.5"
           stroke="#FFFFFF"
-          strokeWidth="4"
+          strokeWidth="4.8"
           strokeLinecap="round"
-          strokeLinejoin="round"
+          fill="none"
         />
       </svg>
     </div>
@@ -70,8 +74,8 @@ export const GastoArIcon: React.FC<{ size?: number | string; className?: string 
 };
 
 /**
- * GastoAR Complete Brand Logo (Opción 1 Brand Guidelines)
- * Includes Icon + "Gasto" (Deep Plum #2E0854 / White) + "AR" (Electric Purple #9333EA)
+ * GastoAR Complete Brand Logo
+ * Includes Icon + "GastoAR" (Crisp White in Dark Mode / Deep Plum #2E0854 in Light Mode)
  * + Tagline "Registrá. Controlá. Ahorrá." + Violet Accent Bar
  */
 export const GastoArBrand: React.FC<GastoArLogoProps> = ({
@@ -128,12 +132,12 @@ export const GastoArBrand: React.FC<GastoArLogoProps> = ({
       <GastoArIcon size={config.iconSize} />
 
       <div className="flex flex-col justify-center">
-        {/* Brand Text: Gasto + AR */}
+        {/* Brand Text: Gasto + AR (Pure white in dark mode) */}
         <div className={`font-black tracking-tight leading-none ${config.textSize} flex items-center`}>
-          <span className={isDarkCanvas ? 'text-white' : 'text-[#2E0854]'}>
+          <span className={isDarkCanvas ? 'text-white' : 'text-[#2E0854] dark:text-white'}>
             Gasto
           </span>
-          <span className="text-[#9333EA] ml-0.5">
+          <span className={isDarkCanvas ? 'text-white' : 'text-[#9333EA] dark:text-white ml-0.5'}>
             AR
           </span>
         </div>
@@ -142,15 +146,15 @@ export const GastoArBrand: React.FC<GastoArLogoProps> = ({
         {showTagline && (
           <div className="flex flex-col items-start mt-0.5">
             <span className={`font-bold tracking-normal leading-tight ${config.taglineSize} ${
-              isDarkCanvas ? 'text-purple-200' : 'text-slate-700'
+              isDarkCanvas ? 'text-purple-200' : 'text-slate-700 dark:text-slate-300'
             }`}>
               Registrá. Controlá. Ahorrá.
             </span>
 
-            {/* Violet/Purple Opción 1 accent line */}
+            {/* Violet to Orange Official Accent Line */}
             {showAccentBar && (
               <span 
-                className={`${config.barWidth} ${config.barHeight} rounded-full bg-gradient-to-r from-[#9333EA] via-[#7928CA] to-[#F95420] mt-0.5`} 
+                className={`${config.barWidth} ${config.barHeight} rounded-full bg-gradient-to-r from-[#7E22CE] via-[#D946EF] to-[#F97316] mt-0.5`} 
               />
             )}
           </div>
@@ -175,7 +179,7 @@ export const GastoArHeroBrand: React.FC<{ className?: string }> = ({ className =
       {/* Brand Title */}
       <div className="font-black text-3xl sm:text-4xl tracking-tight leading-none flex items-center justify-center">
         <span className="text-white">Gasto</span>
-        <span className="text-[#A855F7] ml-1">AR</span>
+        <span className="text-[#D946EF] ml-1">AR</span>
       </div>
 
       {/* Slogan */}
@@ -183,8 +187,8 @@ export const GastoArHeroBrand: React.FC<{ className?: string }> = ({ className =
         Registrá. Controlá. Ahorrá.
       </p>
 
-      {/* Opción 1 Gradient Accent Bar */}
-      <div className="w-12 h-1 bg-gradient-to-r from-[#A855F7] to-[#F95420] rounded-full mt-1.5" />
+      {/* Official Gradient Accent Bar */}
+      <div className="w-14 h-1 bg-gradient-to-r from-[#7E22CE] via-[#D946EF] to-[#F97316] rounded-full mt-1.5" />
     </div>
   );
 };

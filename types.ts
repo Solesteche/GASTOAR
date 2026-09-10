@@ -4,6 +4,13 @@ export type SplitType = '50_50' | '60_40' | '70_30' | '100_user1' | '100_user2' 
 
 export type PaymentMethod = 'Efectivo' | 'Débito' | 'Crédito' | 'Transferencia' | 'Mercado Pago' | 'Otro';
 
+export interface TransactionConfidence {
+  amount: number;
+  category: number;
+  paymentMethod: number;
+  installments: number;
+}
+
 export interface Transaction {
   id: string;
   concepto: string;
@@ -24,6 +31,10 @@ export interface Transaction {
   user1Amount?: number;
   user2Amount?: number;
   metodoPago?: PaymentMethod;
+  // Spoken voice & AI interpretation audit fields
+  inputMethod?: 'audio' | 'manual';
+  audioTranscription?: string;
+  confidence?: TransactionConfidence;
   // Installment (Cuotas) fields
   esCuotas?: boolean;
   cuotasTotal?: number; // Total number of installments (e.g. 3, 6, 12, 18, 24)
@@ -35,6 +46,20 @@ export interface Transaction {
   notas?: string;
   comprobanteUrl?: string;
   createdAt?: number;
+  learnedPreferenceApplied?: boolean;
+  learnedMerchantId?: string;
+}
+
+export interface LearnedMerchant {
+  id: string;
+  keyword: string;
+  merchantName: string;
+  categoria: string;
+  subcategoria: string;
+  defaultMetodoPago?: PaymentMethod;
+  frequency: number;
+  lastUsed: number;
+  source: 'auto_learned' | 'manual';
 }
 
 export interface CoupleProfile {

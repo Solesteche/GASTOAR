@@ -54,6 +54,7 @@ interface SidebarProps {
   isAdmin?: boolean;
   isDemoMode?: boolean;
   onExitDemo?: () => void;
+  isDarkMode?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -80,6 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isAdmin = false,
   isDemoMode = false,
   onExitDemo,
+  isDarkMode = false,
 }) => {
   const isUser1 = profile.currentUser === 'user1';
   const currentUserName = isUser1 ? profile.user1Name : profile.user2Name;
@@ -91,13 +93,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'card_alerts', label: 'Vencimientos', icon: CalendarClock, badge: null },
     { 
       id: 'couple_balance', 
-      label: 'Balance de Pareja', 
+      label: 'Balance Cuenta Compartida', 
       icon: Scale, 
       badge: debtInfo.debtAmount > 0 ? (debtInfo.whoOwesWhom === (isUser1 ? 'user1_owes_user2' : 'user2_owes_user1') ? 'Debes' : 'Te deben') : 'Al día' 
     },
-    { id: 'budgets', label: 'Presupuestos & Límites', icon: Sliders, badge: null },
+    { id: 'budgets', label: 'Presupuestos', icon: Sliders, badge: null },
     { id: 'goals', label: 'Metas & Cajas', icon: Target, badge: 'Ahorro' },
-    { id: 'categories', label: 'Categorías & Subcat', icon: FolderPlus, badge: null },
+    { id: 'categories', label: 'Categorías y Subcategorías', icon: FolderPlus, badge: null },
     { id: 'ai', label: 'Gasto por Voz', icon: Mic, badge: 'IA', isModal: true },
   ];
 
@@ -138,7 +140,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <GastoArBrand 
                 size="sm" 
-                variant="light" 
+                variant={isDarkMode ? 'dark' : 'light'} 
                 showTagline={true} 
                 showAccentBar={true} 
               />

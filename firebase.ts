@@ -295,6 +295,9 @@ export async function saveMovementToFirestore(userId: string, tx: Transaction): 
       cuotaActual: tx.cuotaActual || 1,
       montoCuota: tx.montoCuota || tx.monto,
       tarjetaNombre: tx.tarjetaNombre || '',
+      inputMethod: tx.inputMethod || 'manual',
+      audioTranscription: tx.audioTranscription || '',
+      confidence: tx.confidence || null,
       createdAt: tx.createdAt || Date.now()
     });
   } catch (err) {

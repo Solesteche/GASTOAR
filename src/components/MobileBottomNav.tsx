@@ -193,12 +193,11 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           {/* 3. Center Floating Voice Expense Button */}
           <button
             onClick={onOpenVoiceExpense}
-            className="flex flex-col items-center justify-center -mt-5 bg-gradient-to-tr from-[#E04412] via-[#F95420] to-[#FF7A45] hover:from-[#D03808] hover:to-[#F95420] text-white w-12 h-12 rounded-full shadow-lg shadow-orange-500/35 active:scale-95 transition-transform border-2 border-white cursor-pointer"
-            title="Registra un gasto por voz"
-            aria-label="Registra un gasto por voz"
+            className="flex items-center justify-center -mt-5 bg-gradient-to-tr from-[#E04412] via-[#F95420] to-[#FF7A45] hover:from-[#D03808] hover:to-[#F95420] text-white w-12 h-12 rounded-full shadow-lg shadow-orange-500/35 active:scale-95 transition-transform border-2 border-white cursor-pointer"
+            title="Gasto por voz con IA"
+            aria-label="Gasto por voz con IA"
           >
-            <Mic className="w-5 h-5 stroke-[2.8]" />
-            <span className="text-[9px] leading-none font-extrabold">Registra</span>
+            <Mic className="w-5 h-5 stroke-[2.5]" />
           </button>
 
           {/* 4. Vencimientos */}

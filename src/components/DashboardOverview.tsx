@@ -42,6 +42,7 @@ interface DashboardOverviewProps {
   categoryMap: CategoryMap;
   budgets: Budgets;
   activeMode?: ExpenseMode;
+  isDemoMode?: boolean;
   onModeChange?: (mode: ExpenseMode) => void;
   onOpenTransactionModal: () => void;
   onOpenIncomeModal?: () => void;
@@ -117,6 +118,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   categoryMap,
   budgets,
   activeMode = 'all',
+  isDemoMode = false,
   onModeChange,
   onOpenTransactionModal,
   onOpenIncomeModal,
@@ -473,9 +475,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   // 4. Límite de gasto diario restante
   const remainingBudget = Math.max(0, generalBudget - totalExpenses);
-  const dailyBudgetRemaining = Math.max(0, Math.round(remainingBudget / Math.max(1, daysRemaining))) || 2350;
-  const dailyTargetBase = Math.max(1000, Math.round(generalBudget / Math.max(1, totalDaysInRange))) || 5000;
-  const dailyAvailablePercent = dailyTargetBase > 0 ? Math.min(100, Math.round((dailyBudgetRemaining / dailyTargetBase) * 100)) : 47;
+  const dailyBudgetRemaining = generalBudget > 0 ? Math.max(0, Math.round(remainingBudget / Math.max(1, daysRemaining))) : (isDemoMode ? 2350 : 0);
+  const dailyTargetBase = generalBudget > 0 ? Math.max(1000, Math.round(generalBudget / Math.max(1, totalDaysInRange))) : (isDemoMode ? 5000 : 0);
+  const dailyAvailablePercent = dailyTargetBase > 0 ? Math.min(100, Math.round((dailyBudgetRemaining / dailyTargetBase) * 100)) : (isDemoMode ? 47 : 0);
 
   // Group by category for Pie Chart & List
   const categoryPieData = useMemo(() => {
@@ -491,13 +493,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     const total = sorted.reduce((sum, item) => sum + item[1], 0) || 0;
 
     if (sorted.length === 0) {
-      return [
-        { name: "Alimentos",       value: 45600, color: P,       pct: 37 },
-        { name: "Transporte",      value: 25300, color: "#F97316", pct: 21 },
-        { name: "Hogar",           value: 19800, color: "#EF4444", pct: 16 },
-        { name: "Entretenimiento", value: 15200, color: P_MID,   pct: 12 },
-        { name: "Otros",           value: 15650, color: "#2DD4BF", pct: 14 },
-      ];
+      if (isDemoMode) {
+        return [
+          { name: "Alimentos",       value: 45600, color: P,       pct: 37 },
+          { name: "Transporte",      value: 25300, color: "#F97316", pct: 21 },
+          { name: "Hogar",           value: 19800, color: "#EF4444", pct: 16 },
+          { name: "Entretenimiento", value: 15200, color: P_MID,   pct: 12 },
+          { name: "Otros",           value: 15650, color: "#2DD4BF", pct: 14 },
+        ];
+      }
+      return [];
     }
 
     return sorted.map(([name, amount], index) => {
@@ -505,7 +510,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       const color = categoryColors[name] || CATEGORY_DEFAULT_COLORS[name] || (index === 0 ? P : index === 1 ? '#F97316' : index === 2 ? '#EF4444' : index === 3 ? P_MID : '#2DD4BF');
       return { name, value: amount, pct, color };
     });
-  }, [monthExpensesList, categoryColors]);
+  }, [monthExpensesList, categoryColors, isDemoMode]);
 
   const totalPieGastado = useMemo(() => {
     return (categoryPieData || []).reduce((s, d) => s + (d?.value || 0), 0);
@@ -611,104 +616,107 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       .filter(item => item.budget > 0 && item.pct >= 60)
       .sort((a, b) => b.pct - a.pct);
 
-    // Fallback con los datos del diseño/especificación de la imagen si aún no hay categorías con >= 60%
+    // Fallback con los datos del diseño/especificación de la imagen ÚNICAMENTE si está en Modo Demo
     if (computedList.length === 0) {
-      return [
-        {
-          id: 'Alimentos',
-          name: 'Alimentos',
-          originalName: 'Alimentos',
-          emoji: '🛒',
-          budget: 50000,
-          spent: 45600,
-          remaining: 4400,
-          pct: 91,
-          severity: 'critical' as const,
-          statusLabel: 'Límite casi alcanzado',
-          dotColor: 'bg-[#EF4444]',
-          badgeBg: 'bg-[#FEE2E2]/80',
-          badgeBorder: 'border-[#FECACA]',
-          badgeText: 'text-[#EF4444]',
-          textColor: 'text-[#EF4444]',
-          barColor: 'bg-[#EF4444]',
-        },
-        {
-          id: 'Hogar',
-          name: 'Hogar',
-          originalName: 'Hogar',
-          emoji: '🏠',
-          budget: 22000,
-          spent: 19800,
-          remaining: 2200,
-          pct: 90,
-          severity: 'critical' as const,
-          statusLabel: 'Límite casi alcanzado',
-          dotColor: 'bg-[#EF4444]',
-          badgeBg: 'bg-[#FEE2E2]/80',
-          badgeBorder: 'border-[#FECACA]',
-          badgeText: 'text-[#EF4444]',
-          textColor: 'text-[#EF4444]',
-          barColor: 'bg-[#EF4444]',
-        },
-        {
-          id: 'Transporte',
-          name: 'Transporte',
-          originalName: 'Transporte',
-          emoji: '🚌',
-          budget: 30000,
-          spent: 25300,
-          remaining: 4700,
-          pct: 84,
-          severity: 'warning' as const,
-          statusLabel: 'Cerca del límite',
-          dotColor: 'bg-[#F95420]',
-          badgeBg: 'bg-[#FEF3C7]',
-          badgeBorder: 'border-[#FDE68A]',
-          badgeText: 'text-[#D97706]',
-          textColor: 'text-[#F95420]',
-          barColor: 'bg-[#F95420]',
-        },
-        {
-          id: 'Entretenimiento',
-          name: 'Entretenimiento',
-          originalName: 'Entretenimiento',
-          emoji: '🎬',
-          budget: 50000,
-          spent: 38000,
-          remaining: 12000,
-          pct: 76,
-          severity: 'warning' as const,
-          statusLabel: 'Cerca del límite',
-          dotColor: 'bg-[#F95420]',
-          badgeBg: 'bg-[#FEF3C7]',
-          badgeBorder: 'border-[#FDE68A]',
-          badgeText: 'text-[#D97706]',
-          textColor: 'text-[#F95420]',
-          barColor: 'bg-[#F95420]',
-        },
-        {
-          id: 'Salud',
-          name: 'Salud',
-          originalName: 'Salud',
-          emoji: '💊',
-          budget: 30000,
-          spent: 22800,
-          remaining: 7200,
-          pct: 76,
-          severity: 'warning' as const,
-          statusLabel: 'Cerca del límite',
-          dotColor: 'bg-[#F95420]',
-          badgeBg: 'bg-[#FEF3C7]',
-          badgeBorder: 'border-[#FDE68A]',
-          badgeText: 'text-[#D97706]',
-          textColor: 'text-[#F95420]',
-          barColor: 'bg-[#F95420]',
-        },
-      ];
+      if (isDemoMode) {
+        return [
+          {
+            id: 'Alimentos',
+            name: 'Alimentos',
+            originalName: 'Alimentos',
+            emoji: '🛒',
+            budget: 50000,
+            spent: 45600,
+            remaining: 4400,
+            pct: 91,
+            severity: 'critical' as const,
+            statusLabel: 'Límite casi alcanzado',
+            dotColor: 'bg-[#EF4444]',
+            badgeBg: 'bg-[#FEE2E2]/80',
+            badgeBorder: 'border-[#FECACA]',
+            badgeText: 'text-[#EF4444]',
+            textColor: 'text-[#EF4444]',
+            barColor: 'bg-[#EF4444]',
+          },
+          {
+            id: 'Hogar',
+            name: 'Hogar',
+            originalName: 'Hogar',
+            emoji: '🏠',
+            budget: 22000,
+            spent: 19800,
+            remaining: 2200,
+            pct: 90,
+            severity: 'critical' as const,
+            statusLabel: 'Límite casi alcanzado',
+            dotColor: 'bg-[#EF4444]',
+            badgeBg: 'bg-[#FEE2E2]/80',
+            badgeBorder: 'border-[#FECACA]',
+            badgeText: 'text-[#EF4444]',
+            textColor: 'text-[#EF4444]',
+            barColor: 'bg-[#EF4444]',
+          },
+          {
+            id: 'Transporte',
+            name: 'Transporte',
+            originalName: 'Transporte',
+            emoji: '🚌',
+            budget: 30000,
+            spent: 25300,
+            remaining: 4700,
+            pct: 84,
+            severity: 'warning' as const,
+            statusLabel: 'Cerca del límite',
+            dotColor: 'bg-[#F95420]',
+            badgeBg: 'bg-[#FEF3C7]',
+            badgeBorder: 'border-[#FDE68A]',
+            badgeText: 'text-[#D97706]',
+            textColor: 'text-[#F95420]',
+            barColor: 'bg-[#F95420]',
+          },
+          {
+            id: 'Entretenimiento',
+            name: 'Entretenimiento',
+            originalName: 'Entretenimiento',
+            emoji: '🎬',
+            budget: 50000,
+            spent: 38000,
+            remaining: 12000,
+            pct: 76,
+            severity: 'warning' as const,
+            statusLabel: 'Cerca del límite',
+            dotColor: 'bg-[#F95420]',
+            badgeBg: 'bg-[#FEF3C7]',
+            badgeBorder: 'border-[#FDE68A]',
+            badgeText: 'text-[#D97706]',
+            textColor: 'text-[#F95420]',
+            barColor: 'bg-[#F95420]',
+          },
+          {
+            id: 'Salud',
+            name: 'Salud',
+            originalName: 'Salud',
+            emoji: '💊',
+            budget: 30000,
+            spent: 22800,
+            remaining: 7200,
+            pct: 76,
+            severity: 'warning' as const,
+            statusLabel: 'Cerca del límite',
+            dotColor: 'bg-[#F95420]',
+            badgeBg: 'bg-[#FEF3C7]',
+            badgeBorder: 'border-[#FDE68A]',
+            badgeText: 'text-[#D97706]',
+            textColor: 'text-[#F95420]',
+            barColor: 'bg-[#F95420]',
+          },
+        ];
+      }
+      return [];
     }
 
     return computedList;
-  }, [monthExpensesList, budgets]);
+  }, [monthExpensesList, budgets, isDemoMode]);
 
   const criticalAlertsCount = useMemo(() => {
     return budgetAlertsList.filter(item => item.severity === 'critical').length;
@@ -716,13 +724,58 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   // Upcoming bills / vencimientos
   const upcomingBills = useMemo(() => {
-    return [
-      { id: "1", icon: "💧", title: "Aysa",    cat: "Agua",          due: "28/09", amount: 4850,  daysLeft: 2  },
-      { id: "2", icon: "⚡", title: "Edenor",  cat: "Electricidad",  due: "01/10", amount: 6120,  daysLeft: 6  },
-      { id: "3", icon: "🏛️", title: "ABL",     cat: "Imp. Municipal",due: "10/10", amount: 5300,  daysLeft: 15 },
-      { id: "4", icon: "🚗", title: "Patente", cat: "Impuesto",      due: "15/10", amount: 8900,  daysLeft: 20 },
-    ];
-  }, []);
+    try {
+      const savedV4 = localStorage.getItem('gastoar_vencimientos_alerts_v4') || localStorage.getItem('gastoar_vencimientos_alerts_v3');
+      if (savedV4) {
+        const parsed = JSON.parse(savedV4);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const todayDate = new Date();
+          const curDay = todayDate.getDate();
+          const iconMap: Record<string, string> = {
+            servicio: '⚡',
+            tarjeta: '💳',
+            impuesto: '🏛️',
+            alquiler: '🏠',
+            otro: '📄',
+          };
+          const unpaid = parsed
+            .filter((item: any) => !item.paidThisMonth && item.name)
+            .map((item: any) => {
+              const dueDay = item.dueDay || 1;
+              const daysLeft = dueDay - curDay;
+              const dueMonth = String(todayDate.getMonth() + 1).padStart(2, '0');
+              const dueDayStr = String(dueDay).padStart(2, '0');
+              return {
+                id: item.id || String(Math.random()),
+                icon: iconMap[item.category] || '📄',
+                title: item.name,
+                cat: item.provider || item.category || 'Servicio',
+                due: `${dueDayStr}/${dueMonth}`,
+                amount: item.estimatedAmount || 0,
+                daysLeft: daysLeft < 0 ? 0 : daysLeft,
+              };
+            })
+            .sort((a: any, b: any) => a.daysLeft - b.daysLeft)
+            .slice(0, 4);
+
+          if (unpaid.length > 0) {
+            return unpaid;
+          }
+        }
+      }
+    } catch {}
+
+    if (isDemoMode) {
+      return [
+        { id: "1", icon: "💧", title: "Aysa",    cat: "Agua",          due: "28/09", amount: 4850,  daysLeft: 2  },
+        { id: "2", icon: "⚡", title: "Edenor",  cat: "Electricidad",  due: "01/10", amount: 6120,  daysLeft: 6  },
+        { id: "3", icon: "🏛️", title: "ABL",     cat: "Imp. Municipal",due: "10/10", amount: 5300,  daysLeft: 15 },
+        { id: "4", icon: "🚗", title: "Patente", cat: "Impuesto",      due: "15/10", amount: 8900,  daysLeft: 20 },
+      ];
+    }
+
+    return [];
+  }, [isDemoMode]);
 
   // Circular progress math (ampliado para mayor visibilidad y presencia visual)
   const r = 40, cx = 50, cy = 50;
@@ -1070,75 +1123,96 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </button>
           )}
         </div>
-        <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-4">
-          {/* Donut Chart */}
-          <div className="relative flex-shrink-0" style={{ width: 130, height: 130 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie 
-                  data={categoryPieData} 
-                  cx="50%" 
-                  cy="50%" 
-                  innerRadius={38} 
-                  outerRadius={58}
-                  paddingAngle={2} 
-                  dataKey="value" 
-                  startAngle={90} 
-                  endAngle={-270}
-                  onClick={(entry) => {
-                    if (entry && entry.name) {
-                      if (onSelectCategory && entry.name !== 'Otros') {
-                        onSelectCategory(entry.name);
-                      } else if (onNavigateTab) {
-                        onNavigateTab('transactions');
+        {categoryPieData.length === 0 ? (
+          <div className="py-6 px-4 text-center flex flex-col items-center justify-center space-y-2">
+            <div className="w-10 h-10 rounded-2xl bg-purple-50 text-[#6F2EC5] flex items-center justify-center text-lg">
+              📊
+            </div>
+            <p className="text-xs sm:text-sm font-bold text-gray-800">Sin gastos este mes</p>
+            <p className="text-xs text-gray-400 max-w-xs">
+              La distribución por categorías aparecerá aquí en cuanto registres tus primeros movimientos.
+            </p>
+            {onOpenTransactionModal && (
+              <button
+                type="button"
+                onClick={onOpenTransactionModal}
+                className="mt-1 px-3 py-1.5 bg-[#F95420] hover:bg-[#EA580C] text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+              >
+                + Registrar primer gasto
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-4">
+            {/* Donut Chart */}
+            <div className="relative flex-shrink-0" style={{ width: 130, height: 130 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie 
+                    data={categoryPieData} 
+                    cx="50%" 
+                    cy="50%" 
+                    innerRadius={38} 
+                    outerRadius={58}
+                    paddingAngle={2} 
+                    dataKey="value" 
+                    startAngle={90} 
+                    endAngle={-270}
+                    onClick={(entry) => {
+                      if (entry && entry.name) {
+                        if (onSelectCategory && entry.name !== 'Otros') {
+                          onSelectCategory(entry.name);
+                        } else if (onNavigateTab) {
+                          onNavigateTab('transactions');
+                        }
                       }
+                    }}
+                    cursor="pointer"
+                  >
+                    {categoryPieData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <p className="text-xs font-bold text-gray-900 font-outfit leading-tight">
+                  {isBalanceHidden ? '$ •••••' : ars(totalPieGastado)}
+                </p>
+                <p className="text-[9px] text-gray-400 text-center leading-tight">Total<br/>gastado</p>
+              </div>
+            </div>
+
+            {/* List */}
+            <div className="flex-1 w-full space-y-1.5">
+              {categoryPieData.slice(0, 5).map(d => (
+                <div 
+                  key={d.name} 
+                  onClick={() => {
+                    if (onSelectCategory && d.name !== 'Otros') {
+                      onSelectCategory(d.name);
+                    } else if (onNavigateTab) {
+                      onNavigateTab('transactions');
                     }
                   }}
-                  cursor="pointer"
+                  className="flex items-center justify-between p-1.5 -mx-1.5 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors group"
+                  title={`Ver gastos de ${d.name}`}
                 >
-                  {categoryPieData.map((d, i) => <Cell key={i} fill={d.color} />)}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <p className="text-xs font-bold text-gray-900 font-outfit leading-tight">
-                {isBalanceHidden ? '$ •••••' : ars(totalPieGastado)}
-              </p>
-              <p className="text-[9px] text-gray-400 text-center leading-tight">Total<br/>gastado</p>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                    <span className="text-xs text-gray-700 truncate group-hover:text-purple-700 group-hover:font-medium transition-colors">
+                      {d.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs font-bold text-gray-900 font-outfit">
+                      {isBalanceHidden ? '$ •••••' : ars(d.value)}
+                    </span>
+                    <span className="text-[10px] text-gray-400 w-7 text-right">{d.pct}%</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-
-          {/* List */}
-          <div className="flex-1 w-full space-y-1.5">
-            {categoryPieData.slice(0, 5).map(d => (
-              <div 
-                key={d.name} 
-                onClick={() => {
-                  if (onSelectCategory && d.name !== 'Otros') {
-                    onSelectCategory(d.name);
-                  } else if (onNavigateTab) {
-                    onNavigateTab('transactions');
-                  }
-                }}
-                className="flex items-center justify-between p-1.5 -mx-1.5 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors group"
-                title={`Ver gastos de ${d.name}`}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
-                  <span className="text-xs text-gray-700 truncate group-hover:text-purple-700 group-hover:font-medium transition-colors">
-                    {d.name}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xs font-bold text-gray-900 font-outfit">
-                    {isBalanceHidden ? '$ •••••' : ars(d.value)}
-                  </span>
-                  <span className="text-[10px] text-gray-400 w-7 text-right">{d.pct}%</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        )}
       </div>
 
       {/* 6. Alertas Límites de Presupuesto */}
@@ -1282,7 +1356,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <button 
                 className="text-xs font-semibold cursor-pointer hover:underline" 
                 style={{ color: P }}
-                onClick={() => onNavigateTab('installments')}
+                onClick={() => onNavigateTab('card_alerts')}
               >
                 Ver todos
               </button>

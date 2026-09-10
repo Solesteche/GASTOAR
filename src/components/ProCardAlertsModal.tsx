@@ -67,6 +67,7 @@ interface ProCardAlertsModalProps {
   onClose: () => void;
   transactions?: Transaction[];
   profile: CoupleProfile;
+  isDemoMode?: boolean;
   onShowToast?: (msg: string, type: 'success' | 'error' | 'info') => void;
   onUpgradePlan?: () => void;
   isProOrTrial?: boolean;
@@ -190,14 +191,18 @@ export const ProCardAlertsModal: React.FC<ProCardAlertsModalProps> = ({
   onClose,
   transactions = [],
   profile,
+  isDemoMode = false,
   onShowToast = (_msg: string, _type?: 'success' | 'error' | 'info') => {},
   onUpgradePlan,
   isProOrTrial = true,
 }) => {
   const [items, setItems] = useState<DueAlertItem[]>(() => {
     try {
+      const savedV4 = localStorage.getItem('gastoar_vencimientos_alerts_v4');
+      if (savedV4 !== null) return JSON.parse(savedV4);
+
       const savedV3 = localStorage.getItem('gastoar_vencimientos_alerts_v3');
-      if (savedV3) return JSON.parse(savedV3);
+      if (savedV3 !== null) return JSON.parse(savedV3);
       
       const savedV2 = localStorage.getItem('gastoar_card_alerts_v2');
       if (savedV2) {
@@ -220,7 +225,7 @@ export const ProCardAlertsModal: React.FC<ProCardAlertsModalProps> = ({
     } catch (e) {
       console.error(e);
     }
-    return DEFAULT_ALERT_ITEMS;
+    return isDemoMode ? DEFAULT_ALERT_ITEMS : [];
   });
 
   const [selectedFilter, setSelectedFilter] = useState<'all' | AlertItemCategory>('all');

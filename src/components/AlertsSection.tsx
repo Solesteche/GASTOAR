@@ -37,7 +37,9 @@ import {
   ChevronDown,
   ChevronUp,
   RotateCcw,
-  Shield
+  Shield,
+  Bell,
+  BellRing
 } from 'lucide-react';
 import { CoupleProfile, Transaction } from '../types';
 import { formatCurrency } from '../utils/formatters';
@@ -67,6 +69,7 @@ export interface DueAlertItem {
 interface AlertsSectionProps {
   profile: CoupleProfile;
   transactions?: Transaction[];
+  isDemoMode?: boolean;
   onShowToast: (msg: string, type: 'success' | 'error' | 'info') => void;
   onOpenTransactionModal?: () => void;
   onOpenCalendarModal?: () => void;
@@ -182,6 +185,7 @@ const PRESET_TEMPLATES = [
 export const AlertsSection: React.FC<AlertsSectionProps> = ({
   profile,
   transactions = [],
+  isDemoMode = false,
   onShowToast,
   onOpenTransactionModal,
   onOpenCalendarModal
@@ -189,11 +193,11 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   const [items, setItems] = useState<DueAlertItem[]>(() => {
     try {
       const savedV4 = localStorage.getItem('gastoar_vencimientos_alerts_v4');
-      if (savedV4) return JSON.parse(savedV4);
+      if (savedV4 !== null) return JSON.parse(savedV4);
     } catch (e) {
       console.error(e);
     }
-    return DEFAULT_ALERT_ITEMS;
+    return isDemoMode ? DEFAULT_ALERT_ITEMS : [];
   });
 
   // Active view tab: 'proximos' | 'todos' | 'calendario'
@@ -235,12 +239,12 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   const [editingItem, setEditingItem] = useState<DueAlertItem | null>(null);
   const [showAllTemplatesModal, setShowAllTemplatesModal] = useState(false);
 
-  // Form states
+  // Form states - string-based to prevent forced leading zeros (e.g. 014)
   const [formCategory, setFormCategory] = useState<AlertItemCategory>('servicio');
   const [formName, setFormName] = useState('');
   const [formProvider, setFormProvider] = useState('');
-  const [formDueDay, setFormDueDay] = useState(10);
-  const [formCloseDay, setFormCloseDay] = useState(20);
+  const [formDueDay, setFormDueDay] = useState<string>('10');
+  const [formCloseDay, setFormCloseDay] = useState<string>('20');
   const [formEstimatedAmount, setFormEstimatedAmount] = useState('');
   const [formPaymentCode, setFormPaymentCode] = useState('');
   const [formAutoDebit, setFormAutoDebit] = useState(false);
@@ -249,9 +253,61 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   const [formReminderClose, setFormReminderClose] = useState(1);
   const [formNotes, setFormNotes] = useState('');
 
+  // Mobile Push Notification Reminders State
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('gastoar_vencimientos_notif_v1') === 'true' && 
+        ('Notification' in window && Notification.permission === 'granted');
+    }
+    return false;
+  });
+
   const today = new Date();
   const currentDay = today.getDate();
   const currentMonthName = today.toLocaleDateString('es-AR', { month: 'long' });
+
+  const handleToggleNotifications = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      onShowToast('Tu dispositivo no soporta notificaciones web directas. Sincronizá con Google Calendar.', 'info');
+      return;
+    }
+
+    if (Notification.permission === 'granted') {
+      try {
+        new Notification('🔔 GastoAR: Recordatorios Activos', {
+          body: '¡Listo! Te avisaremos antes de cada vencimiento en tu celular para evitar recargos.',
+          icon: '/pwa-192x192.png'
+        });
+      } catch (e) {}
+      setNotificationsEnabled(true);
+      localStorage.setItem('gastoar_vencimientos_notif_v1', 'true');
+      onShowToast('🔔 Notificaciones de vencimientos activas en tu celular.', 'success');
+      return;
+    }
+
+    if (Notification.permission !== 'denied') {
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          try {
+            new Notification('🔔 GastoAR: Recordatorios de Vencimientos', {
+              body: '¡Notificaciones activadas! Te avisaremos automáticamente antes de cada fecha de pago.',
+              icon: '/pwa-192x192.png'
+            });
+          } catch (e) {}
+          setNotificationsEnabled(true);
+          localStorage.setItem('gastoar_vencimientos_notif_v1', 'true');
+          onShowToast('🎉 ¡Notificaciones activadas con éxito en tu celular!', 'success');
+        } else {
+          onShowToast('Permiso de notificaciones rechazado.', 'info');
+        }
+      } catch (err) {
+        onShowToast('No se pudo solicitar el permiso de notificaciones.', 'error');
+      }
+    } else {
+      onShowToast('Las notificaciones están bloqueadas. Habilitalas desde la configuración de tu navegador.', 'info');
+    }
+  };
 
   const saveItems = (updated: DueAlertItem[]) => {
     setItems(updated);
@@ -267,8 +323,8 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
     setFormCategory('servicio');
     setFormName('');
     setFormProvider('');
-    setFormDueDay(10);
-    setFormCloseDay(20);
+    setFormDueDay(''); // Clean empty state so user can type "14" directly without a leading 0!
+    setFormCloseDay('');
     setFormEstimatedAmount('');
     setFormPaymentCode('');
     setFormAutoDebit(false);
@@ -281,7 +337,7 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
 
   const handleOpenCreateWithDay = (day: number) => {
     handleOpenCreate();
-    setFormDueDay(day);
+    setFormDueDay(day.toString());
   };
 
   const handleOpenEdit = (item: DueAlertItem) => {
@@ -289,8 +345,8 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
     setFormCategory(item.category);
     setFormName(item.name);
     setFormProvider(item.provider || '');
-    setFormDueDay(item.dueDay || 10);
-    setFormCloseDay(item.closeDay || 20);
+    setFormDueDay(item.dueDay ? item.dueDay.toString() : '10');
+    setFormCloseDay(item.closeDay ? item.closeDay.toString() : '20');
     setFormEstimatedAmount(item.estimatedAmount ? item.estimatedAmount.toString() : '');
     setFormPaymentCode(item.paymentCode || '');
     setFormAutoDebit(Boolean(item.autoDebit));
@@ -306,8 +362,9 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
     setFormCategory(preset.category);
     setFormName(preset.name);
     setFormProvider(preset.provider);
-    setFormDueDay(preset.dueDay);
-    if ('closeDay' in preset && preset.closeDay) setFormCloseDay(preset.closeDay);
+    setFormDueDay(preset.dueDay.toString());
+    if ('closeDay' in preset && preset.closeDay) setFormCloseDay(preset.closeDay.toString());
+    else setFormCloseDay('');
     if (preset.defaultAmount) setFormEstimatedAmount(preset.defaultAmount.toString());
     setFormPaymentCode('');
     setFormAutoDebit(false);
@@ -326,6 +383,13 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
     }
 
     const amt = formEstimatedAmount ? parseFloat(formEstimatedAmount.replace(/[^0-9.]/g, '')) : undefined;
+    
+    // Parse cleaned day (stripping any accidental leading 0s like "014" -> 14)
+    const rawDue = (formDueDay || '10').replace(/^0+(?=\d)/, '');
+    const cleanDue = Math.min(31, Math.max(1, parseInt(rawDue, 10) || 10));
+
+    const rawClose = (formCloseDay || '').replace(/^0+(?=\d)/, '');
+    const cleanClose = rawClose ? Math.min(31, Math.max(1, parseInt(rawClose, 10) || 20)) : undefined;
 
     if (editingItem) {
       // Update existing
@@ -336,8 +400,8 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
             category: formCategory,
             name: formName.trim(),
             provider: formProvider.trim() || 'Proveedor',
-            dueDay: Math.min(31, Math.max(1, Number(formDueDay) || 10)),
-            closeDay: formCategory === 'tarjeta' ? Math.min(31, Math.max(1, Number(formCloseDay) || 20)) : undefined,
+            dueDay: cleanDue,
+            closeDay: formCategory === 'tarjeta' ? cleanClose : undefined,
             estimatedAmount: isNaN(amt as number) ? undefined : amt,
             paymentCode: formPaymentCode.trim() || undefined,
             autoDebit: formAutoDebit,
@@ -358,8 +422,8 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
         category: formCategory,
         name: formName.trim(),
         provider: formProvider.trim() || 'Proveedor',
-        dueDay: Math.min(31, Math.max(1, Number(formDueDay) || 10)),
-        closeDay: formCategory === 'tarjeta' ? Math.min(31, Math.max(1, Number(formCloseDay) || 20)) : undefined,
+        dueDay: cleanDue,
+        closeDay: formCategory === 'tarjeta' ? cleanClose : undefined,
         estimatedAmount: isNaN(amt as number) ? undefined : amt,
         paymentCode: formPaymentCode.trim() || undefined,
         autoDebit: formAutoDebit,
@@ -984,7 +1048,30 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-2.5 self-end sm:self-auto">
+        <div className="flex items-center gap-2 sm:gap-2.5 self-end sm:self-auto flex-wrap justify-end">
+          <button
+            type="button"
+            onClick={handleToggleNotifications}
+            className={`px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer ${
+              notificationsEnabled 
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-950/20' 
+                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-slate-900/5'
+            }`}
+            title="Activar notificaciones y recordatorios automáticos en tu celular"
+          >
+            {notificationsEnabled ? (
+              <>
+                <BellRing className="w-4 h-4 text-white animate-pulse" />
+                <span>Alertas celular activas</span>
+              </>
+            ) : (
+              <>
+                <Bell className="w-4 h-4 text-purple-600" />
+                <span>Activar avisos al celular</span>
+              </>
+            )}
+          </button>
+
           {onOpenCalendarModal && (
             <button
               onClick={onOpenCalendarModal}
@@ -1253,42 +1340,6 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
             </div>
           )}
 
-          {/* Next 7 Days Section */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#5B21B6] flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-[#5B21B6]" />
-                <span>
-                  PRÓXIMOS 7 DÍAS ({upcomingGroups.dueToday.length + upcomingGroups.next7Days.length + upcomingGroups.overdue.length})
-                </span>
-              </h3>
-              <button
-                type="button"
-                onClick={() => setActiveView('todos')}
-                className="text-xs font-semibold text-[#5B21B6] hover:underline cursor-pointer"
-              >
-                Ver todos
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {/* Overdue if any */}
-              {upcomingGroups.overdue.map(item => renderItemCard(item))}
-
-              {/* Due Today */}
-              {upcomingGroups.dueToday.map(item => renderItemCard(item))}
-
-              {/* Next 7 Days */}
-              {upcomingGroups.next7Days.map(item => renderItemCard(item))}
-
-              {upcomingGroups.dueToday.length === 0 && upcomingGroups.next7Days.length === 0 && upcomingGroups.overdue.length === 0 && (
-                <div className="p-6 text-center bg-white rounded-2xl border border-slate-100 text-xs text-slate-500">
-                  No hay vencimientos en los próximos 7 días.
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* TODOS LOS VENCIMIENTOS section inside Proximos view (as shown in the reference image) */}
           <section className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-100 shadow-2xs space-y-4">
             <div className="flex items-center justify-between gap-3">
@@ -1368,7 +1419,44 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
 
             {/* List of items */}
             <div className="space-y-3 pt-1">
-              {allFilteredItems.map(item => renderItemCard(item))}
+              {allFilteredItems.length > 0 ? (
+                allFilteredItems.map(item => renderItemCard(item))
+              ) : items.length === 0 ? (
+                <div className="p-8 text-center bg-white rounded-3xl border border-dashed border-purple-200/80 shadow-2xs space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-50 text-[#5B21B6] mx-auto flex items-center justify-center">
+                    <CalendarClock className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800">¡Empezá de cero con tus vencimientos!</h4>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                      No tenés vencimientos cargados todavía. Podés dar de alta los tuyos (Alquiler, Luz, Gas, Internet, Tarjetas) o elegir de las plantillas sugeridas de arriba.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleOpenCreate}
+                      className="px-4 py-2 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                    >
+                      + Dar de alta vencimiento
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        saveItems(DEFAULT_ALERT_ITEMS);
+                        onShowToast('Servicios sugeridos cargados como plantilla.', 'success');
+                      }}
+                      className="px-4 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#5B21B6] text-xs font-bold transition-all border border-purple-200 cursor-pointer"
+                    >
+                      Cargar servicios sugeridos de Argentina
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-6 text-center bg-white rounded-2xl border border-slate-100 text-xs text-slate-500">
+                  No hay vencimientos pendientes con los filtros seleccionados.
+                </div>
+              )}
             </div>
           </section>
         </div>
@@ -1633,12 +1721,21 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
                   </label>
                   <div className="flex items-center gap-2">
                     <input
-                      type="number"
-                      min={1}
-                      max={31}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="Ej. 14"
                       required
                       value={formDueDay}
-                      onChange={e => setFormDueDay(Number(e.target.value))}
+                      onChange={e => {
+                        const raw = e.target.value.replace(/\D/g, '');
+                        const clean = raw.replace(/^0+(?=\d)/, '');
+                        if (clean === '') {
+                          setFormDueDay('');
+                        } else {
+                          const num = parseInt(clean, 10);
+                          setFormDueDay(Math.min(31, Math.max(1, num)).toString());
+                        }
+                      }}
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-black font-outfit text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-400 text-sm"
                     />
                     <span className="text-xs text-slate-500 font-semibold shrink-0">de cada mes</span>
@@ -1652,11 +1749,20 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
                     </label>
                     <div className="flex items-center gap-2">
                       <input
-                        type="number"
-                        min={1}
-                        max={31}
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="Ej. 20"
                         value={formCloseDay}
-                        onChange={e => setFormCloseDay(Number(e.target.value))}
+                        onChange={e => {
+                          const raw = e.target.value.replace(/\D/g, '');
+                          const clean = raw.replace(/^0+(?=\d)/, '');
+                          if (clean === '') {
+                            setFormCloseDay('');
+                          } else {
+                            const num = parseInt(clean, 10);
+                            setFormCloseDay(Math.min(31, Math.max(1, num)).toString());
+                          }
+                        }}
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-black font-outfit text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-400 text-sm"
                       />
                       <span className="text-xs text-slate-500 font-semibold shrink-0">de cada mes</span>

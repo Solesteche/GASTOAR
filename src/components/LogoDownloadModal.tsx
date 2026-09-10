@@ -85,16 +85,17 @@ export const LogoDownloadModal: React.FC<LogoDownloadModalProps> = ({
       const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
         <defs>
           <linearGradient id="gastoArGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#00d2ff" />
-            <stop offset="52%" stop-color="#7928ca" />
-            <stop offset="100%" stop-color="#ff0080" />
+            <stop offset="0%" stop-color="#4A0E78" />
+            <stop offset="35%" stop-color="#7E22CE" />
+            <stop offset="65%" stop-color="#D946EF" />
+            <stop offset="100%" stop-color="#F97316" />
           </linearGradient>
         </defs>
         <rect width="512" height="512" rx="140" fill="url(#gastoArGrad)" />
         <g transform="translate(64, 64) scale(3.84)">
-          <path d="M 68 32 A 28 28 0 1 0 74 62 L 54 62 L 54 50 L 75 50" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          <line x1="50" y1="34" x2="50" y2="66" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
-          <path d="M 54 41 C 54 38 46 38 46 43 C 46 48 54 48 54 53 C 54 58 46 58 46 55" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M 68 30 A 28 28 0 1 0 78 50 L 63 50" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <circle cx="51" cy="41" r="5" fill="#FFFFFF"/>
+          <path d="M 44 56.5 Q 51 63.5 58 56.5" stroke="#FFFFFF" stroke-width="4.8" stroke-linecap="round" fill="none"/>
         </g>
       </svg>`;
 
@@ -107,28 +108,29 @@ export const LogoDownloadModal: React.FC<LogoDownloadModalProps> = ({
       const darkSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 240" width="800" height="240">
         <defs>
           <linearGradient id="iconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#00d2ff" />
-            <stop offset="52%" stop-color="#7928ca" />
-            <stop offset="100%" stop-color="#ff0080" />
+            <stop offset="0%" stop-color="#4A0E78" />
+            <stop offset="35%" stop-color="#7E22CE" />
+            <stop offset="65%" stop-color="#D946EF" />
+            <stop offset="100%" stop-color="#F97316" />
           </linearGradient>
           <linearGradient id="barGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#9333EA" />
-            <stop offset="50%" stop-color="#7928CA" />
-            <stop offset="100%" stop-color="#F95420" />
+            <stop offset="0%" stop-color="#7E22CE" />
+            <stop offset="50%" stop-color="#D946EF" />
+            <stop offset="100%" stop-color="#F97316" />
           </linearGradient>
         </defs>
         <rect width="800" height="240" fill="#0B0517" rx="24"/>
         <!-- Icon -->
         <g transform="translate(48, 48)">
-          <rect width="144" height="144" rx="42" fill="url(#iconGrad)"/>
+          <rect width="144" height="144" rx="40" fill="url(#iconGrad)"/>
           <g transform="translate(18, 18) scale(1.08)">
-            <path d="M 68 32 A 28 28 0 1 0 74 62 L 54 62 L 54 50 L 75 50" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-            <line x1="50" y1="34" x2="50" y2="66" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
-            <path d="M 54 41 C 54 38 46 38 46 43 C 46 48 54 48 54 53 C 54 58 46 58 46 55" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <path d="M 68 30 A 28 28 0 1 0 78 50 L 63 50" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <circle cx="51" cy="41" r="5" fill="#FFFFFF"/>
+            <path d="M 44 56.5 Q 51 63.5 58 56.5" stroke="#FFFFFF" stroke-width="4.8" stroke-linecap="round" fill="none"/>
           </g>
         </g>
         <!-- Text -->
-        <text x="220" y="125" font-family="Plus Jakarta Sans, sans-serif" font-weight="900" font-size="70" fill="#FFFFFF">Gasto<tspan fill="#A855F7">AR</tspan></text>
+        <text x="220" y="125" font-family="Plus Jakarta Sans, sans-serif" font-weight="900" font-size="70" fill="#FFFFFF">Gasto<tspan fill="#D946EF">AR</tspan></text>
         <text x="222" y="165" font-family="Plus Jakarta Sans, sans-serif" font-weight="700" font-size="22" fill="#E9D5FF">Registrá. Controlá. Ahorrá.</text>
         <rect x="222" y="178" width="160" height="6" rx="3" fill="url(#barGrad)"/>
       </svg>`;
@@ -142,28 +144,29 @@ export const LogoDownloadModal: React.FC<LogoDownloadModalProps> = ({
       const lightSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 240" width="800" height="240">
         <defs>
           <linearGradient id="iconGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#00d2ff" />
-            <stop offset="52%" stop-color="#7928ca" />
-            <stop offset="100%" stop-color="#ff0080" />
+            <stop offset="0%" stop-color="#4A0E78" />
+            <stop offset="35%" stop-color="#7E22CE" />
+            <stop offset="65%" stop-color="#D946EF" />
+            <stop offset="100%" stop-color="#F97316" />
           </linearGradient>
           <linearGradient id="barGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#9333EA" />
-            <stop offset="50%" stop-color="#7928CA" />
-            <stop offset="100%" stop-color="#F95420" />
+            <stop offset="0%" stop-color="#7E22CE" />
+            <stop offset="50%" stop-color="#D946EF" />
+            <stop offset="100%" stop-color="#F97316" />
           </linearGradient>
         </defs>
         <rect width="800" height="240" fill="#FFFFFF" rx="24"/>
         <!-- Icon -->
         <g transform="translate(48, 48)">
-          <rect width="144" height="144" rx="42" fill="url(#iconGrad2)"/>
+          <rect width="144" height="144" rx="40" fill="url(#iconGrad2)"/>
           <g transform="translate(18, 18) scale(1.08)">
-            <path d="M 68 32 A 28 28 0 1 0 74 62 L 54 62 L 54 50 L 75 50" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-            <line x1="50" y1="34" x2="50" y2="66" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
-            <path d="M 54 41 C 54 38 46 38 46 43 C 46 48 54 48 54 53 C 54 58 46 58 46 55" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <path d="M 68 30 A 28 28 0 1 0 78 50 L 63 50" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <circle cx="51" cy="41" r="5" fill="#FFFFFF"/>
+            <path d="M 44 56.5 Q 51 63.5 58 56.5" stroke="#FFFFFF" stroke-width="4.8" stroke-linecap="round" fill="none"/>
           </g>
         </g>
         <!-- Text -->
-        <text x="220" y="125" font-family="Plus Jakarta Sans, sans-serif" font-weight="900" font-size="70" fill="#2E0854">Gasto<tspan fill="#9333EA">AR</tspan></text>
+        <text x="220" y="125" font-family="Plus Jakarta Sans, sans-serif" font-weight="900" font-size="70" fill="#2E0854">Gasto<tspan fill="#7E22CE">AR</tspan></text>
         <text x="222" y="165" font-family="Plus Jakarta Sans, sans-serif" font-weight="700" font-size="22" fill="#334155">Registrá. Controlá. Ahorrá.</text>
         <rect x="222" y="178" width="160" height="6" rx="3" fill="url(#barGrad2)"/>
       </svg>`;

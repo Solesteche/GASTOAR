@@ -1,6 +1,6 @@
 import React from 'react';
 import { VoiceExpenseModal } from './VoiceExpenseModal';
-import { Budgets, CategoryMap, CoupleProfile, Transaction } from '../types';
+import { Budgets, CategoryMap, CoupleProfile, Transaction, Goal, GoalContribution } from '../types';
 
 interface AiAssistantModalProps {
   isOpen: boolean;
@@ -10,6 +10,9 @@ interface AiAssistantModalProps {
   profile: CoupleProfile;
   transactions: Transaction[];
   budgets: Budgets;
+  goals?: Goal[];
+  onAddGoal?: (goalData: Omit<Goal, 'id' | 'createdAt'>) => Goal;
+  onAddGoalContribution?: (goalId: string, contribution: Omit<GoalContribution, 'id'>) => void;
   onShowToast: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 

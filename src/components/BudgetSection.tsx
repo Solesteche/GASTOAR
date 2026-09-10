@@ -4,31 +4,39 @@ import {
   AlertTriangle, 
   AlertCircle, 
   Settings2,
-  CheckCircle2,
-  TrendingUp,
-  TrendingDown,
-  Calendar,
-  Clock,
-  Search,
-  Sliders,
-  Filter,
-  ArrowRight,
-  ExternalLink,
-  Edit3,
-  Plus,
-  Coins,
-  ShieldCheck,
-  ShieldAlert,
-  HelpCircle,
-  BarChart3,
-  Layers,
-  Sparkles,
-  Check,
-  X
+  CheckCircle2, 
+  TrendingUp, 
+  TrendingDown, 
+  Calendar, 
+  Clock, 
+  Search, 
+  Sliders, 
+  Filter, 
+  ArrowRight, 
+  ExternalLink, 
+  Edit3, 
+  Plus, 
+  Coins, 
+  ShieldCheck, 
+  ShieldAlert, 
+  HelpCircle, 
+  BarChart3, 
+  Layers, 
+  Sparkles, 
+  Check, 
+  X,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw
 } from 'lucide-react';
 import { Budgets, CategoryColors, CategoryMap, Transaction } from '../types';
 import { formatCurrency } from '../utils/formatters';
-import { BudgetComparisonView } from './BudgetComparisonView';
+import { BudgetCategoryEditModal } from './budget/BudgetCategoryEditModal';
+import { BudgetAlertsSection } from './budget/BudgetAlertsSection';
+import { BudgetProjectionSection } from './budget/BudgetProjectionSection';
+import { BudgetComparisonSection } from './budget/BudgetComparisonSection';
 
 interface BudgetSectionProps {
   budgets: Budgets;
@@ -43,6 +51,7 @@ interface BudgetSectionProps {
 
 const DEFAULT_BUDGETS: Budgets = { categories: {}, subcategories: {} };
 
+type ActiveBudgetSection = 'overview' | 'alerts' | 'projection' | 'comparison';
 type StatusFilter = 'all' | 'risk' | 'safe' | 'no_budget';
 type SortOption = 'percentage' | 'spent' | 'remaining' | 'name';
 
@@ -56,52 +65,113 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
   onUpdateBudgets,
   onSelectCategory,
 }) => {
-  // View mode: 'cards' (Control y Semáforo) or 'comparison' (Tabla detallada histórica)
-  const [viewMode, setViewMode] = useState<'cards' | 'comparison'>('cards');
-  
+  // Navigation: 1) Alta y Categorías, 2) Alertas y Límites, 3) Proyección Automática, 4) Tabla Comparativa
+  const [activeSection, setActiveSection] = useState<ActiveBudgetSection>('overview');
+
   // Search & Filter state for category cards
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortOption, setSortOption] = useState<SortOption>('percentage');
 
-  // Quick edit category limit modal state
+  // Quick edit single category limit modal state
   const [editingCategory, setEditingCategory] = useState<{
     name: string;
     currentLimit: number;
     currentSpent: number;
+    color: string;
   } | null>(null);
-  const [quickLimitInput, setQuickLimitInput] = useState<string>('');
 
-  // 1. Month Pacing Calculations
+  // 1. Unified Single Date Filter Logic (Eliminates repeated and confusing date filters)
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const currentDay = now.getDate();
-  const daysRemaining = Math.max(1, daysInMonth - currentDay);
-  const monthProgressPct = Math.round((currentDay / daysInMonth) * 100);
-  const monthName = now.toLocaleDateString('es-AR', { month: 'long' });
-  const monthNameCapitalized = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-
-  // Filter transactions for this month (expenses only)
   const currentMonthIso = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-  
-  const currentMonthExpenses = useMemo(() => {
+
+  const availableMonths = useMemo(() => {
+    const set = new Set<string>();
+    set.add(currentMonthIso);
+    (transactions || []).forEach(tx => {
+      if (tx && tx.fecha && tx.fecha.length >= 7) {
+        set.add(tx.fecha.substring(0, 7));
+      }
+    });
+
+    return Array.from(set)
+      .sort()
+      .reverse()
+      .map(ym => {
+        const [y, m] = ym.split('-').map(Number);
+        const d = new Date(y, m - 1, 1);
+        const label = d.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+        return {
+          value: ym,
+          label: label.charAt(0).toUpperCase() + label.slice(1),
+          year: y,
+          month: m - 1,
+        };
+      });
+  }, [transactions, currentMonthIso]);
+
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthIso);
+
+  const selectedMonthObj = useMemo(() => {
+    const found = availableMonths.find(m => m.value === selectedMonth);
+    if (found) return found;
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const d = new Date(y, m - 1, 1);
+    const label = d.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+    return {
+      value: selectedMonth,
+      label: label.charAt(0).toUpperCase() + label.slice(1),
+      year: y,
+      month: m - 1,
+    };
+  }, [selectedMonth, availableMonths]);
+
+  // Month navigation handlers
+  const handlePrevMonth = () => {
+    const currentIndex = availableMonths.findIndex(m => m.value === selectedMonth);
+    if (currentIndex >= 0 && currentIndex < availableMonths.length - 1) {
+      setSelectedMonth(availableMonths[currentIndex + 1].value);
+    } else {
+      const [y, m] = selectedMonth.split('-').map(Number);
+      const prevDate = new Date(y, m - 2, 1);
+      const prevIso = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+      setSelectedMonth(prevIso);
+    }
+  };
+
+  const handleNextMonth = () => {
+    const currentIndex = availableMonths.findIndex(m => m.value === selectedMonth);
+    if (currentIndex > 0) {
+      setSelectedMonth(availableMonths[currentIndex - 1].value);
+    } else {
+      const [y, m] = selectedMonth.split('-').map(Number);
+      const nextDate = new Date(y, m, 1);
+      const nextIso = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+      setSelectedMonth(nextIso);
+    }
+  };
+
+  // Month Pacing Calculations based on unified selected month
+  const isCurrentMonth = selectedMonth === currentMonthIso;
+  const daysInMonth = new Date(selectedMonthObj.year, selectedMonthObj.month + 1, 0).getDate();
+  const currentDay = isCurrentMonth ? now.getDate() : daysInMonth;
+  const daysRemaining = isCurrentMonth ? Math.max(1, daysInMonth - currentDay) : 0;
+  const monthProgressPct = isCurrentMonth ? Math.round((currentDay / daysInMonth) * 100) : 100;
+
+  // Filter transactions for this selected month (expenses only)
+  const effectiveExpenses = useMemo(() => {
     return (transactions || []).filter(tx => {
       if (!tx || !tx.fecha) return false;
       if (tx.tipoTransaccion === 'ingreso') return false;
-      return tx.fecha.startsWith(currentMonthIso);
+      return tx.fecha.startsWith(selectedMonth);
     });
-  }, [transactions, currentMonthIso]);
-
-  // Fallback to all expenses if dataset doesn't have current month (e.g. historical sample data)
-  const effectiveExpenses = currentMonthExpenses.length > 0 
-    ? currentMonthExpenses 
-    : (transactions || []).filter(tx => tx && tx.tipoTransaccion !== 'ingreso');
+  }, [transactions, selectedMonth]);
 
   const alertThreshold = budgets?.alertThresholdPercent || 80;
 
-  // 2. Compute spending per category
+  // 2. Spending per category & subcategory in the selected month
   const catSpending = useMemo(() => {
     const map: Record<string, { spent: number; count: number }> = {};
     effectiveExpenses.forEach(tx => {
@@ -114,7 +184,19 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
     return map;
   }, [effectiveExpenses]);
 
-  // 3. Complete category list
+  const subcatSpending = useMemo(() => {
+    const map: Record<string, Record<string, number>> = {};
+    effectiveExpenses.forEach(tx => {
+      if (!tx) return;
+      const cat = tx.categoria || 'Otros';
+      const sub = tx.subcategoria || 'General';
+      if (!map[cat]) map[cat] = {};
+      map[cat][sub] = (map[cat][sub] || 0) + (tx.monto || 0);
+    });
+    return map;
+  }, [effectiveExpenses]);
+
+  // 3. Complete category items list (with subcategory breakdown & auto-summed category budgets)
   const categoryItems = useMemo(() => {
     const set = new Set<string>([
       ...Object.keys(categoryMap || {}),
@@ -123,7 +205,34 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
     ]);
 
     return Array.from(set).map(cat => {
-      const budget = budgets?.categories?.[cat] || 0;
+      const subs = categoryMap[cat] || [];
+      const subcategoriesDetails = subs.map(subName => {
+        const subBudget = budgets?.subcategories?.[subName] || 0;
+        const subSpent = subcatSpending[cat]?.[subName] || 0;
+        const subRem = subBudget > 0 ? subBudget - subSpent : 0;
+        const subPct = subBudget > 0 ? Math.round((subSpent / subBudget) * 100) : (subSpent > 0 ? 100 : 0);
+        let subStatus: 'exceeded' | 'warning' | 'ok' | 'no_budget' = 'no_budget';
+        if (subBudget > 0) {
+          if (subPct >= 100) subStatus = 'exceeded';
+          else if (subPct >= alertThreshold) subStatus = 'warning';
+          else subStatus = 'ok';
+        }
+        return {
+          name: subName,
+          budget: subBudget,
+          spent: subSpent,
+          remaining: subRem,
+          percentage: subPct,
+          status: subStatus,
+        };
+      });
+
+      // USER REQUIREMENT: Automatically sum subcategories to determine the category total
+      const subBudgetsSum = subcategoriesDetails.reduce((sum, s) => sum + s.budget, 0);
+      const hasSubcategoryBudgets = subBudgetsSum > 0;
+      const directBudget = budgets?.categories?.[cat] || 0;
+      const budget = hasSubcategoryBudgets ? subBudgetsSum : directBudget;
+
       const catData = catSpending[cat] || { spent: 0, count: 0 };
       const spent = catData.spent;
       const count = catData.count;
@@ -138,7 +247,9 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
         else status = 'ok';
       }
 
-      const dailyAllowance = budget > 0 && remaining > 0 ? Math.round(remaining / daysRemaining) : 0;
+      const dailyAllowance = budget > 0 && remaining > 0 && daysRemaining > 0
+        ? Math.round(remaining / daysRemaining)
+        : 0;
 
       return {
         category: cat,
@@ -151,9 +262,11 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
         status,
         color: (categoryColors && categoryColors[cat]) || '#7928CA',
         dailyAllowance,
+        hasSubcategoryBudgets,
+        subcategories: subcategoriesDetails,
       };
     });
-  }, [categoryMap, budgets, catSpending, alertThreshold, daysRemaining, categoryColors]);
+  }, [categoryMap, budgets, catSpending, subcatSpending, alertThreshold, daysRemaining, categoryColors]);
 
   // 4. Global Budget Totals
   const globalSummary = useMemo(() => {
@@ -180,7 +293,9 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
 
     const netRemaining = totalBudget - totalSpentWithBudget;
     const globalPct = totalBudget > 0 ? Math.round((totalSpentWithBudget / totalBudget) * 100) : 0;
-    const dailySafeSpending = netRemaining > 0 ? Math.round(netRemaining / daysRemaining) : 0;
+    const dailySafeSpending = netRemaining > 0 && daysRemaining > 0 
+      ? Math.round(netRemaining / daysRemaining) 
+      : 0;
 
     return {
       totalBudget,
@@ -197,7 +312,7 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
     };
   }, [categoryItems, daysRemaining]);
 
-  // 5. Pacing status evaluation
+  // 5. Pacing evaluation
   const pacingEvaluation = useMemo(() => {
     const { globalPct, totalBudget } = globalSummary;
     if (totalBudget === 0) {
@@ -214,16 +329,16 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
         title: '¡Límite Mensual Superado!',
         badge: 'Excedido',
         color: 'bg-rose-50 text-rose-800 border-rose-200',
-        desc: `Consumiste el ${globalPct}% del presupuesto mensual a ${daysRemaining} días del cierre.`,
+        desc: `Consumiste el ${globalPct}% del presupuesto mensual en ${selectedMonthObj.label}.`,
         isOptimal: false,
       };
     }
-    if (globalPct > monthProgressPct + 15) {
+    if (isCurrentMonth && globalPct > monthProgressPct + 15) {
       return {
         title: 'Ritmo de Gasto Acelerado',
         badge: 'Atención',
         color: 'bg-amber-50 text-amber-900 border-amber-200',
-        desc: `Vas en el día ${currentDay} (${monthProgressPct}% del mes), pero ya gastaste el ${globalPct}%. Conviene frenar gastos no esenciales.`,
+        desc: `Día ${currentDay} (${monthProgressPct}% del mes) con ${globalPct}% gastado. Conviene moderar consumos discrecionales.`,
         isOptimal: false,
       };
     }
@@ -231,12 +346,12 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
       title: 'Ritmo Financiero Saludable',
       badge: 'Bajo Control',
       color: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-      desc: `Día ${currentDay} (${monthProgressPct}% del mes) con el ${globalPct}% gastado. Vas a buen ritmo para cerrar el mes con superávit.`,
+      desc: `${selectedMonthObj.label}: Consumo dentro de los límites programados (${globalPct}% ejecutado).`,
       isOptimal: true,
     };
-  }, [globalSummary, monthProgressPct, currentDay, daysRemaining]);
+  }, [globalSummary, monthProgressPct, currentDay, selectedMonthObj.label, isCurrentMonth]);
 
-  // 6. Filtered and Sorted Category Items
+  // 6. Filtered and Sorted Category Items for Tab 1
   const displayedCategories = useMemo(() => {
     return categoryItems
       .filter(item => {
@@ -270,313 +385,365 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
       });
   }, [categoryItems, searchTerm, statusFilter, sortOption]);
 
+  const [expandedCardSubs, setExpandedCardSubs] = useState<Record<string, boolean>>({});
+
   // Quick edit handlers
-  const handleOpenQuickEdit = (item: typeof categoryItems[0]) => {
+  const handleOpenEdit = (item: { category: string; budget: number; spent: number; color?: string }) => {
     setEditingCategory({
       name: item.category,
       currentLimit: item.budget,
       currentSpent: item.spent,
+      color: item.color || '#7928CA',
     });
-    setQuickLimitInput(item.budget > 0 ? String(item.budget) : (item.spent > 0 ? String(item.spent) : '50000'));
   };
 
-  const handleSaveQuickLimit = () => {
-    if (!editingCategory) return;
-    const num = Math.max(0, Math.round(Number(quickLimitInput) || 0));
+  const handleSaveCategoryBudget = (
+    categoryName: string, 
+    newBudget: number, 
+    newSubcategoryBudgets?: Record<string, number>
+  ) => {
     const newCategories = {
       ...(budgets.categories || {}),
-      [editingCategory.name]: num,
+      [categoryName]: newBudget,
+    };
+    const newSubs = {
+      ...(budgets.subcategories || {}),
+      ...(newSubcategoryBudgets || {}),
     };
     const updated: Budgets = {
       ...budgets,
       categories: newCategories,
+      subcategories: newSubs,
     };
     if (onUpdateBudgets) {
       onUpdateBudgets(updated);
     }
-    setEditingCategory(null);
   };
 
   return (
     <div className="space-y-6">
-      {/* SECTION HEADER & PRIMARY CONTROLS */}
-      <section className="bg-white p-5 sm:p-7 rounded-3xl shadow-[0_4px_24px_-4px_rgba(121,40,202,0.07)] border border-purple-100/90 space-y-6">
+      {/* 1. TOP UNIFIED DATE BAR (Eliminates repeated/confusing date filters) */}
+      <section className="bg-white p-4 sm:p-5 rounded-3xl shadow-xs border border-purple-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
         
-        {/* Top Title Bar */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <div className="w-10 h-10 rounded-2xl bg-purple-50 text-[#7928CA] flex items-center justify-center shadow-xs">
-                <Target className="w-5 h-5" />
-              </div>
-              <h2 className="font-extrabold text-[#2E0854] text-lg sm:text-xl tracking-tight">
-                Control y Límites de Presupuestos
-              </h2>
-              <span className="px-2.5 py-0.5 rounded-full bg-purple-100/80 text-[#7928CA] font-bold text-xs border border-purple-200">
-                {monthNameCapitalized} {currentYear}
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 font-bold text-xs border border-amber-200">
-                Alerta al {alertThreshold}%
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium">
-              Controlá el ritmo de gasto diario, detectá desvíos a tiempo y asigná límites por categoría para no llegar a fin de mes en rojo.
-            </p>
-          </div>
+        {/* Left: Month Navigator */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handlePrevMonth}
+            className="p-2 rounded-xl bg-slate-50 hover:bg-purple-50 text-slate-600 hover:text-[#7928CA] border border-slate-200 transition-colors cursor-pointer"
+            title="Mes anterior"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
 
-          {/* Action CTAs */}
-          <div className="flex items-center gap-2.5 self-start lg:self-auto flex-wrap">
-            {/* View Switcher: Tablero vs Detalle */}
-            <div className="bg-slate-100 p-1 rounded-2xl flex items-center text-xs font-bold border border-slate-200/80">
-              <button
-                type="button"
-                onClick={() => setViewMode('cards')}
-                className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
-                  viewMode === 'cards'
-                    ? 'bg-white text-[#7928CA] shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>Semáforo & Control</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('comparison')}
-                className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
-                  viewMode === 'comparison'
-                    ? 'bg-white text-[#7928CA] shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <BarChart3 className="w-3.5 h-3.5" />
-                <span>Tabla Comparativa</span>
-              </button>
-            </div>
-
-            <button
-              onClick={onOpenBudgetModal}
-              className="px-4 py-2 bg-gradient-to-r from-[#F95420] to-[#FF6B3D] hover:from-[#E04412] hover:to-[#F95420] text-white text-xs font-bold rounded-2xl shadow-md transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
-              title="Ajustar límites de forma masiva o proyectar aumentos por inflación"
+          {/* Month Selector Dropdown */}
+          <div className="relative">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="appearance-none bg-purple-50 text-[#7928CA] font-extrabold text-sm sm:text-base py-2 pl-4 pr-9 rounded-2xl border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
             >
-              <Settings2 className="w-4 h-4" />
-              <span>Configurar / Inflación</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 3 HIGH-IMPACT METRIC CARDS FOR EFFECTIVE BUDGET CONTROL */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
-          
-          {/* Card 1: Presupuesto Global del Mes */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-purple-50/70 to-indigo-50/40 border border-purple-100 space-y-3">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-              <span className="flex items-center gap-1.5 text-purple-900">
-                <Coins className="w-4 h-4 text-[#7928CA]" />
-                Presupuesto del Mes
-              </span>
-              <span className="font-extrabold text-[#7928CA]">
-                {globalSummary.globalPct}% consumido
-              </span>
-            </div>
-
-            <div className="flex items-baseline justify-between">
-              <div>
-                <span className="text-xl sm:text-2xl font-black text-slate-900 font-outfit">
-                  {formatCurrency(globalSummary.totalSpentWithBudget, currency)}
-                </span>
-                <span className="text-xs text-slate-400 font-medium ml-1.5">
-                  / {formatCurrency(globalSummary.totalBudget, currency)}
-                </span>
-              </div>
-            </div>
-
-            {/* Progress bar */}
-            <div className="space-y-1">
-              <div className="w-full h-2.5 bg-purple-100 rounded-full overflow-hidden relative">
-                <div 
-                  className={`h-full transition-all duration-500 rounded-full ${
-                    globalSummary.globalPct >= 100 
-                      ? 'bg-rose-500' 
-                      : globalSummary.globalPct >= alertThreshold 
-                        ? 'bg-amber-500' 
-                        : 'bg-[#7928CA]'
-                  }`}
-                  style={{ width: `${Math.min(100, globalSummary.globalPct)}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                <span>Día {currentDay} de {daysInMonth} ({monthProgressPct}% del mes)</span>
-                <span>
-                  {globalSummary.netRemaining >= 0 ? (
-                    <strong className="text-emerald-700">Quedan {formatCurrency(globalSummary.netRemaining, currency)}</strong>
-                  ) : (
-                    <strong className="text-rose-600">Exceso {formatCurrency(Math.abs(globalSummary.netRemaining), currency)}</strong>
-                  )}
-                </span>
-              </div>
-            </div>
+              {availableMonths.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            <Calendar className="w-4 h-4 text-[#7928CA] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-75" />
           </div>
 
-          {/* Card 2: Margen Diario Seguro (Pacing) */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-emerald-50/60 to-teal-50/40 border border-emerald-100 space-y-3">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-              <span className="flex items-center gap-1.5 text-emerald-900">
-                <Clock className="w-4 h-4 text-emerald-600" />
-                Gasto Diario Seguro
-              </span>
-              <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                {daysRemaining} días restantes
-              </span>
-            </div>
+          <button
+            type="button"
+            onClick={handleNextMonth}
+            className="p-2 rounded-xl bg-slate-50 hover:bg-purple-50 text-slate-600 hover:text-[#7928CA] border border-slate-200 transition-colors cursor-pointer"
+            title="Mes siguiente"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
 
-            <div className="flex items-baseline justify-between">
-              <div>
-                <span className="text-xl sm:text-2xl font-black text-emerald-800 font-outfit">
-                  {formatCurrency(globalSummary.dailySafeSpending, currency)}
-                </span>
-                <span className="text-xs text-slate-500 font-medium ml-1">
-                  / día
-                </span>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-600 font-medium leading-relaxed">
-              {globalSummary.netRemaining > 0 ? (
-                <>
-                  Margen máximo por día para no pasarte del presupuesto antes del <strong>{daysInMonth} de {monthName}</strong>.
-                </>
-              ) : (
-                <span className="text-rose-600 font-bold">
-                  Sin margen diario disponible. El presupuesto mensual ha sido sobrepasado.
-                </span>
-              )}
-            </p>
-          </div>
-
-          {/* Card 3: Semáforo y Estado de Salud de Categorías */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-50 to-purple-50/30 border border-slate-200 space-y-3 sm:col-span-2 lg:col-span-1">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-              <span className="flex items-center gap-1.5 text-slate-800">
-                <ShieldCheck className="w-4 h-4 text-purple-600" />
-                Semáforo de Categorías
-              </span>
-              <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${pacingEvaluation.color}`}>
-                {pacingEvaluation.badge}
-              </span>
-            </div>
-
-            {/* Status Breakdown Chips */}
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => setStatusFilter('safe')}
-                className={`p-2 rounded-xl border flex items-center justify-between transition-all cursor-pointer ${
-                  statusFilter === 'safe'
-                    ? 'bg-emerald-100 border-emerald-300 font-bold text-emerald-900'
-                    : 'bg-emerald-50/70 border-emerald-100 text-emerald-800 hover:bg-emerald-100/60'
-                }`}
-              >
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  Bajo control
-                </span>
-                <strong className="font-outfit">{globalSummary.okCount}</strong>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setStatusFilter('risk')}
-                className={`p-2 rounded-xl border flex items-center justify-between transition-all cursor-pointer ${
-                  statusFilter === 'risk'
-                    ? 'bg-rose-100 border-rose-300 font-bold text-rose-900'
-                    : 'bg-rose-50/70 border-rose-100 text-rose-800 hover:bg-rose-100/60'
-                }`}
-              >
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-rose-500" />
-                  En riesgo / Exceso
-                </span>
-                <strong className="font-outfit">
-                  {globalSummary.exceededCount + globalSummary.warningCount}
-                </strong>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setStatusFilter('no_budget')}
-                className={`p-2 rounded-xl border flex items-center justify-between transition-all cursor-pointer ${
-                  statusFilter === 'no_budget'
-                    ? 'bg-slate-200 border-slate-300 font-bold text-slate-900'
-                    : 'bg-slate-100/70 border-slate-200 text-slate-700 hover:bg-slate-200/60'
-                }`}
-              >
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-slate-400" />
-                  Sin límite
-                </span>
-                <strong className="font-outfit">{globalSummary.noBudgetCount}</strong>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setStatusFilter('all')}
-                className={`p-2 rounded-xl border flex items-center justify-between transition-all cursor-pointer ${
-                  statusFilter === 'all'
-                    ? 'bg-purple-100 border-purple-300 font-bold text-[#7928CA]'
-                    : 'bg-purple-50/50 border-purple-100 text-slate-700 hover:bg-purple-100/50'
-                }`}
-              >
-                <span className="flex items-center gap-1.5">
-                  <span>Todas</span>
-                </span>
-                <strong className="font-outfit">{globalSummary.categoriesCount}</strong>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* RITMO & DIAGNOSIS BANNER */}
-        <div className={`p-4 rounded-2xl border text-xs sm:text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${pacingEvaluation.color}`}>
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 shrink-0">
-              {pacingEvaluation.isOptimal ? (
-                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-              ) : (
-                <AlertTriangle className="w-5 h-5 text-amber-600" />
-              )}
-            </div>
-            <div>
-              <div className="font-bold text-slate-900 flex items-center gap-2">
-                <span>{pacingEvaluation.title}</span>
-                {globalSummary.exceededCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-extrabold">
-                    {globalSummary.exceededCount} {globalSummary.exceededCount === 1 ? 'categoría superada' : 'categorías superadas'}
-                  </span>
-                )}
-              </div>
-              <p className="text-slate-600 mt-0.5 text-xs">
-                {pacingEvaluation.desc}
-              </p>
-            </div>
-          </div>
-
-          {globalSummary.exceededCount > 0 && (
+          {/* Quick jump to current month */}
+          {!isCurrentMonth && (
             <button
-              onClick={() => setStatusFilter('risk')}
-              className="px-3.5 py-1.5 bg-white rounded-xl shadow-xs border border-rose-200 text-rose-700 font-bold text-xs hover:bg-rose-50 transition-colors self-start sm:self-auto shrink-0 cursor-pointer"
+              type="button"
+              onClick={() => setSelectedMonth(currentMonthIso)}
+              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
             >
-              Ver categorías en riesgo
+              <RotateCcw className="w-3 h-3" />
+              <span>Ir al mes actual</span>
             </button>
           )}
         </div>
+
+        {/* Right: Month Pacing Context */}
+        <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
+          {isCurrentMonth ? (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200">
+              <Clock className="w-3.5 h-3.5 text-[#7928CA]" />
+              <span>Día <strong>{currentDay}</strong> de {daysInMonth} ({monthProgressPct}% del mes) · <strong>{daysRemaining} días restantes</strong></span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-600">
+              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <span>Mes cerrado · {daysInMonth} días</span>
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={onOpenBudgetModal}
+            className="px-4 py-2 bg-gradient-to-r from-[#F95420] to-[#FF6B3D] hover:from-[#E04412] hover:to-[#F95420] text-white text-xs font-bold rounded-2xl shadow-sm transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer ml-auto md:ml-0"
+            title="Configuración masiva de presupuestos"
+          >
+            <Settings2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Configuración General</span>
+            <span className="sm:hidden">Ajustes</span>
+          </button>
+        </div>
       </section>
 
-      {/* VIEW MODE 1: INTERACTIVE CARDS & CONTROL DASHBOARD */}
-      {viewMode === 'cards' && (
-        <div className="space-y-4">
+      {/* 2. FOUR CORE NAVIGATION SECTIONS (Exact User Requirements) */}
+      <nav className="bg-slate-100/90 p-1.5 rounded-2xl flex items-center gap-1 border border-slate-200/80 overflow-x-auto scrollbar-none shadow-2xs">
+        {/* Section 1: Alta y Edición de Presupuesto */}
+        <button
+          type="button"
+          onClick={() => setActiveSection('overview')}
+          className={`flex-1 min-w-[170px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            activeSection === 'overview'
+              ? 'bg-white text-[#7928CA] shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <Target className="w-4 h-4" />
+          <span>1) Alta Presupuesto</span>
+        </button>
+
+        {/* Section 2: Configurar Alertas de Presupuesto (Alertas y Límites) */}
+        <button
+          type="button"
+          onClick={() => setActiveSection('alerts')}
+          className={`flex-1 min-w-[170px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            activeSection === 'alerts'
+              ? 'bg-white text-[#7928CA] shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <ShieldAlert className="w-4 h-4" />
+          <span>2) Alertas y Límites</span>
+        </button>
+
+        {/* Section 3: Proyección Automática */}
+        <button
+          type="button"
+          onClick={() => setActiveSection('projection')}
+          className={`flex-1 min-w-[170px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            activeSection === 'projection'
+              ? 'bg-white text-[#7928CA] shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <TrendingUp className="w-4 h-4" />
+          <span>3) Proyección Automática</span>
+        </button>
+
+        {/* Section 4: Tabla Comparativa */}
+        <button
+          type="button"
+          onClick={() => setActiveSection('comparison')}
+          className={`flex-1 min-w-[170px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            activeSection === 'comparison'
+              ? 'bg-white text-[#7928CA] shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span>4) Tabla Comparativa</span>
+        </button>
+      </nav>
+
+      {/* 3. SECTION CONTENT SWITCHER */}
+      
+      {/* SECTION 1: ALTA Y EDICIÓN DE PRESUPUESTO */}
+      {activeSection === 'overview' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
           
-          {/* Filtering & Search Toolbar */}
+          {/* Header & Global Pacing Cards */}
+          <section className="bg-white p-5 sm:p-7 rounded-3xl shadow-[0_4px_24px_-4px_rgba(121,40,202,0.07)] border border-purple-100/90 space-y-6">
+            
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-extrabold text-[#2E0854] text-lg sm:text-xl tracking-tight flex items-center gap-2">
+                  <Target className="w-5 h-5 text-[#7928CA]" />
+                  Gestión y Asignación de Presupuestos
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                  Cargá o editá el límite de cada categoría directamente haciendo clic en el botón de edición.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={onOpenBudgetModal}
+                className="px-4 py-2 bg-purple-50 text-[#7928CA] hover:bg-purple-100 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 self-start sm:self-auto cursor-pointer border border-purple-200"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Asignar masivamente</span>
+              </button>
+            </div>
+
+            {/* 3 High-Impact KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+              
+              {/* Card 1: Presupuesto Global */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-purple-50/70 to-indigo-50/40 border border-purple-100 space-y-3">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                  <span className="flex items-center gap-1.5 text-purple-900">
+                    <Coins className="w-4 h-4 text-[#7928CA]" />
+                    Presupuesto Global
+                  </span>
+                  <span className="font-extrabold text-[#7928CA]">
+                    {globalSummary.globalPct}% consumido
+                  </span>
+                </div>
+
+                <div className="flex items-baseline justify-between">
+                  <div>
+                    <span className="text-xl sm:text-2xl font-black text-slate-900 font-outfit">
+                      {formatCurrency(globalSummary.totalSpentWithBudget, currency)}
+                    </span>
+                    <span className="text-xs text-slate-400 font-medium ml-1.5">
+                      / {formatCurrency(globalSummary.totalBudget, currency)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div className="space-y-1">
+                  <div className="w-full h-2.5 bg-purple-100 rounded-full overflow-hidden relative">
+                    <div 
+                      className={`h-full transition-all duration-500 rounded-full ${
+                        globalSummary.globalPct >= 100 
+                          ? 'bg-rose-500' 
+                          : globalSummary.globalPct >= alertThreshold 
+                            ? 'bg-amber-500' 
+                            : 'bg-[#7928CA]'
+                      }`}
+                      style={{ width: `${Math.min(100, globalSummary.globalPct)}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                    <span>{selectedMonthObj.label}</span>
+                    <span>
+                      {globalSummary.netRemaining >= 0 ? (
+                        <strong className="text-emerald-700">Quedan {formatCurrency(globalSummary.netRemaining, currency)}</strong>
+                      ) : (
+                        <strong className="text-rose-600">Exceso {formatCurrency(Math.abs(globalSummary.netRemaining), currency)}</strong>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Margen Diario Seguro */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-emerald-50/60 to-teal-50/40 border border-emerald-100 space-y-3">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                  <span className="flex items-center gap-1.5 text-emerald-900">
+                    <Clock className="w-4 h-4 text-emerald-600" />
+                    Gasto Diario Seguro
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                    {daysRemaining} días restantes
+                  </span>
+                </div>
+
+                <div className="flex items-baseline justify-between">
+                  <div>
+                    <span className="text-xl sm:text-2xl font-black text-emerald-800 font-outfit">
+                      {formatCurrency(globalSummary.dailySafeSpending, currency)}
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium ml-1">
+                      / día
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                  {globalSummary.netRemaining > 0 ? (
+                    <>Margen máximo por día para no pasarte del presupuesto mensual.</>
+                  ) : (
+                    <span className="text-rose-600 font-bold">Sin margen disponible restante este mes.</span>
+                  )}
+                </p>
+              </div>
+
+              {/* Card 3: Resumen de Cobertura */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-50 to-purple-50/30 border border-slate-200 space-y-3 sm:col-span-2 lg:col-span-1">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                  <span className="flex items-center gap-1.5 text-slate-800">
+                    <ShieldCheck className="w-4 h-4 text-purple-600" />
+                    Cobertura de Categorías
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${pacingEvaluation.color}`}>
+                    {pacingEvaluation.badge}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="p-2 rounded-xl bg-emerald-50/80 border border-emerald-100 flex items-center justify-between">
+                    <span className="text-emerald-800 font-medium">Bajo control:</span>
+                    <strong className="font-outfit text-emerald-900 font-bold">{globalSummary.okCount}</strong>
+                  </div>
+                  <div className="p-2 rounded-xl bg-rose-50/80 border border-rose-100 flex items-center justify-between">
+                    <span className="text-rose-800 font-medium">En riesgo:</span>
+                    <strong className="font-outfit text-rose-900 font-bold">
+                      {globalSummary.exceededCount + globalSummary.warningCount}
+                    </strong>
+                  </div>
+                  <div className="p-2 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-between col-span-2">
+                    <span className="text-slate-600 font-medium">Sin límite fijado:</span>
+                    <strong className="font-outfit text-slate-800 font-bold">{globalSummary.noBudgetCount} categorías</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Diagnostic banner */}
+            <div className={`p-4 rounded-2xl border text-xs sm:text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${pacingEvaluation.color}`}>
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 shrink-0">
+                  {pacingEvaluation.isOptimal ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  ) : (
+                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  )}
+                </div>
+                <div>
+                  <div className="font-bold text-slate-900 flex items-center gap-2">
+                    <span>{pacingEvaluation.title}</span>
+                    {globalSummary.exceededCount > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-extrabold">
+                        {globalSummary.exceededCount} {globalSummary.exceededCount === 1 ? 'categoría superada' : 'categorías superadas'}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-slate-600 mt-0.5 text-xs">
+                    {pacingEvaluation.desc}
+                  </p>
+                </div>
+              </div>
+
+              {globalSummary.exceededCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('risk')}
+                  className="px-3.5 py-1.5 bg-white rounded-xl shadow-xs border border-rose-200 text-rose-700 font-bold text-xs hover:bg-rose-50 transition-colors self-start sm:self-auto shrink-0 cursor-pointer"
+                >
+                  Ver categorías en riesgo
+                </button>
+              )}
+            </div>
+          </section>
+
+          {/* Search and Filters Toolbar */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
             
             {/* Search Input */}
@@ -586,7 +753,7 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar categoría..."
+                placeholder="Buscar categoría para editar..."
                 className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#7928CA]"
               />
               {searchTerm && (
@@ -627,7 +794,7 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
                     statusFilter === 'safe' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-500 hover:text-emerald-700'
                   }`}
                 >
-                  Seguras ({globalSummary.okCount})
+                  Bajo Control ({globalSummary.okCount})
                 </button>
                 <button
                   type="button"
@@ -657,7 +824,7 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
             </div>
           </div>
 
-          {/* CATEGORY CONTROL CARDS GRID */}
+          {/* CATEGORY EDIT CARDS GRID */}
           {displayedCategories.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {displayedCategories.map((item) => {
@@ -690,9 +857,17 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
                             className="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs" 
                             style={{ backgroundColor: item.color }} 
                           />
-                          <h4 className="font-extrabold text-slate-900 text-sm truncate">
-                            {item.category}
-                          </h4>
+                          <div className="min-w-0">
+                            <h4 className="font-extrabold text-slate-900 text-sm truncate">
+                              {item.category}
+                            </h4>
+                            {item.hasSubcategoryBudgets && (
+                              <span className="text-[10px] text-[#7928CA] font-extrabold flex items-center gap-1">
+                                <Sparkles className="w-2.5 h-2.5" />
+                                Suma de {item.subcategories?.filter(s => s.budget > 0).length} subcategorías
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         {/* Status badge */}
@@ -718,14 +893,16 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
                       {/* Amounts Display */}
                       <div className="flex items-baseline justify-between pt-1">
                         <div>
-                          <span className="text-xs text-slate-400 font-medium block">Gastado este mes</span>
+                          <span className="text-xs text-slate-400 font-medium block">Gastado ({selectedMonthObj.label})</span>
                           <span className="text-lg font-black text-slate-900 font-outfit">
                             {formatCurrency(item.spent, currency)}
                           </span>
                         </div>
 
                         <div className="text-right">
-                          <span className="text-xs text-slate-400 font-medium block">Límite fijado</span>
+                          <span className="text-xs text-slate-400 font-medium block">
+                            {item.hasSubcategoryBudgets ? 'Total subcategorías' : 'Límite mensual'}
+                          </span>
                           {item.budget > 0 ? (
                             <span className="text-sm font-bold text-slate-700 font-outfit">
                               {formatCurrency(item.budget, currency)}
@@ -742,7 +919,7 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
                       {item.budget > 0 ? (
                         <div className="space-y-1.5 pt-1">
                           <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden relative">
-                            {/* 80% threshold tick indicator */}
+                            {/* Threshold marker */}
                             <div 
                               className="absolute top-0 bottom-0 w-0.5 bg-slate-300 z-10" 
                               style={{ left: `${alertThreshold}%` }} 
@@ -772,7 +949,7 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
                               </span>
                             )}
 
-                            {item.dailyAllowance > 0 && !isExceeded && (
+                            {item.dailyAllowance > 0 && !isExceeded && isCurrentMonth && (
                               <span className="text-slate-500 font-medium text-[10px]">
                                 ~{formatCurrency(item.dailyAllowance, currency)} / día
                               </span>
@@ -784,19 +961,71 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
                           <span>Sin límite de gasto fijado.</span>
                           <button
                             type="button"
-                            onClick={() => handleOpenQuickEdit(item)}
+                            onClick={() => handleOpenEdit(item)}
                             className="text-[#7928CA] font-bold hover:underline flex items-center gap-1"
                           >
                             <Plus className="w-3 h-3" />
-                            Fijar límite
+                            Fijar presupuesto
                           </button>
+                        </div>
+                      )}
+
+                      {/* Subcategories Breakdown Drawer inside Card */}
+                      {item.subcategories && item.subcategories.length > 0 && (
+                        <div className="pt-2 border-t border-slate-100/90 space-y-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedCardSubs(p => ({ ...p, [item.category]: !p[item.category] }))}
+                            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-purple-50/50 hover:bg-purple-100/60 text-[#7928CA] text-xs font-extrabold transition-colors cursor-pointer"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <Layers className="w-3 h-3" />
+                              <span>{expandedCardSubs[item.category] ? 'Ocultar' : 'Ver'} subcategorías ({item.subcategories.length})</span>
+                            </span>
+                            {expandedCardSubs[item.category] ? (
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+
+                          {expandedCardSubs[item.category] && (
+                            <div className="space-y-1 p-2 rounded-xl bg-slate-50/80 border border-slate-200/80 max-h-48 overflow-y-auto">
+                              {item.subcategories.map(sub => (
+                                <div key={sub.name} className="flex items-center justify-between gap-2 p-1.5 bg-white rounded-lg border border-slate-200/70 text-[11px]">
+                                  <div className="min-w-0">
+                                    <span className="font-bold text-slate-800 block truncate">
+                                      {sub.name}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500 font-medium">
+                                      Gasto: {formatCurrency(sub.spent, currency)}
+                                    </span>
+                                  </div>
+
+                                  <div className="text-right shrink-0">
+                                    <span className="font-outfit font-extrabold text-slate-900 block">
+                                      {sub.budget > 0 ? (
+                                        formatCurrency(sub.budget, currency)
+                                      ) : (
+                                        <span className="text-slate-400 font-normal italic text-[10px]">Sin límite</span>
+                                      )}
+                                    </span>
+                                    {sub.budget > 0 && (
+                                      <span className={`text-[10px] font-extrabold ${sub.status === 'exceeded' ? 'text-rose-600' : sub.status === 'warning' ? 'text-amber-600' : 'text-emerald-700'}`}>
+                                        {sub.percentage}%
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
 
-                    {/* Bottom Action Footer */}
+                    {/* Bottom Action Footer with Direct Category Edit Button */}
                     <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
-                      {/* Navigate to Transactions Table for this category */}
                       <button
                         type="button"
                         onClick={() => {
@@ -811,15 +1040,15 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
                         <span>Ver gastos ({item.count})</span>
                       </button>
 
-                      {/* Quick Edit Budget Button */}
+                      {/* EDIT CATEGORY BUDGET BUTTON (User Request: "Habilitar la opción de editar el presupuesto de una categoría") */}
                       <button
                         type="button"
-                        onClick={() => handleOpenQuickEdit(item)}
-                        className="px-2.5 py-1 rounded-lg bg-purple-50 text-[#7928CA] hover:bg-purple-100 font-bold flex items-center gap-1 transition-all cursor-pointer text-xs active:scale-95"
+                        onClick={() => handleOpenEdit(item)}
+                        className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#7928CA] font-extrabold flex items-center gap-1.5 transition-all cursor-pointer text-xs active:scale-95 shadow-2xs border border-purple-200/70"
                         title="Modificar límite de presupuesto para esta categoría"
                       >
-                        <Edit3 className="w-3 h-3" />
-                        <span>{item.budget > 0 ? 'Editar límite' : 'Asignar límite'}</span>
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>{item.budget > 0 ? 'Editar Presupuesto' : 'Asignar Presupuesto'}</span>
                       </button>
                     </div>
 
@@ -848,140 +1077,61 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
         </div>
       )}
 
-      {/* VIEW MODE 2: HISTORICAL DETAILED COMPARISON TABLE */}
-      {viewMode === 'comparison' && (
-        <BudgetComparisonView
+      {/* SECTION 2: CONFIGURAR ALERTAS DE PRESUPUESTO (ALERTAS Y LÍMITES) */}
+      {activeSection === 'alerts' && (
+        <BudgetAlertsSection
+          categoryItems={categoryItems}
+          budgets={budgets}
+          currency={currency}
+          daysRemaining={daysRemaining}
+          daysInMonth={daysInMonth}
+          currentDay={currentDay}
+          monthProgressPct={monthProgressPct}
+          onUpdateBudgets={onUpdateBudgets}
+          onOpenEditCategory={handleOpenEdit}
+          onSelectCategory={onSelectCategory}
+        />
+      )}
+
+      {/* SECTION 3: PROYECCIÓN AUTOMÁTICA PARA LOS PRÓXIMOS MESES */}
+      {activeSection === 'projection' && (
+        <BudgetProjectionSection
           budgets={budgets}
           categoryMap={categoryMap}
           categoryColors={categoryColors}
           transactions={transactions}
           currency={currency}
+          onUpdateBudgets={onUpdateBudgets}
         />
       )}
 
-      {/* QUICK EDIT CATEGORY LIMIT MODAL */}
+      {/* SECTION 4: TABLA COMPARATIVA (PRESUPUESTO VS. REAL) */}
+      {activeSection === 'comparison' && (
+        <BudgetComparisonSection
+          categoryItems={categoryItems}
+          currency={currency}
+          selectedMonthName={selectedMonthObj.label}
+          alertThreshold={alertThreshold}
+          onOpenEditCategory={handleOpenEdit}
+          onSelectCategory={onSelectCategory}
+        />
+      )}
+
+      {/* DIRECT CATEGORY BUDGET EDIT MODAL */}
       {editingCategory && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-purple-100 space-y-5 animate-in zoom-in-95 duration-150">
-            
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-purple-50 text-[#7928CA] flex items-center justify-center">
-                  <Target className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-slate-900 text-sm">
-                    Límite para {editingCategory.name}
-                  </h3>
-                  <span className="text-[11px] text-slate-400 font-medium">
-                    Presupuesto mensual asignado
-                  </span>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setEditingCategory(null)}
-                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Current Spent Info */}
-            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-between text-xs">
-              <span className="text-slate-600 font-medium">Gasto actual este mes:</span>
-              <strong className="font-bold text-slate-900 font-outfit">
-                {formatCurrency(editingCategory.currentSpent, currency)}
-              </strong>
-            </div>
-
-            {/* Input Form */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 block">
-                Nuevo límite mensual ({currency}):
-              </label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
-                  $
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  step="1000"
-                  value={quickLimitInput}
-                  onChange={(e) => setQuickLimitInput(e.target.value)}
-                  className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-slate-300 text-slate-900 font-bold text-base font-outfit focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-[#7928CA]"
-                  placeholder="0"
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            {/* Quick Presets based on current spend */}
-            <div className="space-y-1.5">
-              <span className="text-[11px] font-bold text-slate-400 block uppercase tracking-wider">
-                Sugerencias rápidas:
-              </span>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {editingCategory.currentSpent > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setQuickLimitInput(String(Math.round(editingCategory.currentSpent * 1.15)))}
-                    className="p-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#7928CA] font-bold text-center transition-colors cursor-pointer"
-                  >
-                    +15% del gasto ({formatCurrency(Math.round(editingCategory.currentSpent * 1.15), currency)})
-                  </button>
-                )}
-                {editingCategory.currentSpent > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setQuickLimitInput(String(Math.ceil(editingCategory.currentSpent / 10000) * 10000))}
-                    className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-center transition-colors cursor-pointer"
-                  >
-                    Redondear ({formatCurrency(Math.ceil(editingCategory.currentSpent / 10000) * 10000, currency)})
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setQuickLimitInput('0')}
-                  className="p-2 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-700 font-semibold text-center border border-slate-200 transition-colors cursor-pointer"
-                >
-                  Sin límite ($0)
-                </button>
-                {editingCategory.currentLimit > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setQuickLimitInput(String(Math.round(editingCategory.currentLimit * 1.1)))}
-                    className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-center transition-colors cursor-pointer"
-                  >
-                    +10% inflación
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setEditingCategory(null)}
-                className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-bold transition-colors cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveQuickLimit}
-                className="px-5 py-2 bg-gradient-to-r from-[#7928CA] to-[#9d4edd] hover:opacity-90 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
-              >
-                <Check className="w-4 h-4" />
-                <span>Guardar Límite</span>
-              </button>
-            </div>
-
-          </div>
-        </div>
+        <BudgetCategoryEditModal
+          isOpen={true}
+          onClose={() => setEditingCategory(null)}
+          categoryName={editingCategory.name}
+          currentBudget={editingCategory.currentLimit}
+          currentSpent={editingCategory.currentSpent}
+          currency={currency}
+          categoryColor={editingCategory.color}
+          subcategories={categoryMap[editingCategory.name] || []}
+          subcategoriesBudgets={budgets.subcategories || {}}
+          subcategoriesSpent={subcatSpending[editingCategory.name] || {}}
+          onSave={handleSaveCategoryBudget}
+        />
       )}
     </div>
   );

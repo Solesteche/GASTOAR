@@ -17,7 +17,8 @@ import {
   Layers,
   Clock,
   ChevronDown,
-  Coins
+  Coins,
+  Trash2
 } from 'lucide-react';
 import { CategoryMap, CoupleProfile, PaymentMethod, SplitType, Transaction } from '../types';
 import { BankCardSelect } from './BankCardSelect';
@@ -26,6 +27,7 @@ interface TransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (tx: Partial<Transaction>) => void;
+  onDelete?: (id: string) => void;
   editingTransaction?: Transaction | null;
   categoryMap: CategoryMap;
   profile: CoupleProfile;
@@ -50,6 +52,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   isOpen,
   onClose,
   onSave,
+  onDelete,
   editingTransaction,
   categoryMap,
   profile,
@@ -275,6 +278,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         tipoTransaccion: 'ingreso',
         pagadoPor, // Quién cobró o recibió el dinero
         metodoPago: metodoPago || 'Transferencia',
+        inputMethod: editingTransaction?.inputMethod || 'manual',
+        audioTranscription: editingTransaction?.audioTranscription,
+        confidence: editingTransaction?.confidence,
       });
       return;
     }
@@ -308,6 +314,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       tarjetaNombre: isInstallmentActive ? tarjetaNombre.trim() : undefined,
       primerMesCuota: isInstallmentActive ? (fechaPrimerPago ? fechaPrimerPago.substring(0, 7) : primerMesCuota) : undefined,
       fechaPrimerPago: isInstallmentActive ? fechaPrimerPago : undefined,
+      inputMethod: editingTransaction?.inputMethod || 'manual',
+      audioTranscription: editingTransaction?.audioTranscription,
+      confidence: editingTransaction?.confidence,
     });
   };
 
@@ -1030,29 +1039,50 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           )}
 
           {/* Footer Actions */}
-          <div className="pt-3 flex items-center justify-end space-x-2 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className={`px-5 py-2.5 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-1.5 ${
-                isIncome 
-                  ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/25' 
-                  : 'bg-[#0070f3] hover:bg-[#0060df] shadow-blue-500/25'
-              }`}
-            >
-              <Check className="w-4 h-4 stroke-[3]" />
-              <span>
-                {editingTransaction 
-                  ? 'Guardar Cambios' 
-                  : (isIncome ? 'Registrar Ingreso' : (esCuotas ? 'Registrar Compra en Cuotas' : 'Registrar Gasto'))}
-              </span>
-            </button>
+          <div className="pt-3 flex items-center justify-between gap-2 border-t border-slate-100">
+            {editingTransaction && onDelete ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm(`¿Estás seguro de que querés borrar el movimiento "${editingTransaction.concepto}" por $${editingTransaction.monto.toLocaleString('es-AR')}?`)) {
+                    onDelete(editingTransaction.id);
+                    onClose();
+                  }
+                }}
+                className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 border border-rose-200 cursor-pointer"
+                title="Eliminar este movimiento permanentemente"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                <span>Borrar Movimiento</span>
+              </button>
+            ) : (
+              <div />
+            )}
+
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className={`px-5 py-2.5 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-1.5 ${
+                  isIncome 
+                    ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/25' 
+                    : 'bg-[#0070f3] hover:bg-[#0060df] shadow-blue-500/25'
+                }`}
+              >
+                <Check className="w-4 h-4 stroke-[3]" />
+                <span>
+                  {editingTransaction 
+                    ? 'Guardar Cambios' 
+                    : (isIncome ? 'Registrar Ingreso' : (esCuotas ? 'Registrar Compra en Cuotas' : 'Registrar Gasto'))}
+                </span>
+              </button>
+            </div>
           </div>
         </form>
 
