@@ -644,6 +644,7 @@ ${existingGoals.map((g: any) => `- Meta: "${g.nombre || g}"`).join('\n')}\n`;
 Tu función es interpretar gastos, ingresos y aportes a metas grabados por voz o audios de WhatsApp.
 ${learnedPrompt}${goalsPrompt}
 Ejemplos de frases:
+- "gasté 50000 en dia" / "gaste 50000 en dia" / "50000 en dia" -> tipoOperacion: "gasto", monto: 50000, concepto: "Supermercado Día", categoria: "Alimentación & Bebidas", subcategoria: "Supermercado & Hipermercado"
 - "gasté 50000 en coto" -> tipoOperacion: "gasto", monto: 50000, concepto: "Coto", categoria: "Alimentación & Bebidas", subcategoria: "Supermercado & Hipermercado"
 - "50000 en farmacia con la visa" -> tipoOperacion: "gasto", monto: 50000, metodoPago: "Crédito", tarjetaNombre: "Visa", categoria: "Salud & Cuidado Personal", subcategoria: "Farmacia & Medicamentos"
 - "50 en farmacia" -> tipoOperacion: "gasto", monto: 50000, concepto: "Farmacia", categoria: "Salud & Cuidado Personal", subcategoria: "Farmacia & Medicamentos"
@@ -666,7 +667,8 @@ REGLAS CRÍTICAS DE NÚMEROS Y MONTOS EN ARGENTINA:
 - Si el usuario menciona una tarjeta (Visa, Mastercard, Naranja, BBVA, Santander, etc.), metodoPago debe ser "Crédito" y tarjetaNombre debe ser el nombre de la tarjeta.
 
 REGLAS ESTRICTAS DE CLASIFICACIÓN PARA ARGENTINA:
-- Si menciona Coto, Carrefour, ChangoMás, Día, Jumbo, Vea, Makro, Vital, Maxiconsumo, Disco o "el super" -> Categoría: "Alimentación & Bebidas", Subcategoría: "Supermercado & Hipermercado".
+- Si menciona Día, Dia, "en dia", "en día", "supermercado dia" o cualquier compra en dia -> Concepto: "Supermercado Día", Categoría: "Alimentación & Bebidas", Subcategoría: "Supermercado & Hipermercado" (o subcategoría de supermercado).
+- Si menciona Coto, Carrefour, ChangoMás, Jumbo, Vea, Makro, Vital, Maxiconsumo, Disco o "el super" -> Categoría: "Alimentación & Bebidas", Subcategoría: "Supermercado & Hipermercado".
 - Si menciona carnicería, granja, verdulería, panadería, kiosco -> Categoría: "Alimentación & Bebidas" con su respectiva subcategoría.
 - Si menciona YPF, Shell, Axion, Puma, combustible, nafta, GNC -> Categoría: "Transporte & Movilidad", Subcategoría: "Combustible (Nafta / GNC)".
 - Si menciona SUBE, colectivo, subte, tren -> Categoría: "Transporte & Movilidad", Subcategoría: "Carga Tarjeta SUBE (Colectivo, Tren, Subte)".
@@ -827,14 +829,33 @@ Usuarios de la cuenta: ${JSON.stringify(userNames || ["Yo", "Mi Pareja"])}.`;
       };
     } else {
       // Standard Gasto
+      // Specifically verify Supermercado Dia reference
+      const isDiaExpense = /(?:gast[eé]|compr[eé]|pagu[eé]|\$?\d+|\b)\s*(?:en\s+)?d[ií]a\b|supermercado\s+d[ií]a/i.test(combinedContext) ||
+        combinedContext.includes('en dia') ||
+        combinedContext.includes('en día');
+
+      if (isDiaExpense) {
+        parsedData.concepto = "Supermercado Día";
+        parsedData.categoria = "Alimentación & Bebidas";
+        let superSub = "Supermercado & Hipermercado";
+        if (categoryMap && categoryMap["Alimentación & Bebidas"]) {
+          const found = categoryMap["Alimentación & Bebidas"].find((s: string) => s.toLowerCase().includes("supermercado"));
+          if (found) superSub = found;
+        }
+        parsedData.subcategoria = superSub;
+      }
+
       if (!parsedData.confidence) {
         parsedData.confidence = {
           amount: parsedData.monto > 0 ? 0.99 : 0.35,
-          category: parsedData.concepto && parsedData.concepto !== 'Gasto por voz' ? 0.95 : 0.50,
+          category: isDiaExpense ? 1.0 : (parsedData.concepto && parsedData.concepto !== 'Gasto por voz' ? 0.95 : 0.50),
           paymentMethod: hasExplicitPayment ? 0.95 : 0.35,
           installments: parsedData.metodoPago === 'Crédito' ? 0.85 : 0.98
         };
       } else {
+        if (isDiaExpense) {
+          parsedData.confidence.category = 1.0;
+        }
         if (!hasExplicitPayment) {
           parsedData.confidence.paymentMethod = 0.35;
         }
@@ -882,6 +903,7 @@ Usuarios de la cuenta: ${JSON.stringify(userNames || ["Yo", "Mi Pareja"])}.`;
     // Fallback parser so the app never fails for the user
     const textPrompt = req.body.textPrompt || "";
     const lower = textPrompt.toLowerCase();
+    const fallbackCategoryMap = req.body.categoryMap || {};
     
     // Compute accurate amount with Argentine logic
     let monto = parseArgentineAmount(lower) || 0;
@@ -961,6 +983,8 @@ Usuarios de la cuenta: ${JSON.stringify(userNames || ["Yo", "Mi Pareja"])}.`;
       lower.includes("carrefour") ||
       lower.includes("dia") ||
       lower.includes("día") ||
+      lower.includes("en dia") ||
+      lower.includes("en día") ||
       lower.includes("jumbo") ||
       lower.includes("vea") ||
       lower.includes("changomas") ||
@@ -971,11 +995,16 @@ Usuarios de la cuenta: ${JSON.stringify(userNames || ["Yo", "Mi Pareja"])}.`;
       lower.includes("super")
     )) {
       categoria = "Alimentación & Bebidas";
-      subcategoria = "Supermercado & Hipermercado";
+      let superSub = "Supermercado & Hipermercado";
+      if (fallbackCategoryMap && fallbackCategoryMap["Alimentación & Bebidas"]) {
+        const found = fallbackCategoryMap["Alimentación & Bebidas"].find((s: string) => s.toLowerCase().includes("supermercado"));
+        if (found) superSub = found;
+      }
+      subcategoria = superSub;
       hasExplicitCat = true;
       if (lower.includes("coto")) concepto = "Coto";
       else if (lower.includes("carrefour")) concepto = "Carrefour";
-      else if (lower.includes("dia") || lower.includes("día")) concepto = "Supermercado Día";
+      else if (lower.includes("dia") || lower.includes("día") || lower.includes("en dia") || lower.includes("en día")) concepto = "Supermercado Día";
       else if (lower.includes("jumbo")) concepto = "Jumbo";
       else concepto = "Supermercado";
     } else if (tipoOperacion === 'gasto' && (lower.includes("ypf") || lower.includes("shell") || lower.includes("axion") || lower.includes("nafta") || lower.includes("combustible"))) {

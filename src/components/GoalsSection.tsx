@@ -245,7 +245,7 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
             </div>
             <div>
               <h1 className="text-2xl sm:text-3xl font-black text-[#2E0854] tracking-tight">
-                Metas & Cajas de Ahorro
+                Metas & Cajas
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 font-medium">
                 Crea cajas personalizadas para ahorrar para viajes, saldar deudas o crear fondos de respaldo

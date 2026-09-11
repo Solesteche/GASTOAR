@@ -81,15 +81,59 @@ export const DEFAULT_LEARNED_MERCHANTS: LearnedMerchant[] = [
     source: 'auto_learned'
   },
   {
+    id: 'en-dia',
+    keyword: 'en dia',
+    merchantName: 'Supermercado Día',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Supermercado & Hipermercado',
+    defaultMetodoPago: 'Débito',
+    frequency: 15,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
     id: 'dia',
     keyword: 'dia',
     merchantName: 'Supermercado Día',
     categoria: 'Alimentación & Bebidas',
     subcategoria: 'Supermercado & Hipermercado',
     defaultMetodoPago: 'Débito',
-    frequency: 4,
+    frequency: 15,
     lastUsed: Date.now(),
-    source: 'auto_learned'
+    source: 'manual'
+  },
+  {
+    id: 'en-dia-acento',
+    keyword: 'en día',
+    merchantName: 'Supermercado Día',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Supermercado & Hipermercado',
+    defaultMetodoPago: 'Débito',
+    frequency: 15,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'dia-acento',
+    keyword: 'día',
+    merchantName: 'Supermercado Día',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Supermercado & Hipermercado',
+    defaultMetodoPago: 'Débito',
+    frequency: 15,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'supermercado-dia',
+    keyword: 'supermercado dia',
+    merchantName: 'Supermercado Día',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Supermercado & Hipermercado',
+    defaultMetodoPago: 'Débito',
+    frequency: 15,
+    lastUsed: Date.now(),
+    source: 'manual'
   },
   {
     id: 'farmacity',
@@ -174,7 +218,58 @@ export function getLearnedPreferences(): LearnedMerchant[] {
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
+      // Ensure the user's explicit rule for Supermercado Dia is guaranteed to be present and prioritized
+      let needsSave = false;
+      const list: LearnedMerchant[] = [...parsed];
+
+      const hasEnDia = list.some(p => p.keyword === 'en dia');
+      if (!hasEnDia) {
+        list.unshift({
+          id: 'en-dia',
+          keyword: 'en dia',
+          merchantName: 'Supermercado Día',
+          categoria: 'Alimentación & Bebidas',
+          subcategoria: 'Supermercado & Hipermercado',
+          defaultMetodoPago: 'Débito',
+          frequency: 15,
+          lastUsed: Date.now(),
+          source: 'manual'
+        });
+        needsSave = true;
+      }
+
+      const diaIndex = list.findIndex(p => p.keyword === 'dia');
+      if (diaIndex >= 0) {
+        if (list[diaIndex].merchantName !== 'Supermercado Día' || !list[diaIndex].subcategoria.toLowerCase().includes('supermercado')) {
+          list[diaIndex] = {
+            ...list[diaIndex],
+            merchantName: 'Supermercado Día',
+            categoria: 'Alimentación & Bebidas',
+            subcategoria: 'Supermercado & Hipermercado',
+            frequency: Math.max(list[diaIndex].frequency || 0, 15),
+            source: 'manual'
+          };
+          needsSave = true;
+        }
+      } else {
+        list.unshift({
+          id: 'dia',
+          keyword: 'dia',
+          merchantName: 'Supermercado Día',
+          categoria: 'Alimentación & Bebidas',
+          subcategoria: 'Supermercado & Hipermercado',
+          defaultMetodoPago: 'Débito',
+          frequency: 15,
+          lastUsed: Date.now(),
+          source: 'manual'
+        });
+        needsSave = true;
+      }
+
+      if (needsSave) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      }
+      return list;
     }
     return DEFAULT_LEARNED_MERCHANTS;
   } catch (err) {

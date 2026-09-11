@@ -89,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const baseNavItems = [
     { id: 'dashboard', label: 'Resumen', icon: LayoutDashboard, badge: null },
     { id: 'transactions', label: 'Movimientos', icon: Receipt, badge: null },
-    { id: 'installments', label: 'Gastos en Cuotas', icon: CreditCard, badge: 'Tarjetas' },
+    { id: 'installments', label: 'Gastos en Cuotas', icon: CreditCard, badge: null },
     { id: 'card_alerts', label: 'Vencimientos', icon: CalendarClock, badge: null },
     { 
       id: 'couple_balance', 
@@ -98,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: null 
     },
     { id: 'budgets', label: 'Presupuestos', icon: Sliders, badge: null },
-    { id: 'goals', label: 'Metas & Cajas', icon: Target, badge: 'Ahorro' },
+    { id: 'goals', label: 'Metas & Cajas', icon: Target, badge: null },
     { id: 'categories', label: 'Categorías y Subcategorías', icon: FolderPlus, badge: null },
     { id: 'ai', label: 'Gasto por Voz', icon: Mic, badge: 'IA', isModal: true },
   ];

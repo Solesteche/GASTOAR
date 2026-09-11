@@ -424,7 +424,17 @@ export function parseVoiceExpenseLocally(
   if (tipoOperacion === 'gasto' && learnedMatch) {
     concepto = learnedMatch.merchantName;
     categoria = learnedMatch.categoria;
-    subcategoria = learnedMatch.subcategoria;
+    let targetSub = learnedMatch.subcategoria;
+    if (categoryMap && categoryMap[categoria]) {
+      if (!categoryMap[categoria].includes(targetSub)) {
+        const found = categoryMap[categoria].find(s => 
+          s.toLowerCase().includes('supermercado') || 
+          s.toLowerCase().includes(targetSub.toLowerCase())
+        );
+        if (found) targetSub = found;
+      }
+    }
+    subcategoria = targetSub;
     if (!hasExplicitPaymentMethod && learnedMatch.defaultMetodoPago) {
       metodoPago = learnedMatch.defaultMetodoPago;
     }
@@ -451,7 +461,12 @@ export function parseVoiceExpenseLocally(
     lower.includes('super')
   )) {
     categoria = 'Alimentación & Bebidas';
-    subcategoria = 'Supermercado & Hipermercado';
+    let superSub = 'Supermercado & Hipermercado';
+    if (categoryMap && categoryMap['Alimentación & Bebidas']) {
+      const found = categoryMap['Alimentación & Bebidas'].find(s => s.toLowerCase().includes('supermercado'));
+      if (found) superSub = found;
+    }
+    subcategoria = superSub;
     if (lower.includes('coto')) concepto = 'Coto';
     else if (lower.includes('carrefour')) concepto = 'Carrefour';
     else if (lower.includes('dia') || lower.includes('día')) concepto = 'Supermercado Día';
@@ -461,6 +476,7 @@ export function parseVoiceExpenseLocally(
     else if (lower.includes('makro')) concepto = 'Makro';
     else if (lower.includes('vital')) concepto = 'Mayorista Vital';
     else concepto = 'Supermercado';
+    hasExplicitCategory = true;
   } else if (lower.includes('carniceria') || lower.includes('carnicería') || lower.includes('carne') || lower.includes('asado') || lower.includes('granja') || lower.includes('pollo')) {
     categoria = 'Alimentación & Bebidas';
     subcategoria = 'Carnicería & Granja';
