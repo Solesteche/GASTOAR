@@ -443,119 +443,129 @@ export function parseVoiceExpenseLocally(
     matchedLearnedRule = learnedMatch;
   }
 
-  // Supermarkets & Food
-  if (!learnedPreferenceApplied && (
-    lower.includes('coto') ||
-    lower.includes('carrefour') ||
-    lower.includes('dia') ||
-    lower.includes('día') ||
-    lower.includes('jumbo') ||
-    lower.includes('vea') ||
-    lower.includes('changomas') ||
-    lower.includes('chango más') ||
-    lower.includes('makro') ||
-    lower.includes('vital') ||
-    lower.includes('disco') ||
-    lower.includes('maxiconsumo') ||
-    lower.includes('supermercado') ||
-    lower.includes('super')
-  )) {
-    categoria = 'Alimentación & Bebidas';
-    let superSub = 'Supermercado & Hipermercado';
-    if (categoryMap && categoryMap['Alimentación & Bebidas']) {
-      const found = categoryMap['Alimentación & Bebidas'].find(s => s.toLowerCase().includes('supermercado'));
-      if (found) superSub = found;
+  // 4.6 Category Fallback Classification (Only if not already resolved by learned preference)
+  if (!learnedPreferenceApplied) {
+    // Supermarkets & Food
+    if (
+      lower.includes('coto') ||
+      lower.includes('carrefour') ||
+      /\b(?:en\s+)?d[ií]a\b/i.test(lower) ||
+      lower.includes('dia') ||
+      lower.includes('día') ||
+      lower.includes('jumbo') ||
+      lower.includes('vea') ||
+      lower.includes('changomas') ||
+      lower.includes('chango más') ||
+      lower.includes('makro') ||
+      lower.includes('vital') ||
+      lower.includes('disco') ||
+      lower.includes('maxiconsumo') ||
+      lower.includes('supermercado') ||
+      lower.includes('super')
+    ) {
+      categoria = 'Alimentación & Bebidas';
+      let superSub = 'Supermercado & Hipermercado';
+      if (categoryMap && categoryMap['Alimentación & Bebidas']) {
+        const found = categoryMap['Alimentación & Bebidas'].find(s => s.toLowerCase().includes('supermercado'));
+        if (found) superSub = found;
+      }
+      subcategoria = superSub;
+      if (lower.includes('coto')) concepto = 'Coto';
+      else if (lower.includes('carrefour')) concepto = 'Carrefour';
+      else if (/\b(?:en\s+)?d[ií]a\b/i.test(lower) || lower.includes('dia') || lower.includes('día')) concepto = 'Supermercado Día';
+      else if (lower.includes('jumbo')) concepto = 'Jumbo';
+      else if (lower.includes('vea')) concepto = 'Vea';
+      else if (lower.includes('changomas') || lower.includes('chango más')) concepto = 'ChangoMás';
+      else if (lower.includes('makro')) concepto = 'Makro';
+      else if (lower.includes('vital')) concepto = 'Mayorista Vital';
+      else concepto = 'Supermercado';
+      hasExplicitCategory = true;
+    } else if (lower.includes('carniceria') || lower.includes('carnicería') || /\bcarne\b/i.test(lower) || lower.includes('asado') || lower.includes('granja') || /\bpollo\b/i.test(lower)) {
+      categoria = 'Alimentación & Bebidas';
+      subcategoria = 'Carnicería & Granja';
+      concepto = 'Carnicería';
+    } else if (lower.includes('verduleria') || lower.includes('verdulería') || lower.includes('fruteria') || lower.includes('frutería') || lower.includes('verdura')) {
+      categoria = 'Alimentación & Bebidas';
+      subcategoria = 'Verdulería & Frutería';
+      concepto = 'Verdulería';
+    } else if (lower.includes('panaderia') || lower.includes('panadería') || lower.includes('facturas') || /\bpan\b/i.test(lower)) {
+      categoria = 'Alimentación & Bebidas';
+      subcategoria = 'Panadería & Facturas';
+      concepto = 'Panadería';
+    } else if (lower.includes('pedidosya') || lower.includes('pedidos ya') || lower.includes('rappi') || lower.includes('delivery')) {
+      categoria = 'Alimentación & Bebidas';
+      subcategoria = 'Delivery (PedidosYa / Rappi)';
+      concepto = lower.includes('rappi') ? 'Rappi' : 'PedidosYa';
+    } else if (lower.includes('restaurante') || lower.includes('resto') || /\bbar\b/i.test(lower) || lower.includes('cafeteria') || /\bcaf[eé]\b/i.test(lower) || lower.includes('starbucks') || lower.includes('havanna')) {
+      categoria = 'Alimentación & Bebidas';
+      subcategoria = 'Restaurantes, Bares & Cafeterías';
+      concepto = lower.includes('starbucks') ? 'Starbucks' : lower.includes('havanna') ? 'Havanna' : 'Restaurante / Bar';
     }
-    subcategoria = superSub;
-    if (lower.includes('coto')) concepto = 'Coto';
-    else if (lower.includes('carrefour')) concepto = 'Carrefour';
-    else if (lower.includes('dia') || lower.includes('día')) concepto = 'Supermercado Día';
-    else if (lower.includes('jumbo')) concepto = 'Jumbo';
-    else if (lower.includes('vea')) concepto = 'Vea';
-    else if (lower.includes('changomas') || lower.includes('chango más')) concepto = 'ChangoMás';
-    else if (lower.includes('makro')) concepto = 'Makro';
-    else if (lower.includes('vital')) concepto = 'Mayorista Vital';
-    else concepto = 'Supermercado';
-    hasExplicitCategory = true;
-  } else if (lower.includes('carniceria') || lower.includes('carnicería') || lower.includes('carne') || lower.includes('asado') || lower.includes('granja') || lower.includes('pollo')) {
-    categoria = 'Alimentación & Bebidas';
-    subcategoria = 'Carnicería & Granja';
-    concepto = 'Carnicería';
-  } else if (lower.includes('verduleria') || lower.includes('verdulería') || lower.includes('fruteria') || lower.includes('frutería') || lower.includes('verdura')) {
-    categoria = 'Alimentación & Bebidas';
-    subcategoria = 'Verdulería & Frutería';
-    concepto = 'Verdulería';
-  } else if (lower.includes('panaderia') || lower.includes('panadería') || lower.includes('facturas') || lower.includes('pan')) {
-    categoria = 'Alimentación & Bebidas';
-    subcategoria = 'Panadería & Facturas';
-    concepto = 'Panadería';
-  } else if (lower.includes('pedidosya') || lower.includes('pedidos ya') || lower.includes('rappi') || lower.includes('delivery')) {
-    categoria = 'Alimentación & Bebidas';
-    subcategoria = 'Delivery (PedidosYa / Rappi)';
-    concepto = lower.includes('rappi') ? 'Rappi' : 'PedidosYa';
-  } else if (lower.includes('restaurante') || lower.includes('resto') || lower.includes('bar') || lower.includes('cafeteria') || lower.includes('café') || lower.includes('cafe') || lower.includes('starbucks') || lower.includes('havanna')) {
-    categoria = 'Alimentación & Bebidas';
-    subcategoria = 'Restaurantes, Bares & Cafeterías';
-    concepto = lower.includes('starbucks') ? 'Starbucks' : lower.includes('havanna') ? 'Havanna' : 'Restaurante / Bar';
-  }
-  // Fuel & Transport
-  else if (
-    lower.includes('ypf') ||
-    lower.includes('shell') ||
-    lower.includes('axion') ||
-    lower.includes('puma') ||
-    lower.includes('nafta') ||
-    lower.includes('combustible') ||
-    lower.includes('gnc') ||
-    lower.includes('estacion') ||
-    lower.includes('estación')
-  ) {
-    categoria = 'Transporte & Movilidad';
-    subcategoria = 'Combustible (Nafta / GNC)';
-    if (lower.includes('ypf')) concepto = 'YPF';
-    else if (lower.includes('shell')) concepto = 'Shell';
-    else if (lower.includes('axion')) concepto = 'Axion';
-    else concepto = 'Combustible';
-  } else if (lower.includes('sube') || lower.includes('colectivo') || lower.includes('subte') || lower.includes('tren')) {
-    categoria = 'Transporte & Movilidad';
-    subcategoria = 'Carga Tarjeta SUBE (Colectivo, Tren, Subte)';
-    concepto = 'Carga SUBE';
-  } else if (lower.includes('uber') || lower.includes('cabify') || lower.includes('didi') || lower.includes('taxi')) {
-    categoria = 'Transporte & Movilidad';
-    subcategoria = 'Taxi / Uber / Cabify / Didi';
-    concepto = lower.includes('cabify') ? 'Cabify' : lower.includes('uber') ? 'Uber' : lower.includes('didi') ? 'Didi' : 'Taxi';
-  }
-  // Health & Pharmacy
-  else if (lower.includes('farmacity') || lower.includes('farmacia') || lower.includes('remedio') || lower.includes('medicamento')) {
-    categoria = 'Salud & Cuidado Personal';
-    subcategoria = 'Farmacia & Medicamentos';
-    concepto = lower.includes('farmacity') ? 'Farmacity' : 'Farmacia';
-  }
-  // Housing / Rent / Services
-  else if (lower.includes('alquiler')) {
-    categoria = 'Alquiler';
-    subcategoria = 'Alquiler Mensual';
-    concepto = 'Alquiler Mensual';
-  } else if (lower.includes('expensa') || lower.includes('expensas')) {
-    categoria = 'Expensas';
-    subcategoria = 'Expensas Ordinarias';
-    concepto = 'Expensas';
-  } else if (lower.includes('edenor') || lower.includes('edesur') || lower.includes('luz') || lower.includes('electricidad')) {
-    categoria = 'Servicios';
-    subcategoria = 'Luz / Electricidad (Edenor, Edesur, Provincial)';
-    concepto = lower.includes('edenor') ? 'Edenor' : lower.includes('edesur') ? 'Edesur' : 'Luz';
-  } else if (lower.includes('metrogas') || lower.includes('naturgy') || lower.includes('gas')) {
-    categoria = 'Servicios';
-    subcategoria = 'Gas Natural / Garrafa (Metrogas, Naturgy)';
-    concepto = 'Gas';
-  } else if (lower.includes('aysa') || lower.includes('agua')) {
-    categoria = 'Servicios';
-    subcategoria = 'Agua & Cloacas (AySA, Provincial)';
-    concepto = 'AySA / Agua';
-  } else if (lower.includes('fibertel') || lower.includes('personal') || lower.includes('claro') || lower.includes('movistar') || lower.includes('wifi') || lower.includes('internet')) {
-    categoria = 'Servicios';
-    subcategoria = 'Internet Fibra Óptica & Wi-Fi';
-    concepto = 'Internet';
+    // Fuel & Transport
+    else if (
+      lower.includes('ypf') ||
+      lower.includes('shell') ||
+      lower.includes('axion') ||
+      lower.includes('puma') ||
+      lower.includes('nafta') ||
+      lower.includes('combustible') ||
+      lower.includes('gnc') ||
+      lower.includes('estacion') ||
+      lower.includes('estación')
+    ) {
+      categoria = 'Transporte & Movilidad';
+      subcategoria = 'Combustible (Nafta / GNC)';
+      if (lower.includes('ypf')) concepto = 'YPF';
+      else if (lower.includes('shell')) concepto = 'Shell';
+      else if (lower.includes('axion')) concepto = 'Axion';
+      else concepto = 'Combustible';
+    } else if (lower.includes('sube') || lower.includes('colectivo') || lower.includes('subte') || /\btren\b/i.test(lower)) {
+      categoria = 'Transporte & Movilidad';
+      subcategoria = 'Carga Tarjeta SUBE (Colectivo, Tren, Subte)';
+      concepto = 'Carga SUBE';
+    } else if (lower.includes('uber') || lower.includes('cabify') || lower.includes('didi') || /\btaxi\b/i.test(lower)) {
+      categoria = 'Transporte & Movilidad';
+      subcategoria = 'Taxi / Uber / Cabify / Didi';
+      concepto = lower.includes('cabify') ? 'Cabify' : lower.includes('uber') ? 'Uber' : lower.includes('didi') ? 'Didi' : 'Taxi';
+    }
+    // Health & Pharmacy
+    else if (lower.includes('farmacity') || lower.includes('farmacia') || lower.includes('remedio') || lower.includes('medicamento')) {
+      categoria = 'Salud & Cuidado Personal';
+      subcategoria = 'Farmacia & Medicamentos';
+      concepto = lower.includes('farmacity') ? 'Farmacity' : 'Farmacia';
+    }
+    // Housing / Rent / Services
+    else if (lower.includes('alquiler')) {
+      categoria = 'Alquiler';
+      subcategoria = 'Alquiler Mensual';
+      concepto = 'Alquiler Mensual';
+    } else if (lower.includes('expensa') || lower.includes('expensas')) {
+      categoria = 'Expensas';
+      subcategoria = 'Expensas Ordinarias';
+      concepto = 'Expensas';
+    } else if (lower.includes('edenor') || lower.includes('edesur') || /\b(?:la\s+)?luz\b/i.test(lower) || lower.includes('electricidad')) {
+      categoria = 'Servicios';
+      subcategoria = 'Luz / Electricidad (Edenor, Edesur, Provincial)';
+      concepto = lower.includes('edenor') ? 'Edenor' : lower.includes('edesur') ? 'Edesur' : 'Luz';
+    } else if (
+      lower.includes('metrogas') ||
+      lower.includes('naturgy') ||
+      lower.includes('camuzzi') ||
+      lower.includes('garrafa') ||
+      /\b(?:el\s+)?gas(?:\s+natural)?\b/i.test(lower)
+    ) {
+      categoria = 'Servicios';
+      subcategoria = 'Gas Natural / Garrafa (Metrogas, Naturgy)';
+      concepto = 'Gas';
+    } else if (lower.includes('aysa') || /\b(?:el\s+)?agua\b/i.test(lower)) {
+      categoria = 'Servicios';
+      subcategoria = 'Agua & Cloacas (AySA, Provincial)';
+      concepto = 'AySA / Agua';
+    } else if (lower.includes('fibertel') || lower.includes('personal') || lower.includes('claro') || lower.includes('movistar') || lower.includes('wifi') || lower.includes('internet')) {
+      categoria = 'Servicios';
+      subcategoria = 'Internet Fibra Óptica & Wi-Fi';
+      concepto = 'Internet';
+    }
   }
 
   // Verify that category exists in user's categoryMap; fallback gracefully

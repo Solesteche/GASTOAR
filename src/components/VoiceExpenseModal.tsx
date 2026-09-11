@@ -210,6 +210,18 @@ export const VoiceExpenseModal: React.FC<VoiceExpenseModalProps> = ({
             sub = localResult.subcategoria;
           }
 
+          // Also guarantee that references to Dia supermarket are always mapped to Alimentación & Bebidas
+          const combinedLower = ((geminiData.transcripcion || text || '') + ' ' + (geminiData.concepto || '')).toLowerCase();
+          const isDiaMention = /\b(?:en\s+)?d[ií]a\b/i.test(combinedLower) ||
+            combinedLower.includes('supermercado dia') ||
+            combinedLower.includes('supermercado día');
+
+          if (isDiaMention) {
+            cat = categoryMap['Alimentación & Bebidas'] ? 'Alimentación & Bebidas' : (Object.keys(categoryMap)[0] || 'Alimentación & Bebidas');
+            const foundSub = categoryMap[cat]?.find(s => s.toLowerCase().includes('supermercado')) || categoryMap[cat]?.[0] || 'Supermercado & Hipermercado';
+            sub = foundSub;
+          }
+
           // Determine best, most accurate Argentine monto (prevent 11000 turning into 11, or 50000 into 50)
           let finalMonto = localResult.monto;
           const returnedMonto = typeof geminiData.monto === 'number' ? geminiData.monto : 0;
@@ -256,7 +268,7 @@ export const VoiceExpenseModal: React.FC<VoiceExpenseModalProps> = ({
 
           setParsedExpense({
             transcripcion: geminiData.transcripcion || text,
-            concepto: geminiData.concepto || localResult.concepto,
+            concepto: isDiaMention ? 'Supermercado Día' : (geminiData.concepto || localResult.concepto),
             descripcion: geminiData.descripcion || localResult.descripcion,
             monto: finalMonto,
             categoria: cat,
