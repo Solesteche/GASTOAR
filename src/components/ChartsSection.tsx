@@ -35,6 +35,8 @@ const CATEGORY_EMOJIS: Record<string, string> = {
   'Servicios & Hogar': '🏠',
   'Entretenimiento': '🎬',
   'Ocio & Suscripciones': '🎬',
+  'Suscripciones': '📺',
+  'Suscripciones y Plataformas': '📺',
   'Salud': '💊',
   'Farmacia & Salud': '💊',
   'Restaurantes': '🍽️',
@@ -52,6 +54,8 @@ const CATEGORY_DEFAULT_COLORS: Record<string, string> = {
   'Servicios & Hogar': '#ef4444',
   'Entretenimiento': '#ec4899',
   'Ocio & Suscripciones': '#ec4899',
+  'Suscripciones': '#7928CA',
+  'Suscripciones y Plataformas': '#7928CA',
   'Otros': '#38bdf8',
   'Otros Gastos': '#38bdf8',
 };

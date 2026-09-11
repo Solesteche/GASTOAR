@@ -240,8 +240,8 @@ export const ProCardAlertsModal: React.FC<ProCardAlertsModalProps> = ({
   const [formCategory, setFormCategory] = useState<AlertItemCategory>('servicio');
   const [formName, setFormName] = useState('');
   const [formProvider, setFormProvider] = useState('Edenor');
-  const [formDueDay, setFormDueDay] = useState(10);
-  const [formCloseDay, setFormCloseDay] = useState(20);
+  const [formDueDay, setFormDueDay] = useState<string>('10');
+  const [formCloseDay, setFormCloseDay] = useState<string>('20');
   const [formEstimatedAmount, setFormEstimatedAmount] = useState<string>('');
   const [formPaymentCode, setFormPaymentCode] = useState('');
   const [formAutoDebit, setFormAutoDebit] = useState(false);
@@ -264,8 +264,8 @@ export const ProCardAlertsModal: React.FC<ProCardAlertsModalProps> = ({
     setFormCategory('servicio');
     setFormName('');
     setFormProvider('');
-    setFormDueDay(10);
-    setFormCloseDay(20);
+    setFormDueDay('');
+    setFormCloseDay('');
     setFormEstimatedAmount('');
     setFormPaymentCode('');
     setFormAutoDebit(false);
@@ -280,8 +280,9 @@ export const ProCardAlertsModal: React.FC<ProCardAlertsModalProps> = ({
     setFormCategory(preset.category);
     setFormName(preset.name);
     setFormProvider(preset.provider);
-    setFormDueDay(preset.dueDay);
-    if (preset.closeDay) setFormCloseDay(preset.closeDay);
+    setFormDueDay(preset.dueDay ? preset.dueDay.toString() : '10');
+    if (preset.closeDay) setFormCloseDay(preset.closeDay.toString());
+    else setFormCloseDay('');
     if (preset.defaultAmount) setFormEstimatedAmount(preset.defaultAmount.toString());
     setShowAddForm(true);
   };
@@ -291,8 +292,8 @@ export const ProCardAlertsModal: React.FC<ProCardAlertsModalProps> = ({
     setFormCategory(item.category);
     setFormName(item.name);
     setFormProvider(item.provider || '');
-    setFormDueDay(item.dueDay || 10);
-    setFormCloseDay(item.closeDay || 20);
+    setFormDueDay(item.dueDay ? item.dueDay.toString() : '10');
+    setFormCloseDay(item.closeDay ? item.closeDay.toString() : '20');
     setFormEstimatedAmount(item.estimatedAmount ? item.estimatedAmount.toString() : '');
     setFormPaymentCode(item.paymentCode || '');
     setFormAutoDebit(Boolean(item.autoDebit));
@@ -311,6 +312,8 @@ export const ProCardAlertsModal: React.FC<ProCardAlertsModalProps> = ({
     }
 
     const amt = formEstimatedAmount ? parseFloat(formEstimatedAmount.replace(/[^0-9.]/g, '')) : undefined;
+    const cleanDue = Math.min(31, Math.max(1, parseInt((formDueDay || '10').replace(/^0+(?=\d)/, ''), 10) || 10));
+    const cleanClose = formCategory === 'tarjeta' ? Math.min(31, Math.max(1, parseInt((formCloseDay || '20').replace(/^0+(?=\d)/, ''), 10) || 20)) : undefined;
 
     if (editingItemId) {
       // Edit existing
@@ -321,8 +324,8 @@ export const ProCardAlertsModal: React.FC<ProCardAlertsModalProps> = ({
             category: formCategory,
             name: formName.trim(),
             provider: formProvider.trim(),
-            dueDay: Math.min(31, Math.max(1, Number(formDueDay) || 10)),
-            closeDay: formCategory === 'tarjeta' ? Math.min(31, Math.max(1, Number(formCloseDay) || 20)) : undefined,
+            dueDay: cleanDue,
+            closeDay: cleanClose,
             estimatedAmount: isNaN(amt as number) ? undefined : amt,
             paymentCode: formPaymentCode.trim() || undefined,
             autoDebit: formAutoDebit,
@@ -343,8 +346,8 @@ export const ProCardAlertsModal: React.FC<ProCardAlertsModalProps> = ({
         category: formCategory,
         name: formName.trim(),
         provider: formProvider.trim() || (formCategory === 'tarjeta' ? 'Banco' : 'Proveedor'),
-        dueDay: Math.min(31, Math.max(1, Number(formDueDay) || 10)),
-        closeDay: formCategory === 'tarjeta' ? Math.min(31, Math.max(1, Number(formCloseDay) || 20)) : undefined,
+        dueDay: cleanDue,
+        closeDay: cleanClose,
         estimatedAmount: isNaN(amt as number) ? undefined : amt,
         paymentCode: formPaymentCode.trim() || undefined,
         autoDebit: formAutoDebit,
@@ -983,15 +986,24 @@ export const ProCardAlertsModal: React.FC<ProCardAlertsModalProps> = ({
                   </label>
                   <div className="flex items-center gap-2">
                     <input
-                      type="number"
-                      min="1"
-                      max="31"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="ej. 14"
                       required
                       value={formDueDay}
-                      onChange={(e) => setFormDueDay(Number(e.target.value))}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/\D/g, '');
+                        const clean = raw.replace(/^0+(?=\d)/, '');
+                        if (clean === '') {
+                          setFormDueDay('');
+                        } else {
+                          const num = parseInt(clean, 10);
+                          setFormDueDay(Math.min(31, Math.max(1, num)).toString());
+                        }
+                      }}
                       className="w-24 px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
                     />
-                    <span className="text-[11px] text-slate-500">Día {formDueDay} de cada mes</span>
+                    <span className="text-[11px] text-slate-500">{formDueDay ? `Día ${formDueDay} de cada mes` : 'Día del mes'}</span>
                   </div>
                 </div>
 
@@ -1002,15 +1014,24 @@ export const ProCardAlertsModal: React.FC<ProCardAlertsModalProps> = ({
                     </label>
                     <div className="flex items-center gap-2">
                       <input
-                        type="number"
-                        min="1"
-                        max="31"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="ej. 20"
                         required
                         value={formCloseDay}
-                        onChange={(e) => setFormCloseDay(Number(e.target.value))}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/\D/g, '');
+                          const clean = raw.replace(/^0+(?=\d)/, '');
+                          if (clean === '') {
+                            setFormCloseDay('');
+                          } else {
+                            const num = parseInt(clean, 10);
+                            setFormCloseDay(Math.min(31, Math.max(1, num)).toString());
+                          }
+                        }}
                         className="w-24 px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
                       />
-                      <span className="text-[11px] text-slate-500">Corte día {formCloseDay} de cada mes</span>
+                      <span className="text-[11px] text-slate-500">{formCloseDay ? `Corte día ${formCloseDay} de cada mes` : 'Día de corte'}</span>
                     </div>
                   </div>
                 ) : (

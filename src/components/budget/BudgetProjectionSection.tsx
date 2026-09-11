@@ -323,8 +323,8 @@ export const BudgetProjectionSection: React.FC<BudgetProjectionSectionProps> = (
 
             {/* Input + Presets */}
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <div className="relative flex-1 w-full">
                   <input
                     type="number"
                     min="0"
@@ -344,7 +344,7 @@ export const BudgetProjectionSection: React.FC<BudgetProjectionSectionProps> = (
                 <button
                   type="button"
                   onClick={() => setCompoundMonthly(!compoundMonthly)}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer shrink-0 ${
+                  className={`w-full sm:w-auto px-3 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer shrink-0 text-center ${
                     compoundMonthly
                       ? 'bg-purple-100 border-purple-300 text-[#7928CA]'
                       : 'bg-white border-slate-200 text-slate-600'
@@ -378,7 +378,7 @@ export const BudgetProjectionSection: React.FC<BudgetProjectionSectionProps> = (
         </div>
 
         {/* 2. THREE-MONTH PROJECTION SUMMARY CARDS */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           {nextMonths.map((m, idx) => {
             const mTotal = idx === 0 ? totals.m1Total : idx === 1 ? totals.m2Total : totals.m3Total;
             const diff = mTotal - totals.baseTotal;
@@ -427,21 +427,68 @@ export const BudgetProjectionSection: React.FC<BudgetProjectionSectionProps> = (
           <button
             type="button"
             onClick={handleApplyProjections}
-            className="px-5 py-2.5 bg-gradient-to-r from-[#7928CA] to-[#9d4edd] hover:opacity-95 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95 shrink-0 self-start sm:self-auto"
+            className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-[#7928CA] to-[#9d4edd] hover:opacity-95 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shrink-0"
           >
             <Check className="w-4 h-4" />
             <span>Aplicar a mis presupuestos</span>
           </button>
         </div>
 
-        {/* 3. CATEGORY PROJECTION BREAKDOWN TABLE */}
+        {/* 3. CATEGORY PROJECTION BREAKDOWN */}
         <div className="space-y-3 pt-2">
           <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
             <Layers className="w-4 h-4 text-[#7928CA]" />
             Desglose Proyectado por Categoría:
           </h4>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white">
+          {/* MOBILE CARDS VIEW (block md:hidden) */}
+          <div className="block md:hidden space-y-2.5">
+            {projectedTable.map((item) => (
+              <div key={`mob-proj-${item.category}`} className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div
+                      className="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="font-extrabold text-slate-900 text-xs truncate">
+                      {item.category}
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-purple-50 text-[#7928CA] text-[10px] font-extrabold shrink-0 border border-purple-200">
+                    +{Math.round(nextMonths[0]?.rate * 100)}% est.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 p-2 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-medium block">
+                      Base ({sourceMode === 'current_budget' ? 'Límite' : 'Real'})
+                    </span>
+                    <span className="font-bold text-slate-700 font-outfit block mt-0.5">
+                      {formatCurrency(item.base, currency)}
+                    </span>
+                  </div>
+                  <div className="bg-purple-100/40 p-1.5 rounded-lg border border-purple-200/50">
+                    <span className="text-[10px] text-purple-900 font-bold block">
+                      {nextMonths[0]?.name}
+                    </span>
+                    <span className="font-black text-[#7928CA] font-outfit block mt-0.5">
+                      {formatCurrency(item.month1.projected, currency)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
+                  <span>{nextMonths[1]?.name}: <strong>{formatCurrency(item.month2.projected, currency)}</strong></span>
+                  <span>{nextMonths[2]?.name}: <strong>{formatCurrency(item.month3.projected, currency)}</strong></span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* DESKTOP TABLE VIEW (hidden md:block) */}
+          <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-200/80 bg-white">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-600 font-bold">

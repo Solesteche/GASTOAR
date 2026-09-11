@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Lock, 
   Mail, 
@@ -27,7 +27,10 @@ import {
   RotateCw,
   ArrowLeft,
   UserPlus,
-  Phone
+  Phone,
+  AlertCircle,
+  HelpCircle,
+  X
 } from 'lucide-react';
 import { BillingCycle, CoupleProfile, SubscriptionPlan, SubscriptionPlanId, UserAccount } from '../types';
 import { GastoArBrand, GastoArHeroBrand } from './GastoArLogo';
@@ -38,10 +41,13 @@ import { AdminAuthModal } from './AdminAuthModal';
 import { 
   registerWithEmailFirebase, 
   sendVerificationEmailFirebase, 
-  checkEmailVerifiedFirebase 
+  checkEmailVerifiedFirebase,
+  sendPasswordResetFirebase 
 } from '../lib/firebase';
 
 interface AuthLandingPageProps {
+  initialTab?: 'login' | 'register';
+  onTabChange?: (tab: 'login' | 'register') => void;
   onLogin: (email: string, password?: string) => Promise<{ success: boolean; error?: string }> | { success: boolean; error?: string };
   onRegister: (data: {
     name: string;
@@ -62,17 +68,50 @@ interface AuthLandingPageProps {
 }
 
 export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
+  initialTab = 'login',
+  onTabChange,
   onLogin,
   onRegister,
   onGoogleLogin,
   onGuestDemo,
   onOpenAdminPanel,
 }) => {
-  const [tab, setTab] = useState<'login' | 'register'>('login');
+  const [tab, setTab] = useState<'login' | 'register'>(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setTab(initialTab);
+    }
+  }, [initialTab]);
+
+  const handleTabSwitch = (newTab: 'login' | 'register') => {
+    setTab(newTab);
+    setErrorMsg('');
+    if (onTabChange) onTabChange(newTab);
+  };
+
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [existingAccountDetected, setExistingAccountDetected] = useState<boolean>(false);
+
+  // Validation helpers
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const isEmailFormatValid = (email: string) => EMAIL_REGEX.test(email.trim());
+  const isPasswordValid = (pass: string) => pass.length >= 6;
+
+  // Validation touched states
+  const [loginEmailTouched, setLoginEmailTouched] = useState<boolean>(false);
+  const [loginPasswordTouched, setLoginPasswordTouched] = useState<boolean>(false);
+  const [regEmailTouched, setRegEmailTouched] = useState<boolean>(false);
+  const [regPasswordTouched, setRegPasswordTouched] = useState<boolean>(false);
+
+  // Forgot Password modal state (Firebase Auth Flow)
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState<boolean>(false);
+  const [forgotEmail, setForgotEmail] = useState<string>('');
+  const [isForgotLoading, setIsForgotLoading] = useState<boolean>(false);
+  const [forgotStatus, setForgotStatus] = useState<{ type: 'idle' | 'success' | 'error'; message: string }>({ type: 'idle', message: '' });
+  const [forgotEmailTouched, setForgotEmailTouched] = useState<boolean>(false);
 
   // Admin PIN Auth Modal State
   const [isAdminAuthOpen, setIsAdminAuthOpen] = useState<boolean>(false);
@@ -98,7 +137,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
   const [regAccountType, setRegAccountType] = useState<'pareja' | 'individual'>('pareja');
   const [regPartnerName, setRegPartnerName] = useState<string>('');
   const [regCurrency, setRegCurrency] = useState<string>('ARS');
-  const [regAccountCode, setRegAccountCode] = useState<string>(() => 'PAIR-' + Math.floor(1000 + Math.random() * 9000));
+  const [regAccountCode, setRegAccountCode] = useState<string>(() => 'COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000));
   const [regSelectedPlan, setRegSelectedPlan] = useState<SubscriptionPlanId>('pareja');
 
   // Email verification step state (Firebase Auth Integration)
@@ -106,6 +145,55 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
   const [isCheckingEmailVerified, setIsCheckingEmailVerified] = useState<boolean>(false);
   const [verificationFeedback, setVerificationFeedback] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
   const [pinResentNotice, setPinResentNotice] = useState<boolean>(false);
+
+  // Password Recovery via sendPasswordResetFirebase
+  const handleSendPasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = forgotEmail.trim().toLowerCase();
+    setForgotEmailTouched(true);
+    if (!clean || !isEmailFormatValid(clean)) {
+      setForgotStatus({
+        type: 'error',
+        message: 'Por favor ingresá un correo electrónico válido (ejemplo: usuario@correo.com).'
+      });
+      return;
+    }
+    setIsForgotLoading(true);
+    setForgotStatus({ type: 'idle', message: '' });
+    try {
+      await sendPasswordResetFirebase(clean);
+      setForgotStatus({
+        type: 'success',
+        message: `¡Correo enviado! Te enviamos un enlace de restablecimiento oficial de Firebase a ${clean}. Revisá tu casilla de correo o spam para generar tu nueva contraseña.`
+      });
+    } catch (error: any) {
+      console.warn('sendPasswordResetFirebase error:', error);
+      const code = error?.code || '';
+      if (code === 'auth/user-not-found') {
+        setForgotStatus({
+          type: 'error',
+          message: 'No existe ningún usuario registrado con este correo en Firebase.'
+        });
+      } else if (code === 'auth/invalid-email') {
+        setForgotStatus({
+          type: 'error',
+          message: 'El formato del correo electrónico no es válido.'
+        });
+      } else if (code === 'auth/too-many-requests') {
+        setForgotStatus({
+          type: 'error',
+          message: 'Demasiadas solicitudes en poco tiempo. Por favor aguardá unos minutos antes de reintentar.'
+        });
+      } else {
+        setForgotStatus({
+          type: 'error',
+          message: error?.message || 'Error al enviar el correo de recuperación. Verificá los datos e intentá de nuevo.'
+        });
+      }
+    } finally {
+      setIsForgotLoading(false);
+    }
+  };
 
   const handleGoogleSignIn = async () => {
     if (!onGoogleLogin) return;
@@ -125,9 +213,19 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginEmailTouched(true);
+    setLoginPasswordTouched(true);
     setErrorMsg('');
     if (!loginEmail.trim()) {
-      setErrorMsg('Por favor ingresa tu correo electrónico o nombre de usuario.');
+      setErrorMsg('Por favor ingresá tu correo electrónico o nombre de usuario.');
+      return;
+    }
+    if (!isEmailFormatValid(loginEmail)) {
+      setErrorMsg('Por favor ingresá un correo electrónico con formato válido (ejemplo: usuario@correo.com).');
+      return;
+    }
+    if (loginPassword && !isPasswordValid(loginPassword)) {
+      setErrorMsg('La contraseña debe tener al menos 6 caracteres por seguridad.');
       return;
     }
     setIsLoading(true);
@@ -145,6 +243,8 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setRegEmailTouched(true);
+    setRegPasswordTouched(true);
     setErrorMsg('');
     setExistingAccountDetected(false);
     setVerificationFeedback(null);
@@ -161,11 +261,11 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
       setErrorMsg('Por favor ingresá tu número de celular.');
       return;
     }
-    if (!regEmail.trim() || !regEmail.includes('@')) {
-      setErrorMsg('Por favor ingresá un correo electrónico válido.');
+    if (!regEmail.trim() || !isEmailFormatValid(regEmail)) {
+      setErrorMsg('Por favor ingresá un correo electrónico válido (ejemplo: nombre@dominio.com).');
       return;
     }
-    if (regPassword.length < 6) {
+    if (!isPasswordValid(regPassword)) {
       setErrorMsg('La contraseña debe tener al menos 6 caracteres (requisito de seguridad de Firebase).');
       return;
     }
@@ -695,16 +795,53 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
                       Correo Electrónico o Usuario
                     </label>
                     <div className="relative">
-                      <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <Mail className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${
+                        loginEmailTouched && loginEmail && !isEmailFormatValid(loginEmail)
+                          ? 'text-rose-400'
+                          : loginEmail && isEmailFormatValid(loginEmail)
+                          ? 'text-emerald-400'
+                          : 'text-slate-500'
+                      }`} />
                       <input
                         type="text"
                         required
                         value={loginEmail}
-                        onChange={(e) => setLoginEmail(e.target.value)}
+                        onChange={(e) => {
+                          setLoginEmail(e.target.value);
+                          if (!loginEmailTouched) setLoginEmailTouched(true);
+                        }}
+                        onBlur={() => setLoginEmailTouched(true)}
                         placeholder="ej. ejemplo@ejemplo.com"
-                        className="w-full pl-10 pr-3.5 py-2.5 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                        className={`w-full pl-10 pr-10 py-2.5 bg-slate-950/70 border rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none transition-all ${
+                          loginEmailTouched && loginEmail && !isEmailFormatValid(loginEmail)
+                            ? 'border-rose-500/80 bg-rose-950/20 focus:ring-2 focus:ring-rose-500/30'
+                            : loginEmail && isEmailFormatValid(loginEmail)
+                            ? 'border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/20'
+                            : 'border-slate-800 focus:ring-2 focus:ring-purple-500'
+                        }`}
                       />
+                      {loginEmail && (
+                        <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                          {isEmailFormatValid(loginEmail) ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-rose-400" />
+                          )}
+                        </div>
+                      )}
                     </div>
+                    {loginEmailTouched && loginEmail && !isEmailFormatValid(loginEmail) && (
+                      <p className="text-[11px] text-rose-400 flex items-center gap-1 mt-1 font-medium">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>Ingresá un correo electrónico válido (ejemplo: usuario@correo.com)</span>
+                      </p>
+                    )}
+                    {loginEmail && isEmailFormatValid(loginEmail) && (
+                      <p className="text-[11px] text-emerald-400 flex items-center gap-1 mt-1 font-medium">
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                        <span>Formato de correo electrónico válido</span>
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-1">
@@ -712,15 +849,44 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
                       <label className="block text-xs font-semibold text-slate-300">
                         Contraseña
                       </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsForgotModalOpen(true);
+                          setForgotEmail(loginEmail.trim() || '');
+                          setForgotStatus({ type: 'idle', message: '' });
+                          setForgotEmailTouched(Boolean(loginEmail.trim()));
+                        }}
+                        className="text-xs text-purple-400 hover:text-purple-300 font-semibold transition-colors hover:underline cursor-pointer flex items-center gap-1"
+                      >
+                        <HelpCircle className="w-3.5 h-3.5" />
+                        <span>¿Olvidaste tu contraseña?</span>
+                      </button>
                     </div>
                     <div className="relative">
-                      <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <Lock className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${
+                        loginPasswordTouched && loginPassword && !isPasswordValid(loginPassword)
+                          ? 'text-rose-400'
+                          : loginPassword && isPasswordValid(loginPassword)
+                          ? 'text-emerald-400'
+                          : 'text-slate-500'
+                      }`} />
                       <input
                         type={showPassword ? 'text' : 'password'}
                         value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
+                        onChange={(e) => {
+                          setLoginPassword(e.target.value);
+                          if (!loginPasswordTouched) setLoginPasswordTouched(true);
+                        }}
+                        onBlur={() => setLoginPasswordTouched(true)}
                         placeholder="Ingresa tu clave"
-                        className="w-full pl-10 pr-10 py-2.5 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                        className={`w-full pl-10 pr-10 py-2.5 bg-slate-950/70 border rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none transition-all ${
+                          loginPasswordTouched && loginPassword && !isPasswordValid(loginPassword)
+                            ? 'border-rose-500/80 bg-rose-950/20 focus:ring-2 focus:ring-rose-500/30'
+                            : loginPassword && isPasswordValid(loginPassword)
+                            ? 'border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/20'
+                            : 'border-slate-800 focus:ring-2 focus:ring-purple-500'
+                        }`}
                       />
                       <button
                         type="button"
@@ -730,6 +896,18 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
                         {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       </button>
                     </div>
+                    {loginPasswordTouched && loginPassword && !isPasswordValid(loginPassword) && (
+                      <p className="text-[11px] text-rose-400 flex items-center gap-1 mt-1 font-medium">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>La contraseña debe tener al menos 6 caracteres por seguridad (faltan {6 - loginPassword.length})</span>
+                      </p>
+                    )}
+                    {loginPassword && isPasswordValid(loginPassword) && (
+                      <p className="text-[11px] text-emerald-400 flex items-center gap-1 mt-1 font-medium">
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                        <span>Contraseña segura ({loginPassword.length} caracteres)</span>
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between text-xs text-slate-400">
@@ -830,21 +1008,59 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
                     </div>
                   </div>
 
+                  {/* Correo Electrónico con Validación Visual */}
                   <div className="space-y-1">
                     <label className="block text-xs font-semibold text-slate-300">
-                      Correo Electrónico (Para verificación)
+                      Correo Electrónico (Para verificación en Firebase)
                     </label>
                     <div className="relative">
-                      <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <Mail className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${
+                        regEmailTouched && regEmail && !isEmailFormatValid(regEmail)
+                          ? 'text-rose-400'
+                          : regEmail && isEmailFormatValid(regEmail)
+                          ? 'text-emerald-400'
+                          : 'text-slate-500'
+                      }`} />
                       <input
                         type="email"
                         required
                         value={regEmail}
-                        onChange={(e) => setRegEmail(e.target.value)}
+                        onChange={(e) => {
+                          setRegEmail(e.target.value);
+                          if (!regEmailTouched) setRegEmailTouched(true);
+                        }}
+                        onBlur={() => setRegEmailTouched(true)}
                         placeholder="ejemplo@ejemplo.com"
-                        className="w-full pl-10 pr-3.5 py-2 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                        className={`w-full pl-10 pr-10 py-2.5 bg-slate-950/70 border rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none transition-all ${
+                          regEmailTouched && regEmail && !isEmailFormatValid(regEmail)
+                            ? 'border-rose-500/80 bg-rose-950/20 focus:ring-2 focus:ring-rose-500/30'
+                            : regEmail && isEmailFormatValid(regEmail)
+                            ? 'border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/20'
+                            : 'border-slate-800 focus:ring-2 focus:ring-purple-500'
+                        }`}
                       />
+                      {regEmail && (
+                        <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                          {isEmailFormatValid(regEmail) ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-rose-400" />
+                          )}
+                        </div>
+                      )}
                     </div>
+                    {regEmailTouched && regEmail && !isEmailFormatValid(regEmail) && (
+                      <p className="text-[11px] text-rose-400 flex items-center gap-1 mt-1 font-medium">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>Ingresá un formato de correo válido (ejemplo: usuario@correo.com)</span>
+                      </p>
+                    )}
+                    {regEmail && isEmailFormatValid(regEmail) && (
+                      <p className="text-[11px] text-emerald-400 flex items-center gap-1 mt-1 font-medium">
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                        <span>Correo válido para tu registro en Firebase</span>
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-1">
@@ -900,18 +1116,39 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
                   )}
 
                   <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-slate-300">
-                      Crear Contraseña
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-semibold text-slate-300">
+                        Crear Contraseña
+                      </label>
+                      <span className="text-[10px] text-slate-400">
+                        Mínimo 6 caracteres
+                      </span>
+                    </div>
                     <div className="relative">
-                      <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <Lock className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${
+                        regPasswordTouched && regPassword && !isPasswordValid(regPassword)
+                          ? 'text-rose-400'
+                          : regPassword && isPasswordValid(regPassword)
+                          ? 'text-emerald-400'
+                          : 'text-slate-500'
+                      }`} />
                       <input
                         type={showPassword ? 'text' : 'password'}
                         required
                         value={regPassword}
-                        onChange={(e) => setRegPassword(e.target.value)}
+                        onChange={(e) => {
+                          setRegPassword(e.target.value);
+                          if (!regPasswordTouched) setRegPasswordTouched(true);
+                        }}
+                        onBlur={() => setRegPasswordTouched(true)}
                         placeholder="Mínimo 6 caracteres"
-                        className="w-full pl-10 pr-10 py-2 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                        className={`w-full pl-10 pr-10 py-2.5 bg-slate-950/70 border rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none transition-all ${
+                          regPasswordTouched && regPassword && !isPasswordValid(regPassword)
+                            ? 'border-rose-500/80 bg-rose-950/20 focus:ring-2 focus:ring-rose-500/30'
+                            : regPassword && isPasswordValid(regPassword)
+                            ? 'border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/20'
+                            : 'border-slate-800 focus:ring-2 focus:ring-purple-500'
+                        }`}
                       />
                       <button
                         type="button"
@@ -921,6 +1158,28 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
                         {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       </button>
                     </div>
+
+                    {/* Barra de progreso de seguridad y feedback visual */}
+                    {regPassword && (
+                      <div className="space-y-1 pt-1 animate-in fade-in duration-150">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className={isPasswordValid(regPassword) ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                            {isPasswordValid(regPassword)
+                              ? `Segura (${regPassword.length} caracteres - cumple requisito Firebase)`
+                              : `Faltan ${6 - regPassword.length} caracteres para el mínimo`}
+                          </span>
+                          <span className="text-slate-500 font-mono">{Math.min(6, regPassword.length)}/6</span>
+                        </div>
+                        <div className="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-300 ${
+                              isPasswordValid(regPassword) ? 'bg-emerald-500' : 'bg-rose-500'
+                            }`}
+                            style={{ width: `${Math.min(100, (regPassword.length / 6) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300 text-[11px] flex items-center gap-2">
@@ -1147,6 +1406,156 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
             onOpenAdminPanel();
           }}
         />
+      )}
+
+      {/* MODAL RECUPERACIÓN DE CONTRASEÑA (Firebase Auth Flow) */}
+      {isForgotModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 text-white">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300">
+                  <KeyRound className="w-5 h-5 text-[#F95420]" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white leading-tight">
+                    Recuperar Contraseña
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Restablecimiento oficial vía Firebase
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsForgotModalOpen(false);
+                  setForgotStatus({ type: 'idle', message: '' });
+                }}
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Ingresá el correo electrónico de tu cuenta. Te enviaremos un enlace oficial de Firebase con instrucciones inmediatas para restablecer tu clave.
+            </p>
+
+            {forgotStatus.message && (
+              <div className={`p-3.5 rounded-xl border text-xs font-semibold flex items-start gap-2.5 leading-relaxed ${
+                forgotStatus.type === 'success'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+              }`}>
+                {forgotStatus.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+                )}
+                <span>{forgotStatus.message}</span>
+              </div>
+            )}
+
+            {forgotStatus.type !== 'success' ? (
+              <form onSubmit={handleSendPasswordReset} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-slate-300">
+                    Correo Electrónico
+                  </label>
+                  <div className="relative">
+                    <Mail className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${
+                      forgotEmailTouched && forgotEmail && !isEmailFormatValid(forgotEmail)
+                        ? 'text-rose-400'
+                        : forgotEmail && isEmailFormatValid(forgotEmail)
+                        ? 'text-emerald-400'
+                        : 'text-slate-500'
+                    }`} />
+                    <input
+                      type="email"
+                      required
+                      value={forgotEmail}
+                      onChange={(e) => {
+                        setForgotEmail(e.target.value);
+                        if (!forgotEmailTouched) setForgotEmailTouched(true);
+                      }}
+                      onBlur={() => setForgotEmailTouched(true)}
+                      placeholder="ej. tu-email@ejemplo.com"
+                      className={`w-full pl-10 pr-10 py-2.5 bg-slate-950/80 border rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none transition-all ${
+                        forgotEmailTouched && forgotEmail && !isEmailFormatValid(forgotEmail)
+                          ? 'border-rose-500/80 bg-rose-950/20 focus:ring-2 focus:ring-rose-500/30'
+                          : forgotEmail && isEmailFormatValid(forgotEmail)
+                          ? 'border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/20'
+                          : 'border-slate-800 focus:ring-2 focus:ring-purple-500'
+                      }`}
+                    />
+                    {forgotEmail && (
+                      <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                        {isEmailFormatValid(forgotEmail) ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 text-rose-400" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {forgotEmailTouched && forgotEmail && !isEmailFormatValid(forgotEmail) && (
+                    <p className="text-[11px] text-rose-400 flex items-center gap-1 mt-1 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>Ingresá un formato de correo válido (ejemplo: usuario@correo.com)</span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsForgotModalOpen(false);
+                      setForgotStatus({ type: 'idle', message: '' });
+                    }}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isForgotLoading || (forgotEmailTouched && !isEmailFormatValid(forgotEmail))}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-[#F95420] hover:from-purple-500 hover:to-orange-500 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {isForgotLoading ? (
+                      <>
+                        <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Enviando enlace...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="w-3.5 h-3.5" />
+                        <span>Enviar Correo</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsForgotModalOpen(false);
+                    handleTabSwitch('login');
+                    setLoginEmail(forgotEmail.trim().toLowerCase());
+                    setForgotStatus({ type: 'idle', message: '' });
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Volver a Iniciar Sesión con este Correo</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

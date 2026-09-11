@@ -93,9 +93,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'card_alerts', label: 'Vencimientos', icon: CalendarClock, badge: null },
     { 
       id: 'couple_balance', 
-      label: 'Balance Cuenta Compartida', 
+      label: 'Cuenta Compartida', 
       icon: Scale, 
-      badge: debtInfo.debtAmount > 0 ? (debtInfo.whoOwesWhom === (isUser1 ? 'user1_owes_user2' : 'user2_owes_user1') ? 'Debes' : 'Te deben') : 'Al día' 
+      badge: null 
     },
     { id: 'budgets', label: 'Presupuestos', icon: Sliders, badge: null },
     { id: 'goals', label: 'Metas & Cajas', icon: Target, badge: 'Ahorro' },

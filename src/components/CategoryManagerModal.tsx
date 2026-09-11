@@ -81,7 +81,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
             </div>
             <div>
               <h3 className="font-extrabold text-sm sm:text-base leading-tight">
-                {canManageCategories ? 'Gestión de Categorías y Subrubros' : 'Catálogo de Categorías'}
+                {canManageCategories ? 'Gestión de Categorías y Subcategorias' : 'Catálogo de Categorías'}
               </h3>
               <p className="text-[10px] text-purple-200">
                 {canManageCategories 
@@ -113,7 +113,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                     <span>Categorías estándar fijas (Plan Básico)</span>
                   </h4>
                   <p className="text-xs text-amber-800 leading-relaxed">
-                    Tu plan incluye todas las categorías base necesarias para registrar tus consumos. Para <strong>crear tus propias categorías, personalizar colores y añadir subrubros ilimitados</strong>, podés pasarte al Plan Parejas Dúo o Plan Pro.
+                    Tu plan incluye todas las categorías base necesarias para registrar tus consumos (incluye <strong>Suscripciones y Plataformas</strong>). Para <strong>crear tus propias categorías, personalizar colores y añadir subcategorías ilimitadas</strong>, podés pasarte al Plan Parejas Dúo o Plan Pro.
                   </p>
                 </div>
               </div>

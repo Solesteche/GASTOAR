@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { 
   Header 
 } from './components/Header';
@@ -97,6 +99,9 @@ import {
   FirebaseCloudSyncModal 
 } from './components/FirebaseCloudSyncModal';
 import { 
+  auth,
+  onAuthStateChanged,
+  logOutFirebase,
   getMesKeyFromDate,
   getMonthMovementsFromFirestore,
   getUserProfileFromFirestore,
@@ -148,10 +153,14 @@ import {
 import { recordLearnedPreference } from './utils/learnedPreferences';
 
 export default function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('control_gastos_is_authenticated') === 'true';
   });
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
 
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
     return localStorage.getItem('control_gastos_is_admin') === 'true';
@@ -164,10 +173,72 @@ export default function App() {
   const [currentUserAccount, setCurrentUserAccount] = useState<UserAccount | null>(() => {
     const saved = localStorage.getItem('control_gastos_account_v1');
     if (saved) {
-      try { return JSON.parse(saved); } catch {}
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed?.accountCode && (parsed.accountCode.startsWith('PAREJA-') || parsed.accountCode.startsWith('PAIR-'))) {
+          parsed.accountCode = parsed.accountCode.replace(/^(PAREJA|PAIR)-/, 'COMPARTIDA-');
+        }
+        return parsed;
+      } catch {}
     }
     return null;
   });
+
+  // Global Session Persistence via Firebase onAuthStateChanged
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setIsAuthenticated(true);
+        localStorage.setItem('control_gastos_is_authenticated', 'true');
+
+        try {
+          const profileFromDb = await getUserProfileFromFirestore(user.uid);
+          if (profileFromDb) {
+            if (profileFromDb.accountCode && (profileFromDb.accountCode.startsWith('PAREJA-') || profileFromDb.accountCode.startsWith('PAIR-'))) {
+              profileFromDb.accountCode = profileFromDb.accountCode.replace(/^(PAREJA|PAIR)-/, 'COMPARTIDA-');
+            }
+            setCurrentUserAccount(profileFromDb);
+            localStorage.setItem('control_gastos_account_v1', JSON.stringify(profileFromDb));
+          } else {
+            setCurrentUserAccount((prev) => {
+              const email = user.email || prev?.email || 'usuario@gastoar.com';
+              const name = user.displayName || prev?.name || email.split('@')[0];
+              const rawCode = prev?.accountCode;
+              const accountCode = rawCode 
+                ? rawCode.replace(/^(PAREJA|PAIR)-/, 'COMPARTIDA-')
+                : ('COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000));
+              const updated: UserAccount = {
+                id: user.uid,
+                email,
+                name,
+                accountType: prev?.accountType || 'pareja',
+                selectedPlanId: prev?.selectedPlanId || 'pareja',
+                accountCode,
+                currency: prev?.currency || 'ARS',
+                createdAt: prev?.createdAt || Date.now(),
+              };
+              localStorage.setItem('control_gastos_account_v1', JSON.stringify(updated));
+              return updated;
+            });
+          }
+        } catch (e) {
+          console.warn('Error synchronizing Firebase user profile:', e);
+        }
+      } else {
+        const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
+        const isAdminStorage = localStorage.getItem('control_gastos_is_admin') === 'true';
+        if (!isDemo && !isAdminStorage) {
+          setIsAuthenticated(false);
+          setCurrentUserAccount(null);
+          localStorage.removeItem('control_gastos_is_authenticated');
+          localStorage.removeItem('control_gastos_account_v1');
+        }
+      }
+      setIsAuthLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Dark Mode State
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -215,8 +286,17 @@ export default function App() {
     if (saved) {
       try {
         const parsed: CategoryMap = JSON.parse(saved);
-        if (!parsed['Suscripciones']) {
-          parsed['Suscripciones'] = DEFAULT_CATEGORY_MAP['Suscripciones'];
+        // Ensure "Suscripciones y Plataformas" is established for all users and plans
+        if (!parsed['Suscripciones y Plataformas']) {
+          parsed['Suscripciones y Plataformas'] = parsed['Suscripciones'] || DEFAULT_CATEGORY_MAP['Suscripciones y Plataformas'] || [
+            "Netflix", "Spotify", "YouTube Premium", "Disney+ / Star+", "Amazon Prime Video",
+            "Max (HBO Max)", "Apple TV+ / iCloud", "ChatGPT Plus / OpenAI", "Paramount+",
+            "Crunchyroll", "Mercado Libre (Meli+)", "PlayStation Plus / Xbox Game Pass",
+            "Google One / Drive", "Otras plataformas digitales"
+          ];
+        }
+        if (parsed['Suscripciones']) {
+          delete parsed['Suscripciones'];
         }
 
         // Add "Gimnasio, Club, Pádel & Deportes" to Salud & Cuidado Personal if missing
@@ -257,8 +337,11 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (!parsed['Suscripciones']) {
-          parsed['Suscripciones'] = DEFAULT_CATEGORY_COLORS['Suscripciones'];
+        if (!parsed['Suscripciones y Plataformas']) {
+          parsed['Suscripciones y Plataformas'] = parsed['Suscripciones'] || DEFAULT_CATEGORY_COLORS['Suscripciones y Plataformas'] || '#7928CA';
+        }
+        if (parsed['Suscripciones']) {
+          delete parsed['Suscripciones'];
         }
         return parsed;
       } catch {}
@@ -272,8 +355,13 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed.categories && !parsed.categories['Suscripciones']) {
-          parsed.categories['Suscripciones'] = 60000;
+        if (parsed.categories) {
+          if (!parsed.categories['Suscripciones y Plataformas']) {
+            parsed.categories['Suscripciones y Plataformas'] = parsed.categories['Suscripciones'] || 60000;
+          }
+          if (parsed.categories['Suscripciones']) {
+            delete parsed.categories['Suscripciones'];
+          }
         }
         return parsed;
       } catch {}
@@ -284,7 +372,13 @@ export default function App() {
   const [profile, setProfile] = useState<CoupleProfile>(() => {
     const saved = localStorage.getItem('control_gastos_profile_v3');
     if (saved) {
-      try { return JSON.parse(saved); } catch {}
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed?.accountCode && (parsed.accountCode.startsWith('PAREJA-') || parsed.accountCode.startsWith('PAIR-'))) {
+          parsed.accountCode = parsed.accountCode.replace(/^(PAREJA|PAIR)-/, 'COMPARTIDA-');
+        }
+        return parsed;
+      } catch {}
     }
     return DEFAULT_COUPLE_PROFILE;
   });
@@ -307,7 +401,23 @@ export default function App() {
   });
 
   // UI States
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'installments' | 'couple_balance' | 'budgets' | 'categories' | 'ai' | 'settlement' | 'goals' | 'subscriptions' | 'admin_subscriptions'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'installments' | 'card_alerts' | 'couple_balance' | 'budgets' | 'categories' | 'ai' | 'settlement' | 'goals' | 'subscriptions' | 'admin_subscriptions'>('dashboard');
+
+  // Sync route path with activeTab if user accesses specific route
+  useEffect(() => {
+    const raw = location.pathname.replace(/^\/+/, '').toLowerCase();
+    if (!raw || raw === 'login') return;
+    if (raw === 'installments' || raw === 'cuotas') setActiveTab('installments');
+    else if (raw === 'card_alerts' || raw === 'vencimientos' || raw === 'alertas') setActiveTab('card_alerts');
+    else if (raw === 'couple_balance' || raw === 'balance') setActiveTab('couple_balance');
+    else if (raw === 'budgets' || raw === 'presupuestos') setActiveTab('budgets');
+    else if (raw === 'categories' || raw === 'categorias') setActiveTab('categories');
+    else if (raw === 'goals' || raw === 'metas') setActiveTab('goals');
+    else if (raw === 'subscriptions' || raw === 'suscripciones') setActiveTab('subscriptions');
+    else if (raw === 'admin_subscriptions' || raw === 'admin') setActiveTab('admin_subscriptions');
+    else if (raw === 'transactions' || raw === 'gastos') setActiveTab('transactions');
+    else if (raw === 'dashboard') setActiveTab('dashboard');
+  }, [location.pathname]);
   const [activeMode, setActiveMode] = useState<ExpenseMode>(() => {
     const saved = localStorage.getItem('gastoar_active_mode');
     if (saved === 'individual' || saved === 'pareja') return saved;
@@ -911,7 +1021,7 @@ export default function App() {
   };
 
   const handleGenerateNewCode = () => {
-    const newCode = 'PAREJA-' + Math.floor(1000 + Math.random() * 9000);
+    const newCode = 'COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000);
     setProfile(prev => ({ ...prev, accountCode: newCode }));
     showToast(`Nuevo código asignado: ${newCode}`, 'success');
   };
@@ -1006,7 +1116,7 @@ export default function App() {
           email: firebaseUser.email || cleanEmail,
           name: firebaseUser.displayName || cleanEmail.split('@')[0],
           accountType: 'individual',
-          accountCode: `PAIR-${Math.floor(1000 + Math.random() * 9000)}`,
+          accountCode: `COMPARTIDA-${Math.floor(1000 + Math.random() * 9000)}`,
           currency: 'ARS',
           createdAt: now,
         };
@@ -1181,7 +1291,7 @@ export default function App() {
         userEmail: cleanEmail,
         userName: `${data.name.trim()}${data.lastName ? ' ' + data.lastName.trim() : ''}`,
         partnerName: data.partnerName ? data.partnerName.trim() : undefined,
-        accountCode: data.accountCode || ('PAIR-' + Math.floor(1000 + Math.random() * 9000)),
+        accountCode: data.accountCode ? data.accountCode.replace(/^(PAREJA|PAIR)-/, 'COMPARTIDA-') : ('COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000)),
         planId: chosenPlan.id,
         planName: chosenPlan.name,
         status: 'trial',
@@ -1329,7 +1439,7 @@ export default function App() {
 
       const email = user.email.toLowerCase();
       const name = user.displayName || email.split('@')[0];
-      const accountCode = 'PAIR-' + Math.floor(1000 + Math.random() * 9000);
+      const accountCode = 'COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000);
 
       const acc: UserAccount = {
         id: user.uid,
@@ -1446,7 +1556,12 @@ export default function App() {
     showToast('Modo Administrador activado. Gestión de suscripciones y clientes.', 'info');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await logOutFirebase();
+    } catch (e) {
+      console.warn('Error signing out of Firebase:', e);
+    }
     setIsAuthenticated(false);
     setIsAdmin(false);
     setIsDemoMode(false);
@@ -1456,12 +1571,13 @@ export default function App() {
     localStorage.removeItem('control_gastos_is_demo');
     localStorage.removeItem('control_gastos_account_v1');
     showToast('Has cerrado sesión correctamente. ¡Hasta pronto! 👋', 'info');
+    navigate('/login', { replace: true });
   };
 
   // Active User Subscription & Permissions
   const activeUserSub = subscriptions.find(s => s.userEmail.toLowerCase() === (currentUserAccount?.email || 'ejemplo@ejemplo.com').toLowerCase());
   const currentPlanId: SubscriptionPlanId = activeUserSub?.planId || currentUserAccount?.selectedPlanId || (currentUserAccount?.accountType === 'individual' ? 'individual' : 'pareja');
-  const canManageCategories = isAdmin || currentPlanId !== 'individual';
+  const canManageCategories = isAdmin || (currentPlanId !== 'individual' && currentPlanId !== 'free');
 
   // Check if Trial is Expired
   const isTrialExpired = useMemo(() => {
@@ -1476,42 +1592,69 @@ export default function App() {
     return false;
   }, [isAdmin, isDemoMode, activeUserSub]);
 
-  // Render Auth Landing Page if not logged in
-  if (!isAuthenticated) {
-    return (
-      <>
-        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-        <AuthLandingPage
-          onLogin={handleLogin}
-          onRegister={handleRegister}
-          onGoogleLogin={handleGoogleLogin}
-          onGuestDemo={handleGuestDemo}
-          onOpenAdminPanel={handleOpenAdminPanel}
-        />
-      </>
-    );
-  }
-
-  // Render Trial Expired Block Screen if trial has ended
-  if (isTrialExpired) {
-    return (
-      <>
-        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-        <TrialExpiredBlockedScreen
-          userAccount={currentUserAccount}
-          subscription={activeUserSub}
-          onSelectPlanPayment={handleSelectPlanPayment}
-          onLogout={handleLogout}
-          onOpenAdminPanel={handleOpenAdminPanel}
-        />
-      </>
-    );
-  }
-
   return (
-    <div className={`min-h-screen flex flex-col md:flex-row antialiased selection:bg-purple-100 selection:text-purple-900 transition-colors duration-300 ${isDarkMode ? 'dark bg-[#0a0314] text-purple-50' : 'bg-slate-50 text-slate-800'}`}>
+    <>
       {/* Toast Notification Layer */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
+      <Routes>
+        {/* Public Login Route */}
+        <Route
+          path="/login"
+          element={
+            isAuthenticated ? (
+              <Navigate to={(location.state as any)?.from?.pathname || '/'} replace />
+            ) : (
+              <AuthLandingPage
+                onLogin={async (email, pass) => {
+                  const res = await handleLogin(email, pass);
+                  if (res.success) {
+                    navigate((location.state as any)?.from?.pathname || '/', { replace: true });
+                  }
+                  return res;
+                }}
+                onRegister={async (data) => {
+                  const res = await handleRegister(data);
+                  if (res.success) {
+                    navigate((location.state as any)?.from?.pathname || '/', { replace: true });
+                  }
+                  return res;
+                }}
+                onGoogleLogin={async () => {
+                  const res = await handleGoogleLogin();
+                  if (res.success) {
+                    navigate((location.state as any)?.from?.pathname || '/', { replace: true });
+                  }
+                  return res;
+                }}
+                onGuestDemo={() => {
+                  handleGuestDemo();
+                  navigate('/', { replace: true });
+                }}
+                onOpenAdminPanel={() => {
+                  handleOpenAdminPanel();
+                  navigate('/admin', { replace: true });
+                }}
+              />
+            )
+          }
+        />
+
+        {/* Protected App Routes (Expenses Management, Balance, Alerts, Categories, Sync, Admin, etc.) */}
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated} isAuthLoading={isAuthLoading}>
+              {isTrialExpired ? (
+                <TrialExpiredBlockedScreen
+                  userAccount={currentUserAccount}
+                  subscription={activeUserSub}
+                  onSelectPlanPayment={handleSelectPlanPayment}
+                  onLogout={handleLogout}
+                  onOpenAdminPanel={handleOpenAdminPanel}
+                />
+              ) : (
+                <div className={`min-h-screen flex flex-col md:flex-row antialiased selection:bg-purple-100 selection:text-purple-900 transition-colors duration-300 ${isDarkMode ? 'dark bg-[#0a0314] text-purple-50' : 'bg-slate-50 text-slate-800'}`}>
 
       {/* Sidebar Navigation */}
       <Sidebar
@@ -1659,7 +1802,8 @@ export default function App() {
             <CategoriesSection
               categoryMap={categoryMap}
               categoryColors={categoryColors}
-              canManageCategories={true}
+              canManageCategories={canManageCategories}
+              onUpgradePlan={() => setActiveTab('subscriptions')}
               onAddCategory={handleAddCategory}
               onAddSubcategory={handleAddSubcategory}
               onDeleteCategory={handleDeleteCategory}
@@ -1952,6 +2096,12 @@ export default function App() {
         budgets={budgets}
         onUpgradePlan={() => { setIsDiagnosisModalOpen(false); setActiveTab('subscriptions'); }}
       />
-    </div>
+                </div>
+              )}
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </>
   );
 }

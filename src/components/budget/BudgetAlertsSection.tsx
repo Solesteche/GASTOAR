@@ -155,7 +155,7 @@ export const BudgetAlertsSection: React.FC<BudgetAlertsSectionProps> = ({
             </div>
 
             {/* Custom slider */}
-            <div className="flex items-center gap-3 flex-1 max-w-xs sm:ml-4">
+            <div className="flex items-center gap-3 w-full sm:w-auto sm:flex-1 sm:max-w-xs sm:ml-4">
               <input
                 type="range"
                 min="50"
@@ -165,7 +165,7 @@ export const BudgetAlertsSection: React.FC<BudgetAlertsSectionProps> = ({
                 onChange={(e) => handleSaveThreshold(Number(e.target.value))}
                 className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#7928CA]"
               />
-              <span className="text-xs font-extrabold text-[#7928CA] w-12 text-right">
+              <span className="text-xs font-extrabold text-[#7928CA] w-12 text-right shrink-0">
                 {selectedThreshold}%
               </span>
             </div>
@@ -283,14 +283,14 @@ export const BudgetAlertsSection: React.FC<BudgetAlertsSectionProps> = ({
       {/* 2. SEMAPHORE CATEGORY BREAKDOWN LIST */}
       <div className="space-y-4">
         {/* Filter bar */}
-        <div className="flex items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-500">Filtrar semáforo:</span>
-            <div className="flex items-center gap-1.5 flex-wrap text-xs font-bold">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-xs font-bold text-slate-500 shrink-0">Filtrar:</span>
+            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-none text-xs font-bold">
               <button
                 type="button"
                 onClick={() => setActiveTabFilter('all')}
-                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   activeTabFilter === 'all'
                     ? 'bg-slate-900 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -301,7 +301,7 @@ export const BudgetAlertsSection: React.FC<BudgetAlertsSectionProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveTabFilter('exceeded')}
-                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   activeTabFilter === 'exceeded'
                     ? 'bg-rose-600 text-white shadow-xs'
                     : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
@@ -312,7 +312,7 @@ export const BudgetAlertsSection: React.FC<BudgetAlertsSectionProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveTabFilter('warning')}
-                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   activeTabFilter === 'warning'
                     ? 'bg-amber-500 text-white shadow-xs'
                     : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
@@ -323,7 +323,7 @@ export const BudgetAlertsSection: React.FC<BudgetAlertsSectionProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveTabFilter('ok')}
-                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   activeTabFilter === 'ok'
                     ? 'bg-emerald-600 text-white shadow-xs'
                     : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'

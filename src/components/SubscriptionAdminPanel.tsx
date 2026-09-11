@@ -61,7 +61,7 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
   // New Subscription Form State
   const [formName, setFormName] = useState<string>('');
   const [formEmail, setFormEmail] = useState<string>('');
-  const [formAccountCode, setFormAccountCode] = useState<string>(() => 'PAIR-' + Math.floor(1000 + Math.random() * 9000));
+  const [formAccountCode, setFormAccountCode] = useState<string>(() => 'COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000));
   const [formPlanId, setFormPlanId] = useState<SubscriptionPlanId>('pareja');
   const [formCycle, setFormCycle] = useState<BillingCycle>('monthly');
   const [formStatus, setFormStatus] = useState<SubscriptionStatus>('trial');

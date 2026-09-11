@@ -8,7 +8,7 @@ import {
   EyeOff, 
   Sparkles, 
   CreditCard, 
-  Heart, 
+  Scale, 
   Copy, 
   Check, 
   Moon, 
@@ -110,7 +110,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const handleCopyCode = () => {
     navigator.clipboard.writeText(profile.accountCode);
     setCopiedCode(true);
-    notify('¡Código Pareja copiado al portapapeles!', 'success');
+    notify('¡Código de Cuenta Compartida copiado al portapapeles!', 'success');
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
@@ -669,13 +669,13 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           </form>
 
           {/* ========================================================================= */}
-          {/* COUPLE CODE (CÓDIGO PAREJA) SECTION                                      */}
+          {/* CÓDIGO CUENTA COMPARTIDA SECTION                                         */}
           {/* ========================================================================= */}
           <div className="p-4 rounded-2xl bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 space-y-3">
             <div className="flex items-center justify-between">
               <span className="font-bold text-amber-900 dark:text-amber-200 text-xs flex items-center gap-1.5">
-                <Heart className="w-4 h-4 text-pink-500 fill-pink-500" />
-                <span>Código Pareja & Vinculación Compartida</span>
+                <Scale className="w-4 h-4 text-amber-700 dark:text-amber-400" />
+                <span>Código Cuenta Compartida & Vinculación</span>
               </span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
                 Sincronizada
@@ -702,12 +702,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             {/* Join another couple code */}
             <div className="pt-2 border-t border-amber-200/60 dark:border-amber-900/30 space-y-1.5">
               <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
-                ¿Querés unirte al código de tu pareja?
+                ¿Querés unirte a una Cuenta Compartida existente?
               </label>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
-                  placeholder="ej. PAREJA-9942"
+                  placeholder="ej. COMPARTIDA-9942"
                   value={joinCodeInput}
                   onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
                   className="flex-1 px-3 py-2 bg-white dark:bg-[#1a0734] border border-amber-300 dark:border-amber-700/60 rounded-xl text-xs uppercase font-mono font-bold text-slate-900 dark:text-white focus:outline-none"

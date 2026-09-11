@@ -116,7 +116,7 @@ export const KpiCards: React.FC<KpiCardsProps> = ({
             <div className="flex items-center gap-1.5 mb-1.5">
               <Scale className="w-3.5 h-3.5 text-[#F95420]" />
               <p className="text-[11px] font-bold uppercase tracking-wider text-purple-900/50">
-                Balance Pareja
+                Cuenta Compartida
               </p>
             </div>
             {isEven ? (
@@ -139,9 +139,9 @@ export const KpiCards: React.FC<KpiCardsProps> = ({
               <div className="mt-1">
                 <h3 className="text-lg sm:text-xl font-bold text-[#7928CA] flex items-center gap-1">
                   <ArrowDownLeft className="w-5 h-5" />
-                  <span>Te deben {formatCurrency(debtInfo.debtAmount, profile.currency)}</span>
+                  <span>Saldo a favor {formatCurrency(debtInfo.debtAmount, profile.currency)}</span>
                 </h3>
-                <p className="text-[11px] text-purple-700 mt-0.5">{partnerName} te debe</p>
+                <p className="text-[11px] text-purple-700 mt-0.5">{partnerName} tiene saldo pendiente</p>
               </div>
             )}
           </div>

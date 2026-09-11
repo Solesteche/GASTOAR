@@ -108,7 +108,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 <div className="w-9 h-9 rounded-xl bg-purple-100 text-[#6F2EC5] flex items-center justify-center">
                   <Scale className="w-4.5 h-4.5" />
                 </div>
-                <span>Pareja</span>
+                <span>Cuenta Compartida</span>
                 {hasDebt && (
                   <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#6F2EC5]" />
                 )}

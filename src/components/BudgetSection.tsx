@@ -421,142 +421,166 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
+      {/* 0. SECTION HEADER WITH TITLE AND ICON */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#2E0854] via-[#4A0E78] to-[#7928CA] text-white flex items-center justify-center shadow-md shadow-purple-900/20 shrink-0">
+            <Sliders className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-black text-[#2E0854] tracking-tight">
+              Presupuestos
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium">
+              Fijá límites, proyectá aumentos y controlá los desvíos mensuales de tus gastos.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* 1. TOP UNIFIED DATE BAR (Eliminates repeated/confusing date filters) */}
-      <section className="bg-white p-4 sm:p-5 rounded-3xl shadow-xs border border-purple-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <section className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl shadow-xs border border-purple-100 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
         
         {/* Left: Month Navigator */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handlePrevMonth}
-            className="p-2 rounded-xl bg-slate-50 hover:bg-purple-50 text-slate-600 hover:text-[#7928CA] border border-slate-200 transition-colors cursor-pointer"
-            title="Mes anterior"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-
-          {/* Month Selector Dropdown */}
-          <div className="relative">
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="appearance-none bg-purple-50 text-[#7928CA] font-extrabold text-sm sm:text-base py-2 pl-4 pr-9 rounded-2xl border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto justify-between sm:justify-start">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <button
+              type="button"
+              onClick={handlePrevMonth}
+              className="p-2 rounded-xl bg-slate-50 hover:bg-purple-50 text-slate-600 hover:text-[#7928CA] border border-slate-200 transition-colors cursor-pointer active:scale-95 shrink-0"
+              title="Mes anterior"
             >
-              {availableMonths.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-            <Calendar className="w-4 h-4 text-[#7928CA] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-75" />
-          </div>
+              <ChevronLeft className="w-4 h-4" />
+            </button>
 
-          <button
-            type="button"
-            onClick={handleNextMonth}
-            className="p-2 rounded-xl bg-slate-50 hover:bg-purple-50 text-slate-600 hover:text-[#7928CA] border border-slate-200 transition-colors cursor-pointer"
-            title="Mes siguiente"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+            {/* Month Selector Dropdown */}
+            <div className="relative">
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="appearance-none bg-purple-50 text-[#7928CA] font-extrabold text-xs sm:text-base py-2 pl-3 sm:pl-4 pr-8 sm:pr-9 rounded-xl sm:rounded-2xl border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
+              >
+                {availableMonths.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#7928CA] absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-75" />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              className="p-2 rounded-xl bg-slate-50 hover:bg-purple-50 text-slate-600 hover:text-[#7928CA] border border-slate-200 transition-colors cursor-pointer active:scale-95 shrink-0"
+              title="Mes siguiente"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
 
           {/* Quick jump to current month */}
           {!isCurrentMonth && (
             <button
               type="button"
               onClick={() => setSelectedMonth(currentMonthIso)}
-              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] sm:text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 active:scale-95 shrink-0"
             >
               <RotateCcw className="w-3 h-3" />
-              <span>Ir al mes actual</span>
+              <span>Actual</span>
             </button>
           )}
         </div>
 
         {/* Right: Month Pacing Context */}
-        <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
+        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 text-xs text-slate-500 font-medium w-full sm:w-auto">
           {isCurrentMonth ? (
-            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200">
-              <Clock className="w-3.5 h-3.5 text-[#7928CA]" />
-              <span>Día <strong>{currentDay}</strong> de {daysInMonth} ({monthProgressPct}% del mes) · <strong>{daysRemaining} días restantes</strong></span>
+            <span className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] sm:text-xs truncate">
+              <Clock className="w-3.5 h-3.5 text-[#7928CA] shrink-0" />
+              <span className="hidden sm:inline">
+                Día <strong>{currentDay}</strong> de {daysInMonth} ({monthProgressPct}% del mes) · <strong>{daysRemaining} días restantes</strong>
+              </span>
+              <span className="sm:hidden">
+                Día <strong>{currentDay}/{daysInMonth}</strong> ({monthProgressPct}%) · <strong>{daysRemaining}d rest.</strong>
+              </span>
             </span>
           ) : (
-            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-600">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              <span>Mes cerrado · {daysInMonth} días</span>
+            <span className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-[11px] sm:text-xs">
+              <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span>Cerrado · {daysInMonth}d</span>
             </span>
           )}
 
           <button
             type="button"
             onClick={onOpenBudgetModal}
-            className="px-4 py-2 bg-gradient-to-r from-[#F95420] to-[#FF6B3D] hover:from-[#E04412] hover:to-[#F95420] text-white text-xs font-bold rounded-2xl shadow-sm transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer ml-auto md:ml-0"
+            className="px-3 sm:px-4 py-2 bg-gradient-to-r from-[#F95420] to-[#FF6B3D] hover:from-[#E04412] hover:to-[#F95420] text-white text-xs font-bold rounded-xl sm:rounded-2xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shrink-0"
             title="Configuración masiva de presupuestos"
           >
-            <Settings2 className="w-4 h-4" />
+            <Settings2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <span className="hidden sm:inline">Configuración General</span>
             <span className="sm:hidden">Ajustes</span>
           </button>
         </div>
       </section>
 
-      {/* 2. FOUR CORE NAVIGATION SECTIONS (Exact User Requirements) */}
-      <nav className="bg-slate-100/90 p-1.5 rounded-2xl flex items-center gap-1 border border-slate-200/80 overflow-x-auto scrollbar-none shadow-2xs">
+      {/* 2. FOUR CORE NAVIGATION SECTIONS (2 buttons per row, 2 rows) */}
+      <nav className="bg-purple-50/70 p-1.5 sm:p-2 rounded-2xl grid grid-cols-2 gap-1.5 sm:gap-2 border border-purple-100/90 shadow-2xs">
         {/* Section 1: Alta y Edición de Presupuesto */}
         <button
           type="button"
           onClick={() => setActiveSection('overview')}
-          className={`flex-1 min-w-[170px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          className={`w-full py-2.5 px-2.5 sm:px-4 rounded-xl text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 text-center ${
             activeSection === 'overview'
-              ? 'bg-white text-[#7928CA] shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              ? 'bg-gradient-to-r from-[#2E0854] via-[#4A0E78] to-[#7928CA] text-white font-extrabold shadow-md shadow-purple-900/25'
+              : 'text-slate-600 hover:text-[#2E0854] hover:bg-white/80 font-bold'
           }`}
         >
-          <Target className="w-4 h-4" />
-          <span>1) Alta Presupuesto</span>
+          <Target className="w-4 h-4 shrink-0" />
+          <span className="truncate">1) Alta Presupuesto</span>
         </button>
 
         {/* Section 2: Configurar Alertas de Presupuesto (Alertas y Límites) */}
         <button
           type="button"
           onClick={() => setActiveSection('alerts')}
-          className={`flex-1 min-w-[170px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          className={`w-full py-2.5 px-2.5 sm:px-4 rounded-xl text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 text-center ${
             activeSection === 'alerts'
-              ? 'bg-white text-[#7928CA] shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              ? 'bg-gradient-to-r from-[#2E0854] via-[#4A0E78] to-[#7928CA] text-white font-extrabold shadow-md shadow-purple-900/25'
+              : 'text-slate-600 hover:text-[#2E0854] hover:bg-white/80 font-bold'
           }`}
         >
-          <ShieldAlert className="w-4 h-4" />
-          <span>2) Alertas y Límites</span>
+          <ShieldAlert className="w-4 h-4 shrink-0" />
+          <span className="truncate">2) Alertas y Límites</span>
         </button>
 
         {/* Section 3: Proyección Automática */}
         <button
           type="button"
           onClick={() => setActiveSection('projection')}
-          className={`flex-1 min-w-[170px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          className={`w-full py-2.5 px-2.5 sm:px-4 rounded-xl text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 text-center ${
             activeSection === 'projection'
-              ? 'bg-white text-[#7928CA] shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              ? 'bg-gradient-to-r from-[#2E0854] via-[#4A0E78] to-[#7928CA] text-white font-extrabold shadow-md shadow-purple-900/25'
+              : 'text-slate-600 hover:text-[#2E0854] hover:bg-white/80 font-bold'
           }`}
         >
-          <TrendingUp className="w-4 h-4" />
-          <span>3) Proyección Automática</span>
+          <TrendingUp className="w-4 h-4 shrink-0" />
+          <span className="truncate">3) Proyección Auto</span>
         </button>
 
         {/* Section 4: Tabla Comparativa */}
         <button
           type="button"
           onClick={() => setActiveSection('comparison')}
-          className={`flex-1 min-w-[170px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          className={`w-full py-2.5 px-2.5 sm:px-4 rounded-xl text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer active:scale-95 text-center ${
             activeSection === 'comparison'
-              ? 'bg-white text-[#7928CA] shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              ? 'bg-gradient-to-r from-[#2E0854] via-[#4A0E78] to-[#7928CA] text-white font-extrabold shadow-md shadow-purple-900/25'
+              : 'text-slate-600 hover:text-[#2E0854] hover:bg-white/80 font-bold'
           }`}
         >
-          <BarChart3 className="w-4 h-4" />
-          <span>4) Tabla Comparativa</span>
+          <BarChart3 className="w-4 h-4 shrink-0" />
+          <span className="truncate">4) Comparativa</span>
         </button>
       </nav>
 
@@ -744,17 +768,17 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
           </section>
 
           {/* Search and Filters Toolbar */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
             
             {/* Search Input */}
-            <div className="relative flex-1 max-w-md">
+            <div className="relative flex-1 w-full md:max-w-md">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Buscar categoría para editar..."
-                className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#7928CA]"
+                className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#7928CA]"
               />
               {searchTerm && (
                 <button
@@ -767,12 +791,12 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
             </div>
 
             {/* Quick Status Chips & Sort */}
-            <div className="flex items-center gap-2 flex-wrap text-xs">
-              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 text-[11px] font-bold">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-2 w-full md:w-auto text-xs">
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80 text-[11px] font-bold overflow-x-auto scrollbar-none w-full sm:w-auto max-w-full">
                 <button
                   type="button"
                   onClick={() => setStatusFilter('all')}
-                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                     statusFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
@@ -781,7 +805,7 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => setStatusFilter('risk')}
-                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                     statusFilter === 'risk' ? 'bg-rose-500 text-white shadow-xs' : 'text-slate-500 hover:text-rose-600'
                   }`}
                 >
@@ -790,7 +814,7 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => setStatusFilter('safe')}
-                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                     statusFilter === 'safe' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-500 hover:text-emerald-700'
                   }`}
                 >
@@ -799,7 +823,7 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => setStatusFilter('no_budget')}
-                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                     statusFilter === 'no_budget' ? 'bg-slate-700 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
@@ -808,12 +832,12 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
               </div>
 
               {/* Sort Selector */}
-              <div className="flex items-center gap-1.5 ml-auto md:ml-0">
-                <span className="text-slate-400 text-[11px] font-medium hidden sm:inline">Ordenar:</span>
+              <div className="flex items-center justify-between sm:justify-start gap-1.5 w-full sm:w-auto">
+                <span className="text-slate-400 text-[11px] font-medium sm:inline shrink-0">Ordenar:</span>
                 <select
                   value={sortOption}
                   onChange={(e) => setSortOption(e.target.value as SortOption)}
-                  className="text-xs bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-2.5 py-1.5 font-bold focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer"
+                  className="text-xs bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-2.5 py-1.5 font-bold focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer flex-1 sm:flex-none"
                 >
                   <option value="percentage">Mayor % Consumido</option>
                   <option value="spent">Mayor Gasto ($)</option>

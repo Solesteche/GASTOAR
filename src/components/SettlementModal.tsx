@@ -7,7 +7,6 @@ import {
   ArrowRight, 
   ArrowDownLeft, 
   ArrowUpRight, 
-  HeartHandshake, 
   Sparkles,
   History,
   Calendar
@@ -175,7 +174,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                 }`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <HeartHandshake className="w-5 h-5 text-pink-600" />
+                      <Coins className="w-5 h-5 text-indigo-600" />
                       <span className="font-bold text-xs uppercase tracking-wider">
                         Resolución del Balance
                       </span>

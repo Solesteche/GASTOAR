@@ -7,7 +7,6 @@ import {
   CheckCircle2, 
   Coins, 
   Sparkles, 
-  HeartHandshake,
   Receipt,
   ArrowUpRight,
   ArrowDownLeft
@@ -68,14 +67,11 @@ export const CoupleBalanceBanner: React.FC<CoupleBalanceBannerProps> = ({
         <div className="space-y-3 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="p-1.5 rounded-xl bg-white/10 text-[#F95420] border border-white/15">
-              <HeartHandshake className="w-4 h-4" />
+              <Scale className="w-4 h-4" />
             </span>
             <h2 className="font-extrabold text-base sm:text-lg text-white flex items-center gap-2">
-              <span>Finanzas Compartidas & Balance de Pareja</span>
+              <span>Cuenta Compartida</span>
             </h2>
-            <span className="text-[10px] font-mono font-bold bg-white/15 text-purple-100 px-2.5 py-0.5 rounded-full border border-white/20 backdrop-blur-xs">
-              Código: {profile.accountCode}
-            </span>
           </div>
 
           <p className="text-xs text-purple-100/90 leading-relaxed max-w-2xl font-medium">

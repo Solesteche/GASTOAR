@@ -9,7 +9,6 @@ import {
   ArrowUpRight, 
   ArrowDownLeft, 
   Filter, 
-  HeartHandshake, 
   Edit3, 
   Trash2, 
   Coins, 
@@ -116,11 +115,8 @@ export const CoupleBalanceSection: React.FC<CoupleBalanceSectionProps> = ({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl font-black text-slate-900 tracking-tight">
-                  Balance en Pareja
+                  Cuenta Compartida
                 </h1>
-                <span className="text-[10px] font-mono font-bold bg-purple-50 text-[#6F2EC5] px-2.5 py-0.5 rounded-full border border-purple-200">
-                  Código: {profile.accountCode}
-                </span>
               </div>
               <p className="text-xs text-slate-500 font-medium">
                 Cuentas claras entre {profile.user1Name} y {profile.user2Name} sin discusiones.
@@ -183,7 +179,7 @@ export const CoupleBalanceSection: React.FC<CoupleBalanceSectionProps> = ({
                     ? '¡Todo equilibrado! Ninguno le debe nada al otro.'
                     : currentUserOwes
                       ? `Le debes transferir a ${partnerName}:`
-                      : `${partnerName} te debe transferir:`}
+                      : `Saldo a favor con ${partnerName}:`}
                 </h3>
               </div>
             </div>
@@ -315,8 +311,8 @@ export const CoupleBalanceSection: React.FC<CoupleBalanceSectionProps> = ({
         <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h2 className="font-bold text-slate-800 text-base flex items-center gap-2">
-              <HeartHandshake className="w-5 h-5 text-[#6F2EC5]" />
-              <span>Gastos Compartidos en Pareja</span>
+              <Receipt className="w-5 h-5 text-[#6F2EC5]" />
+              <span>Gastos de Cuenta Compartida</span>
             </h2>
             <span className="bg-purple-50 text-[#6F2EC5] text-xs font-bold px-2.5 py-0.5 rounded-full border border-purple-200">
               {filteredCoupleTransactions.length} registros
@@ -431,12 +427,12 @@ export const CoupleBalanceSection: React.FC<CoupleBalanceSectionProps> = ({
         ) : (
           <div className="p-8 text-center space-y-3">
             <div className="w-12 h-12 rounded-2xl bg-purple-50 text-[#6F2EC5] flex items-center justify-center mx-auto">
-              <HeartHandshake className="w-6 h-6" />
+              <Scale className="w-6 h-6" />
             </div>
             <div>
               <h4 className="font-extrabold text-sm text-slate-800">No hay gastos compartidos que coincidan</h4>
               <p className="text-xs text-slate-500">
-                Los gastos que registres con la opción "En Pareja" aparecerán detallados aquí para calcular los reembolsos.
+                Los gastos que registres como compartidos aparecerán detallados aquí para calcular los reembolsos.
               </p>
             </div>
             <button

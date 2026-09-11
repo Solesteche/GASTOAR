@@ -1,7 +1,7 @@
 import { CategoryColors, CategoryMap, CoupleProfile, Transaction, Budgets } from '../types';
 
 export const DEFAULT_COUPLE_PROFILE: CoupleProfile = {
-  accountCode: 'PAREJA-2026',
+  accountCode: 'COMPARTIDA-2026',
   user1Name: 'Sol',
   user2Name: 'Martín',
   currentUser: 'user1',
@@ -70,7 +70,7 @@ export const DEFAULT_CATEGORY_MAP: CategoryMap = {
     "Recitales, Boliches & Fiestas",
     "Videojuegos & Entretenimiento Digital"
   ],
-  "Suscripciones": [
+  "Suscripciones y Plataformas": [
     "Netflix",
     "Spotify",
     "YouTube Premium",
@@ -117,7 +117,8 @@ export const DEFAULT_CATEGORY_COLORS: CategoryColors = {
   "Salud & Cuidado Personal": "#ec4899", // Pink
   "Educación & Formación": "#6366f1", // Indigo
   "Entretenimiento, Ocio & Salidas": "#8b5cf6", // Violet
-  "Suscripciones": "#7928CA", // Purple Accent
+  "Suscripciones y Plataformas": "#7928CA", // Purple Accent
+  "Suscripciones": "#7928CA", // Compatibility alias
   "Indumentaria & Calzado": "#06b6d4", // Cyan
   "Mascotas": "#f97316", // Orange
   "Tecnología, Electro & Bazar": "#14b8a6", // Teal
@@ -133,6 +134,7 @@ export const DEFAULT_BUDGETS: Budgets = {
     "Salud & Cuidado Personal": 95000,
     "Educación & Formación": 65000,
     "Entretenimiento, Ocio & Salidas": 55000,
+    "Suscripciones y Plataformas": 60000,
     "Suscripciones": 60000,
     "Indumentaria & Calzado": 60000,
     "Mascotas": 45000,

@@ -9,7 +9,7 @@ import {
   RefreshCw, 
   Download, 
   Upload, 
-  Heart,
+  Scale,
   Coins
 } from 'lucide-react';
 import { CoupleProfile, SplitType, Transaction } from '../types';
@@ -121,7 +121,7 @@ export const CoupleSettingsModal: React.FC<CoupleSettingsModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-sm sm:text-base leading-tight">
-                Configuración de Pareja & Vinculación
+                Configuración de Cuenta Compartida
               </h3>
               <p className="text-[10px] text-amber-100">
                 Sincronización en tiempo real y nombres personalizados
@@ -143,7 +143,7 @@ export const CoupleSettingsModal: React.FC<CoupleSettingsModalProps> = ({
           <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="font-bold text-amber-900 text-xs flex items-center gap-1.5">
-                <Heart className="w-3.5 h-3.5 text-pink-500 fill-pink-500" />
+                <Scale className="w-3.5 h-3.5 text-amber-700" />
                 <span>Código de tu Cuenta Compartida</span>
               </span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
@@ -188,7 +188,7 @@ export const CoupleSettingsModal: React.FC<CoupleSettingsModalProps> = ({
                 type="text"
                 value={joinCodeInput}
                 onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
-                placeholder="Ej: PAREJA-9821"
+                placeholder="Ej: COMPARTIDA-9821"
                 className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl font-mono uppercase text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
               <button
