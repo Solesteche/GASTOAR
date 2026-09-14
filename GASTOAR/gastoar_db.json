@@ -1,0 +1,65 @@
+{
+  "users": {
+    "testvercel@example.com": {
+      "id": "acc-1788609803762-659",
+      "email": "testvercel@example.com",
+      "name": "Test User",
+      "password": "password123",
+      "accountType": "individual",
+      "accountCode": "VERCEL-1234",
+      "currency": "ARS",
+      "selectedPlanId": "individual",
+      "createdAt": 1788609803762,
+      "updatedAt": 1788609803762
+    }
+  },
+  "accountsData": {
+    "testvercel@example.com": {
+      "transactions": [],
+      "categoryMap": null,
+      "categoryColors": null,
+      "budgets": {
+        "categories": {},
+        "subcategories": {}
+      },
+      "profile": {
+        "accountCode": "VERCEL-1234",
+        "user1Name": "Test User",
+        "user2Name": "Fondo Ahorro",
+        "currentUser": "user1",
+        "currency": "ARS",
+        "defaultSplit": "50_50"
+      },
+      "settlementHistory": [],
+      "goals": [],
+      "subscriptions": [],
+      "alertItems": [],
+      "updatedAt": 1788609803762
+    },
+    "VERCEL-1234": {
+      "transactions": [],
+      "categoryMap": null,
+      "categoryColors": null,
+      "budgets": {
+        "categories": {},
+        "subcategories": {}
+      },
+      "profile": {
+        "accountCode": "VERCEL-1234",
+        "user1Name": "Test User",
+        "user2Name": "Fondo Ahorro",
+        "currentUser": "user1",
+        "currency": "ARS",
+        "defaultSplit": "50_50"
+      },
+      "settlementHistory": [],
+      "goals": [],
+      "subscriptions": [],
+      "alertItems": [],
+      "updatedAt": 1788609803762
+    }
+  },
+  "accountCodeToEmail": {
+    "VERCEL-1234": "testvercel@example.com"
+  }
+}
