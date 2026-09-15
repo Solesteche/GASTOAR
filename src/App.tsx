@@ -41,6 +41,9 @@ import {
   BudgetModal 
 } from './components/BudgetModal';
 import { 
+  BudgetCreateModal 
+} from './components/BudgetCreateModal';
+import { 
   CoupleSettingsModal 
 } from './components/CoupleSettingsModal';
 import { 
@@ -438,6 +441,7 @@ export default function App() {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
+  const [isBudgetCreateModalOpen, setIsBudgetCreateModalOpen] = useState(false);
   const [isCoupleModalOpen, setIsCoupleModalOpen] = useState(false);
   const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -1781,6 +1785,7 @@ export default function App() {
                 transactions={transactions}
                 currency={profile.currency}
                 onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
+                onCreateBudget={() => setIsBudgetCreateModalOpen(true)}
                 onUpdateBudgets={(newBudgets) => {
                   setBudgets(newBudgets);
                   showToast('Límites de presupuesto actualizados con éxito', 'success');
@@ -1987,6 +1992,20 @@ export default function App() {
         onAddSubcategory={handleAddSubcategory}
         onDeleteCategory={handleDeleteCategory}
         onDeleteSubcategory={handleDeleteSubcategory}
+      />
+
+      <BudgetCreateModal
+        isOpen={isBudgetCreateModalOpen}
+        onClose={() => setIsBudgetCreateModalOpen(false)}
+        budgets={budgets}
+        categoryMap={categoryMap}
+        categoryColors={categoryColors}
+        transactions={transactions}
+        currency={profile?.currency || 'ARS'}
+        onCreate={(newBudgets) => {
+          setBudgets(newBudgets);
+          showToast('Presupuesto creado con éxito', 'success');
+        }}
       />
 
       <BudgetModal

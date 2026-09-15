@@ -86,6 +86,12 @@ export interface Budgets {
   alertThresholdPercent?: number; // Percentage (e.g. 70, 80, 85, 90) when warning alert triggers
   projectionGrowthPercent?: number; // Last applied growth/inflation projection percentage
   lastProjectedDate?: string;
+  // Optional metadata used by the budget creation flow.
+  name?: string;
+  startDate?: string;
+  endDate?: string;
+  income?: number;
+  createdAt?: string;
 }
 
 export interface UserAccount {
