@@ -12,6 +12,9 @@ import {
   TrendingUp,
   X,
   WalletCards,
+  ChevronDown,
+  ChevronUp,
+  Layers3,
 } from 'lucide-react';
 import { Budgets, CategoryMap, Transaction } from '../types';
 import { formatCurrency } from '../utils/formatters';
@@ -46,14 +49,27 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
   const [endDate, setEndDate] = useState('');
   const [income, setIncome] = useState('');
   const [categories, setCategories] = useState<Record<string, number>>({});
+  const [subcategories, setSubcategories] = useState<Record<string, number>>({});
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [alertThreshold, setAlertThreshold] = useState(80);
   const [created, setCreated] = useState(false);
+  const [recentManualEdit, setRecentManualEdit] = useState<{ cat: string; sub: string } | null>(null);
 
   const realExpensesByCategory = useMemo(() => {
     const result: Record<string, number> = {};
     transactions.forEach((tx) => {
       if (!tx || tx.tipoTransaccion === 'ingreso') return;
       result[tx.categoria] = (result[tx.categoria] || 0) + Number(tx.monto || 0);
+    });
+    return result;
+  }, [transactions]);
+
+  const realExpensesBySubcategory = useMemo(() => {
+    const result: Record<string, number> = {};
+    transactions.forEach((tx) => {
+      if (!tx || tx.tipoTransaccion === 'ingreso' || !tx.subcategoria) return;
+      result[`${tx.categoria}::${tx.subcategoria}`] =
+        (result[`${tx.categoria}::${tx.subcategoria}`] || 0) + Number(tx.monto || 0);
     });
     return result;
   }, [transactions]);
@@ -93,23 +109,130 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
     setEndDate(iso(last));
     setIncome('');
     setCategories({ ...(budgets?.categories || {}) });
+    setSubcategories({ ...(budgets?.subcategories || {}) });
+    setExpandedCategories({});
     setAlertThreshold(budgets?.alertThresholdPercent || 80);
     setCreated(false);
+    setRecentManualEdit(null);
   }, [isOpen, budgets]);
 
   useEffect(() => {
     if (!isOpen) return;
-    if (startMode === 'empty') setCategories({});
-    if (startMode === 'copy') setCategories(suggestedCopy);
-    if (startMode === 'real') setCategories(suggestedByReal);
-  }, [startMode, isOpen, suggestedCopy, suggestedByReal]);
+    if (startMode === 'empty') { setCategories({}); setSubcategories({}); }
+    if (startMode === 'copy') { setCategories(suggestedCopy); setSubcategories({ ...(budgets?.subcategories || {}) }); }
+    if (startMode === 'real') {
+      setCategories(suggestedByReal);
+      const realSubs: Record<string, number> = {};
+      categoryList.forEach((cat) => (categoryMap[cat] || []).forEach((sub) => {
+        const txTotal = transactions.filter((tx) => tx && tx.tipoTransaccion !== 'ingreso' && tx.categoria === cat && tx.subcategoria === sub).reduce((sum, tx) => sum + Number(tx.monto || 0), 0);
+        if (txTotal > 0) realSubs[sub] = Math.round(txTotal / 1000) * 1000;
+      }));
+      setSubcategories(realSubs);
+    }
+  }, [startMode, isOpen, suggestedCopy, suggestedByReal, budgets, categoryList, categoryMap, transactions]);
 
   if (!isOpen) return null;
+
+  const handleSubcategoryChange = (cat: string, sub: string, value: string) => {
+    const numeric = value === '' ? 0 : Math.max(0, Math.round(Number(value) || 0));
+    setSubcategories((prev) => ({ ...prev, [sub]: numeric }));
+    setRecentManualEdit({ cat, sub });
+  };
+
+  const toggleCategory = (cat: string) => {
+    setExpandedCategories((prev) => ({ ...prev, [cat]: !prev[cat] }));
+  };
+
+  const getSubcategoryTotal = (cat: string) =>
+    (categoryMap[cat] || []).reduce((sum, sub) => sum + Number(subcategories[sub] || 0), 0);
+
+  const distributeCategoryAutomatically = (cat: string) => {
+    const limit = Number(categories[cat] || 0);
+    const subs = categoryMap[cat] || [];
+    if (limit <= 0 || subs.length === 0) return;
+
+    const realValues = subs.map((sub) => ({
+      sub,
+      value: Number(realExpensesBySubcategory[`${cat}::${sub}`] || 0),
+    }));
+    const realTotal = realValues.reduce((sum, item) => sum + item.value, 0);
+    const weights = realTotal > 0
+      ? realValues.map((item) => item.value / realTotal)
+      : subs.map(() => 1 / subs.length);
+
+    // Repartimos en múltiplos de $500 sin superar nunca el límite de la categoría.
+    // La última subcategoría absorbe cualquier diferencia de redondeo.
+    let assigned = 0;
+    const nextValues: Record<string, number> = {};
+    subs.forEach((sub, index) => {
+      const remaining = Math.max(0, limit - assigned);
+      const value = index === subs.length - 1
+        ? remaining
+        : Math.min(remaining, Math.round((limit * weights[index]) / 500) * 500);
+      nextValues[sub] = value;
+      assigned += value;
+    });
+
+    setSubcategories((prev) => ({ ...prev, ...nextValues }));
+    setExpandedCategories((prev) => ({ ...prev, [cat]: true }));
+  };
+
+  const distributeAllAutomatically = () => {
+    categoryList.forEach((cat) => distributeCategoryAutomatically(cat));
+    setRecentManualEdit(null);
+  };
+
+  const distributeRemaining = (cat: string, excludedSub?: string) => {
+    const limit = Number(categories[cat] || 0);
+    const subs = categoryMap[cat] || [];
+    if (limit <= 0 || subs.length === 0) return;
+
+    const currentTotal = getSubcategoryTotal(cat);
+    const remaining = Math.max(0, limit - currentTotal);
+    const eligible = subs.filter((sub) => sub !== excludedSub);
+    if (remaining <= 0 || eligible.length === 0) return;
+
+    const realValues = eligible.map((sub) => ({
+      sub,
+      value: Number(realExpensesBySubcategory[`${cat}::${sub}`] || 0),
+    }));
+    const realTotal = realValues.reduce((sum, item) => sum + item.value, 0);
+    const weights = realTotal > 0
+      ? realValues.map((item) => item.value / realTotal)
+      : eligible.map(() => 1 / eligible.length);
+
+    let distributed = 0;
+    const nextValues: Record<string, number> = {};
+    eligible.forEach((sub, index) => {
+      const left = Math.max(0, remaining - distributed);
+      const value = index === eligible.length - 1
+        ? left
+        : Math.min(left, Math.round((remaining * weights[index]) / 500) * 500);
+      nextValues[sub] = value;
+      distributed += value;
+    });
+
+    setSubcategories((prev) => {
+      const next = { ...prev };
+      Object.entries(nextValues).forEach(([sub, value]) => {
+        next[sub] = Number(next[sub] || 0) + value;
+      });
+      return next;
+    });
+    setRecentManualEdit(null);
+    setExpandedCategories((prev) => ({ ...prev, [cat]: true }));
+  };
 
   const handleChange = (cat: string, value: string) => {
     const numeric = value === '' ? 0 : Math.max(0, Math.round(Number(value) || 0));
     setCategories((prev) => ({ ...prev, [cat]: numeric }));
   };
+
+  const subcategoryErrors = useMemo(() => categoryList.filter((cat) => {
+    const limit = Number(categories[cat] || 0);
+    const subTotal = getSubcategoryTotal(cat);
+    return subTotal > 0 && limit > 0 && subTotal > limit;
+  }), [categoryList, categories, subcategories, categoryMap]);
 
   const handleCreate = () => {
     const newBudgets: Budgets = {
@@ -119,6 +242,7 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
       endDate,
       income: Number(income) || 0,
       categories,
+      subcategories,
       alertThresholdPercent: alertThreshold,
       projectionGrowthPercent: budgets?.projectionGrowthPercent || 15,
       createdAt: new Date().toISOString(),
@@ -127,10 +251,10 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
     setCreated(true);
   };
 
-  const canContinue = step === 1 ? Boolean(name.trim() && startDate && endDate) : totalAssigned > 0;
+  const canContinue = step === 1 ? Boolean(name.trim() && startDate && endDate) : step === 2 ? totalAssigned > 0 && subcategoryErrors.length === 0 : totalAssigned > 0;
 
   return (
-    <div className="fixed inset-0 z-[70] bg-slate-950/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+    <div className="budget-create-modal fixed inset-0 z-[70] bg-slate-950/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
       <div className="w-full max-w-3xl max-h-[94vh] overflow-hidden rounded-[28px] bg-white dark:bg-[#140728] border border-purple-100 dark:border-purple-900/50 shadow-2xl text-slate-800 dark:text-slate-100 flex flex-col">
         <div className="bg-gradient-to-r from-[#2E0854] via-[#4A0E78] to-[#7928CA] text-white p-5 sm:p-6 shrink-0">
           <div className="flex items-start justify-between gap-4">
@@ -204,23 +328,92 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
               {step === 2 && (
                 <div className="space-y-5">
                   <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-                    <div><h3 className="text-lg font-black text-[#2E0854] dark:text-white">2. Asigná límites por categoría</h3><p className="text-xs text-slate-500 mt-1">Solo necesitás definir las categorías que realmente querés controlar.</p></div>
-                    <div className="text-right"><p className="text-[10px] uppercase tracking-wider font-black text-slate-400">Total asignado</p><p className="text-xl font-black text-[#7928CA]">{formatCurrency(totalAssigned, currency)}</p></div>
+                    <div><h3 className="text-lg font-black text-[#2E0854] dark:text-white">2. Asigná límites por categoría</h3><p className="text-xs text-slate-500 mt-1">Definí los límites manualmente o dejá que GastoAR los distribuya según tus gastos reales.</p></div>
+                    <div className="flex items-end justify-between sm:justify-end gap-3">
+                      <div className="text-right"><p className="text-[10px] uppercase tracking-wider font-black text-slate-400">Total asignado</p><p className="text-xl font-black text-[#7928CA]">{formatCurrency(totalAssigned, currency)}</p></div>
+                    </div>
                   </div>
-                  <div className="grid sm:grid-cols-2 gap-3">
+                  <div className="rounded-2xl border border-purple-100 dark:border-purple-900/50 bg-gradient-to-r from-purple-50 to-indigo-50/70 dark:from-purple-950/20 dark:to-indigo-950/20 p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-white dark:bg-[#190731] text-[#7928CA] border border-purple-100 dark:border-purple-900/50 flex items-center justify-center shrink-0"><Sparkles className="w-4 h-4" /></div>
+                        <div><p className="text-xs font-black text-[#2E0854] dark:text-purple-100">Distribución inteligente</p><p className="text-[10px] text-slate-500 mt-1 leading-relaxed">Distribuye automáticamente cada categoría entre sus subcategorías usando tu historial real. Si no hay historial, reparte el límite en partes iguales.</p></div>
+                      </div>
+                      <button type="button" onClick={distributeAllAutomatically} disabled={categoryList.every(cat => !(categories[cat] > 0) || !(categoryMap[cat] || []).length)} className="shrink-0 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#7928CA] to-[#A855F7] text-white text-[11px] font-black shadow-sm disabled:opacity-40 flex items-center justify-center gap-1.5"><Sparkles className="w-4 h-4" />Distribuir automáticamente</button>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-purple-100 dark:border-purple-900/50 bg-purple-50/50 dark:bg-purple-950/20 p-4 flex items-start gap-3">
+                    <Layers3 className="w-5 h-5 text-[#7928CA] shrink-0" />
+                    <div><p className="text-xs font-black text-[#2E0854] dark:text-purple-100">También podés asignar un límite por subcategoría</p><p className="text-[11px] text-slate-500 mt-1">El límite de la categoría es el techo general. Las subcategorías distribuyen ese monto internamente.</p></div>
+                  </div>
+                  <div className="space-y-3">
                     {categoryList.map((cat) => {
                       const value = categories[cat] || 0;
                       const real = realExpensesByCategory[cat] || 0;
+                      const subs = categoryMap[cat] || [];
+                      const subTotal = getSubcategoryTotal(cat);
+                      const remaining = value - subTotal;
+                      const hasError = value > 0 && subTotal > value;
+                      const expanded = expandedCategories[cat] ?? false;
                       return (
-                        <div key={cat} className="rounded-2xl border border-slate-200 dark:border-purple-900/50 p-4 bg-white dark:bg-[#16072b]">
-                          <div className="flex items-center gap-2 mb-2"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: categoryColors[cat] || '#7928CA' }} /><span className="text-xs font-black truncate">{cat}</span></div>
-                          <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span><input type="number" min="0" step="1000" value={value || ''} onChange={(e) => handleChange(cat, e.target.value)} placeholder="Sin límite" className="w-full rounded-xl border border-slate-200 dark:border-purple-900 bg-slate-50 dark:bg-[#1a0734] pl-8 pr-3 py-2.5 text-sm font-black outline-none focus:ring-2 focus:ring-purple-500/20" /></div>
-                          {real > 0 && <p className="text-[10px] text-slate-400 mt-2">Gasto real reciente: <strong>{formatCurrency(real, currency)}</strong></p>}
+                        <div key={cat} className={`rounded-2xl border bg-white dark:bg-[#16072b] overflow-hidden ${hasError ? 'border-red-300 dark:border-red-900/60' : 'border-slate-200 dark:border-purple-900/50'}`}>
+                          <div className="p-4">
+                            <div className="flex items-center gap-3">
+                              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: categoryColors[cat] || '#7928CA' }} />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-black truncate">{cat}</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">{subs.length} subcategorías disponibles</p>
+                              </div>
+                              <div className="w-32 sm:w-40 relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span><input type="number" min="0" step="1000" value={value || ''} onChange={(e) => handleChange(cat, e.target.value)} placeholder="Límite total" className="w-full rounded-xl border border-slate-200 dark:border-purple-900 bg-slate-50 dark:bg-[#1a0734] pl-8 pr-2 py-2.5 text-xs font-black outline-none focus:ring-2 focus:ring-purple-500/20" /></div>
+                              {subs.length > 0 && <div className="flex items-center gap-1">
+                                <button type="button" onClick={() => distributeCategoryAutomatically(cat)} disabled={value <= 0} className="p-2 rounded-xl text-[#7928CA] hover:bg-purple-50 dark:hover:bg-purple-950/40 disabled:opacity-30" title="Distribuir automáticamente" aria-label="Distribuir automáticamente"><Sparkles className="w-4 h-4" /></button>
+                                <button type="button" onClick={() => toggleCategory(cat)} className="p-2 rounded-xl text-[#7928CA] hover:bg-purple-50 dark:hover:bg-purple-950/40" aria-label={expanded ? 'Ocultar subcategorías' : 'Mostrar subcategorías'}>{expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</button>
+                              </div>}
+                            </div>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-[10px]">
+                              <span className="text-slate-500">Subcategorías asignadas: <strong className="text-slate-700 dark:text-slate-200">{formatCurrency(subTotal, currency)}</strong></span>
+                              {value > 0 && <span className={remaining < 0 ? 'text-red-600 font-bold' : 'text-emerald-600 font-bold'}>{remaining >= 0 ? `Sin distribuir: ${formatCurrency(remaining, currency)}` : `Exceso: ${formatCurrency(Math.abs(remaining), currency)}`}</span>}
+                              {real > 0 && <span className="text-slate-400">Gasto real: <strong>{formatCurrency(real, currency)}</strong></span>}
+                            </div>
+                            {hasError && <p className="text-[10px] text-red-600 font-bold mt-2">La suma de las subcategorías no puede superar el límite de esta categoría.</p>}
+                            {value > 0 && remaining > 0 && subs.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => distributeRemaining(cat)}
+                                className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-purple-200 dark:border-purple-900/60 bg-purple-50/70 dark:bg-purple-950/30 px-3 py-2 text-[10px] font-black text-[#7928CA] hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
+                              >
+                                <Sparkles className="w-3.5 h-3.5" />
+                                Distribuir saldo restante ({formatCurrency(remaining, currency)})
+                              </button>
+                            )}
+                          </div>
+                          {expanded && subs.length > 0 && (
+                            <div className="border-t border-slate-100 dark:border-purple-900/30 bg-slate-50/70 dark:bg-[#190731] p-3 sm:p-4">
+                              {recentManualEdit?.cat === cat && recentManualEdit.sub && remaining > 0 && (
+                                <div className="mb-3 rounded-xl border border-purple-200 dark:border-purple-900/50 bg-white dark:bg-[#16072b] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                  <div>
+                                    <p className="text-[10px] font-black text-[#2E0854] dark:text-purple-100">Ajustaste una subcategoría</p>
+                                    <p className="text-[9px] text-slate-500 mt-0.5">¿Querés distribuir automáticamente el saldo restante entre las demás?</p>
+                                  </div>
+                                  <button type="button" onClick={() => distributeRemaining(cat, recentManualEdit.sub)} className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#7928CA] to-[#A855F7] px-3 py-2 text-[10px] font-black text-white shadow-sm">
+                                    <Sparkles className="w-3.5 h-3.5" /> Distribuir saldo
+                                  </button>
+                                </div>
+                              )}
+                              <div className="flex items-center justify-between mb-3 gap-3"><div><p className="text-[10px] uppercase tracking-wider font-black text-slate-400">Límites por subcategoría</p><p className="text-[9px] text-slate-400 mt-0.5">Podés editar cada valor después de distribuirlo.</p></div><span className="text-[10px] font-black text-[#7928CA] whitespace-nowrap">{formatCurrency(subTotal, currency)} asignado</span></div>
+                              <div className="grid sm:grid-cols-2 gap-2">
+                                {subs.map((sub) => {
+                                  const subValue = subcategories[sub] || 0;
+                                  return <label key={sub} className="rounded-xl border border-slate-200 dark:border-purple-900/40 bg-white dark:bg-[#16072b] p-3"><div className="flex items-center justify-between gap-2 mb-2"><span className="text-[11px] font-semibold leading-tight">{sub}</span>{subValue > 0 && <span className="text-[9px] font-black text-emerald-600">{formatCurrency(subValue, currency)}</span>}</div><div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">$</span><input type="number" min="0" step="500" value={subValue || ''} onChange={(e) => handleSubcategoryChange(cat, sub, e.target.value)} placeholder="Sin límite" className="w-full rounded-lg border border-slate-200 dark:border-purple-900 bg-slate-50 dark:bg-[#1a0734] pl-7 pr-2 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-purple-500/20" /></div></label>;
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                   </div>
-                  <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 p-4 flex items-start gap-3"><Lightbulb className="w-5 h-5 text-emerald-600 shrink-0" /><div><p className="text-xs font-black text-emerald-900 dark:text-emerald-200">No hace falta completar todo</p><p className="text-[11px] text-emerald-800/80 dark:text-emerald-300/80 mt-1">Podés agregar o ajustar límites después desde la sección Presupuesto.</p></div></div>
+                  <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 p-4 flex items-start gap-3"><Lightbulb className="w-5 h-5 text-emerald-600 shrink-0" /><div><p className="text-xs font-black text-emerald-900 dark:text-emerald-200">No hace falta completar todo</p><p className="text-[11px] text-emerald-800/80 dark:text-emerald-300/80 mt-1">Podés definir solo algunas subcategorías. Si querés ahorrar tiempo, usá <strong>Distribuir automáticamente</strong>: GastoAR toma tu historial real como referencia y luego podés ajustar cualquier valor.</p></div></div>
                 </div>
               )}
 
@@ -235,7 +428,11 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
                   <div className="rounded-3xl border border-slate-200 dark:border-purple-900/50 overflow-hidden">
                     <div className="px-4 py-3 bg-slate-50 dark:bg-[#190731] flex items-center justify-between"><span className="text-xs font-black">{name}</span><span className="text-[10px] text-slate-500">{startDate} → {endDate}</span></div>
                     <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-purple-900/30">
-                      {categoryList.filter(cat => (categories[cat] || 0) > 0).map(cat => <div key={cat} className="px-4 py-3 flex items-center justify-between"><span className="text-xs font-semibold">{cat}</span><strong className="text-xs">{formatCurrency(categories[cat], currency)}</strong></div>)}
+                      {categoryList.filter(cat => (categories[cat] || 0) > 0).map(cat => {
+                        const subTotal = getSubcategoryTotal(cat);
+                        const assignedSubs = (categoryMap[cat] || []).filter(sub => Number(subcategories[sub] || 0) > 0);
+                        return <div key={cat} className="px-4 py-3"><div className="flex items-center justify-between"><span className="text-xs font-semibold">{cat}</span><strong className="text-xs">{formatCurrency(categories[cat], currency)}</strong></div>{assignedSubs.length > 0 && <div className="mt-2 pl-3 border-l-2 border-purple-100 dark:border-purple-900/50 space-y-1">{assignedSubs.map(sub => <div key={sub} className="flex items-center justify-between gap-3 text-[10px] text-slate-500"><span>{sub}</span><span className="font-bold">{formatCurrency(subcategories[sub], currency)}</span></div>)}<div className="flex justify-between text-[10px] font-black text-[#7928CA] pt-1"><span>Asignado a subcategorías</span><span>{formatCurrency(subTotal, currency)}</span></div></div>}</div>;
+                      })}
                     </div>
                   </div>
                   <div className="rounded-2xl border border-purple-100 dark:border-purple-900/50 p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black">Umbral de alerta preventiva</p><p className="text-[10px] text-slate-500 mt-1">Avisar cuando una categoría alcance este porcentaje.</p></div><strong className="text-sm text-[#7928CA]">{alertThreshold}%</strong></div><div className="flex gap-2 mt-3 flex-wrap">{[70,75,80,85,90].map(p => <button key={p} type="button" onClick={() => setAlertThreshold(p)} className={`px-3 py-1.5 rounded-xl text-xs font-black border ${alertThreshold === p ? 'bg-[#7928CA] text-white border-[#7928CA]' : 'bg-white dark:bg-[#16072b] border-slate-200 dark:border-purple-900/60 text-slate-600 dark:text-slate-300'}`}>{p}%</button>)}</div></div>

@@ -118,7 +118,7 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="budget-responsive space-y-5 pb-24 sm:pb-5">
       <section className="rounded-[28px] border border-purple-100 bg-white shadow-[0_8px_30px_-12px_rgba(121,40,202,0.15)] overflow-hidden dark:bg-[#140728] dark:border-purple-900/40">
         <div className="p-4 sm:p-6 bg-gradient-to-br from-[#2E0854] via-[#45108A] to-[#6F2EC5] text-white">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
