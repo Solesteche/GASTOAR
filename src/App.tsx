@@ -117,7 +117,9 @@ import {
   registerWithEmailFirebase,
   loginWithEmailFirebase,
   getAppStateFromFirestore,
-  syncAppStateToFirestore
+  syncAppStateToFirestore,
+  listenToAppState,
+  listenToMonthMovements
 } from './lib/firebase';
 import { 
   BillingCycle,
@@ -163,7 +165,9 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('control_gastos_is_authenticated') === 'true';
   });
-  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(() => {
+    return !localStorage.getItem('control_gastos_is_authenticated');
+  });
 
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
     return localStorage.getItem('control_gastos_is_admin') === 'true';
@@ -520,10 +524,11 @@ export default function App() {
 
   // Active user ID for Firebase Firestore partitioning
   const activeUserId = useMemo(() => {
+    if (auth.currentUser?.uid) return auth.currentUser.uid;
     if (currentUserAccount?.id) return currentUserAccount.id.replace(/[^a-zA-Z0-9_-]/g, '_');
     if (currentUserAccount?.email) return currentUserAccount.email.replace(/[^a-zA-Z0-9_-]/g, '_');
     return 'usuario_principal';
-  }, [currentUserAccount]);
+  }, [currentUserAccount, auth.currentUser?.uid]);
 
   const handleMergeTransactions = (newTxs: Transaction[]) => {
     setTransactions(prev => {
@@ -536,90 +541,96 @@ export default function App() {
 
   // Cloud Sync State (for multi-device real-time consistency)
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('synced');
-  const isInitialCloudLoadDone = React.useRef<boolean>(false);
+  const isRemoteUpdate = useRef<boolean>(false);
+  const isInitialCloudLoadDone = useRef<boolean>(true);
 
-  // Load from Cloud on App start / session restore
-  // OPTIMIZACIÓN DE LECTURAS: Solo se descarga el mes actual (ej: septiembre)
+  // Sincronización en tiempo real con Firebase Firestore (onSnapshot)
+  // Cross-device: PC <-> Celular
+  // Elimina la secuencia bloqueante (mes actual + presupuesto + estado completo) del arranque.
   useEffect(() => {
-    if (!isAuthenticated || !currentUserAccount?.email || isDemoMode) return;
+    if (!isAuthenticated || !currentUserAccount?.email || isDemoMode || !activeUserId) return;
 
-    const loadCloudData = async () => {
-      try {
-        setCloudSyncStatus('syncing');
+    setCloudSyncStatus('syncing');
 
-        // 1. Firebase Firestore: Descarga optimizada únicamente del mes actual
-        if (activeUserId) {
-          try {
-            const currentMonthKey = getMesKeyFromDate('');
-            const firestoreMonthTxs = await getMonthMovementsFromFirestore(activeUserId, currentMonthKey);
-            if (firestoreMonthTxs && firestoreMonthTxs.length > 0) {
-              setTransactions(prev => {
-                const map = new Map<string, Transaction>();
-                prev.forEach(t => map.set(t.id, t));
-                firestoreMonthTxs.forEach(t => map.set(t.id, t));
-                return Array.from(map.values());
-              });
-            }
+    // 1. Listener en tiempo real de Movimientos del mes actual (PC <-> Celular)
+    const currentMonthKey = getMesKeyFromDate('');
+    const unsubscribeMovements = listenToMonthMovements(
+      activeUserId,
+      currentMonthKey,
+      (remoteMonthTxs) => {
+        isRemoteUpdate.current = true;
+        setTransactions(prev => {
+          const map = new Map<string, Transaction>();
+          // Conservar movimientos de otros meses ya cargados en memoria
+          prev.forEach(t => map.set(t.id, t));
+          // Sincronizar reactivamente los movimientos del mes actual
+          remoteMonthTxs.forEach(t => map.set(t.id, t));
+          const merged = Array.from(map.values());
+          merged.sort((a, b) => {
+            const dateDiff = (b.fecha || '').localeCompare(a.fecha || '');
+            if (dateDiff !== 0) return dateDiff;
+            return (b.createdAt || 0) - (a.createdAt || 0);
+          });
+          return merged;
+        });
+        setCloudSyncStatus('synced');
+      },
+      () => setCloudSyncStatus('offline')
+    );
 
-            const firestoreBudgets = await getBudgetsFromFirestore(activeUserId);
-            if (firestoreBudgets) {
-              setBudgets(firestoreBudgets);
-            }
-          } catch (fbErr) {
-            console.warn('Firebase initial month load check:', fbErr);
-          }
+    // 2. Listener en tiempo real del Estado General de la aplicación (PC <-> Celular)
+    const unsubscribeAppState = listenToAppState(
+      activeUserId,
+      (data) => {
+        isRemoteUpdate.current = true;
+        if (Array.isArray(data.transactions) && data.transactions.length > 0) {
+          setTransactions(prev => {
+            const map = new Map<string, Transaction>();
+            (data.transactions as Transaction[]).forEach(t => map.set(t.id, t));
+            prev.forEach(t => map.set(t.id, t));
+            return Array.from(map.values());
+          });
         }
-
-        const data: any = await getAppStateFromFirestore(activeUserId);
-        if (data) {
-            if (Array.isArray(data.transactions) && data.transactions.length > 0) {
-              setTransactions(prev => {
-                const map = new Map<string, Transaction>();
-                (data.transactions as Transaction[]).forEach(t => map.set(t.id, t));
-                prev.forEach(t => map.set(t.id, t));
-                return Array.from(map.values());
-              });
-            }
-            if (data.categoryMap && Object.keys(data.categoryMap).length > 0) {
-              setCategoryMap(data.categoryMap);
-            }
-            if (data.categoryColors) {
-              setCategoryColors(data.categoryColors);
-            }
-            if (data.budgets) {
-              setBudgets(data.budgets);
-            }
-            if (data.profile) {
-              setProfile(data.profile);
-            }
-            if (Array.isArray(data.settlementHistory)) {
-              setSettlementHistory(data.settlementHistory);
-            }
-            if (Array.isArray(data.goals)) {
-              setGoals(data.goals);
-            }
-            if (Array.isArray(data.subscriptions) && data.subscriptions.length > 0) {
-              setSubscriptions(data.subscriptions);
-            }
-            setCloudSyncStatus('synced');
-        } else {
-          setCloudSyncStatus('synced');
+        if (data.categoryMap && Object.keys(data.categoryMap as object).length > 0) {
+          setCategoryMap(data.categoryMap as Record<string, string[]>);
         }
-      } catch (err) {
-        console.warn('Could not sync cloud data on load:', err);
-        setCloudSyncStatus('offline');
-      } finally {
-        isInitialCloudLoadDone.current = true;
-      }
+        if (data.categoryColors) {
+          setCategoryColors(data.categoryColors as Record<string, string>);
+        }
+        if (data.budgets) {
+          setBudgets(data.budgets as Budgets);
+        }
+        if (data.profile) {
+          setProfile(data.profile as CoupleProfile);
+        }
+        if (Array.isArray(data.settlementHistory)) {
+          setSettlementHistory(data.settlementHistory as SettlementRecord[]);
+        }
+        if (Array.isArray(data.goals)) {
+          setGoals(data.goals as Goal[]);
+        }
+        if (Array.isArray(data.subscriptions) && (data.subscriptions as unknown[]).length > 0) {
+          setSubscriptions(data.subscriptions as UserSubscription[]);
+        }
+        setCloudSyncStatus('synced');
+      },
+      () => setCloudSyncStatus('offline')
+    );
+
+    return () => {
+      unsubscribeMovements();
+      unsubscribeAppState();
     };
+  }, [isAuthenticated, currentUserAccount?.email, activeUserId, isDemoMode]);
 
-    loadCloudData();
-  }, [isAuthenticated, currentUserAccount?.email]);
-
-  // Debounced auto-sync to Cloud whenever state changes
+  // Auto-sincronización con Firestore cuando el usuario modifica datos localmente (evita loops por updates remotos)
   useEffect(() => {
-    if (!isAuthenticated || !currentUserAccount?.email || isDemoMode) return;
-    if (!isInitialCloudLoadDone.current) return;
+    if (!isAuthenticated || !currentUserAccount?.email || isDemoMode || !activeUserId) return;
+
+    if (isRemoteUpdate.current) {
+      isRemoteUpdate.current = false;
+      return;
+    }
 
     const timer = setTimeout(async () => {
       try {
@@ -646,8 +657,7 @@ export default function App() {
     subscriptions,
     isAuthenticated,
     currentUserAccount?.email,
-    currentUserAccount?.accountCode,
-    profile.accountCode,
+    activeUserId,
     isDemoMode,
   ]);
 
@@ -855,6 +865,20 @@ export default function App() {
       saveMovementToFirestore(activeUserId, savedTx).catch(err => {
         console.warn('Could not sync movement to Firebase Firestore:', err);
       });
+      // Sincronización inmediata de estado para reflejo instantáneo en otros dispositivos (PC <-> Celular)
+      const updatedTxs = [savedTx, ...transactions.filter(t => t.id !== savedTx.id)];
+      syncAppStateToFirestore(activeUserId, {
+        transactions: updatedTxs,
+        categoryMap,
+        categoryColors,
+        budgets,
+        profile,
+        settlementHistory,
+        goals,
+        subscriptions,
+      }).catch(err => {
+        console.warn('Could not sync app state on save:', err);
+      });
     }
 
     setIsTxModalOpen(false);
@@ -874,6 +898,19 @@ export default function App() {
     if (toDelete && activeUserId && !isDemoMode) {
       deleteMovementFromFirestore(activeUserId, id, toDelete.fecha).catch(err => {
         console.warn('Could not delete movement from Firebase Firestore:', err);
+      });
+      const remainingTxs = transactions.filter(t => t.id !== id);
+      syncAppStateToFirestore(activeUserId, {
+        transactions: remainingTxs,
+        categoryMap,
+        categoryColors,
+        budgets,
+        profile,
+        settlementHistory,
+        goals,
+        subscriptions,
+      }).catch(err => {
+        console.warn('Could not sync app state on delete:', err);
       });
     }
     setTransactions(prev => prev.filter(t => t.id !== id));

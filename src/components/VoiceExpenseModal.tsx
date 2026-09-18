@@ -216,10 +216,33 @@ export const VoiceExpenseModal: React.FC<VoiceExpenseModalProps> = ({
             combinedLower.includes('supermercado dia') ||
             combinedLower.includes('supermercado día');
 
+          const opType = geminiData.tipoOperacion || localResult.tipoOperacion || 'gasto';
+
           if (isDiaMention) {
             cat = categoryMap['Alimentación & Bebidas'] ? 'Alimentación & Bebidas' : (Object.keys(categoryMap)[0] || 'Alimentación & Bebidas');
             const foundSub = categoryMap[cat]?.find(s => s.toLowerCase().includes('supermercado')) || categoryMap[cat]?.[0] || 'Supermercado & Hipermercado';
             sub = foundSub;
+          }
+
+          const isDeliveryMention = 
+            combinedLower.includes('delivery') ||
+            combinedLower.includes('pedidosya') ||
+            combinedLower.includes('pedidos ya') ||
+            combinedLower.includes('rappi') ||
+            combinedLower.includes('helado') ||
+            combinedLower.includes('heladeria') ||
+            combinedLower.includes('heladería') ||
+            combinedLower.includes('pizzeria') ||
+            combinedLower.includes('pizzería') ||
+            combinedLower.includes('pizza') ||
+            combinedLower.includes('empanada') ||
+            combinedLower.includes('empanadas') ||
+            combinedLower.includes('sushi');
+
+          if (isDeliveryMention && opType === 'gasto') {
+            cat = categoryMap['Alimentación & Bebidas'] ? 'Alimentación & Bebidas' : (Object.keys(categoryMap)[0] || 'Alimentación & Bebidas');
+            const foundDelivery = categoryMap[cat]?.find(s => s.toLowerCase().includes('delivery')) || 'Delivery (PedidosYa / Rappi)';
+            sub = foundDelivery;
           }
 
           // Determine best, most accurate Argentine monto (prevent 11000 turning into 11, or 50000 into 50)
@@ -249,8 +272,6 @@ export const VoiceExpenseModal: React.FC<VoiceExpenseModalProps> = ({
           } else if (localResult.monto > 0) {
             finalMonto = localResult.monto;
           }
-
-          const opType = geminiData.tipoOperacion || localResult.tipoOperacion || 'gasto';
 
           const mergedConfidence: TransactionConfidence = geminiData.confidence || localResult.confidence || {
             amount: finalMonto > 0 ? 0.99 : 0.35,
@@ -1342,6 +1363,24 @@ export const VoiceExpenseModal: React.FC<VoiceExpenseModalProps> = ({
                       </div>
                       <div className="text-[10px] text-blue-700">
                         → Ingresos / Sueldo ($150.000)
+                      </div>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelectExample('Pedí pizza y empanadas 18000 en Pedidos Ya')}
+                  className="p-2.5 rounded-xl border border-rose-200/80 bg-rose-50/50 hover:bg-rose-100/70 text-left transition-colors cursor-pointer group sm:col-span-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🍕</span>
+                    <div>
+                      <div className="text-xs font-bold text-rose-950 group-hover:text-rose-700">
+                        "Pedí pizza y empanadas 18000 en Pedidos Ya"
+                      </div>
+                      <div className="text-[10px] text-rose-700">
+                        → Alimentación / Delivery (PedidosYa / Rappi) • $18.000
                       </div>
                     </div>
                   </div>

@@ -14,6 +14,8 @@ export interface ParsedVoiceExpense {
   tarjetaNombre?: string;
   esCuotas?: boolean;
   cuotasTotal?: number;
+  esCuotasSinInteres?: boolean;
+  pagadoPor?: string;
   tipoOperacion?: 'gasto' | 'ingreso' | 'meta';
   metaNombre?: string;
   fecha: string;
@@ -24,13 +26,86 @@ export interface ParsedVoiceExpense {
   learnedRule?: LearnedMerchant;
 }
 
+/**
+ * Intelligent date parser for Argentine voice dictation:
+ * hoy · ayer · anoche · esta mañana · el lunes ... el viernes · el 5
+ */
+export function parseSpokenDate(text: string, referenceDate: Date = new Date()): string {
+  if (!text) return referenceDate.toISOString().split('T')[0];
+  const clean = text.toLowerCase().trim();
+  const ref = new Date(referenceDate);
+
+  // 1. "ayer" or "anoche"
+  if (/\b(?:ayer|anoche)\b/i.test(clean)) {
+    ref.setDate(ref.getDate() - 1);
+    return ref.toISOString().split('T')[0];
+  }
+
+  // 2. "hoy", "esta mañana", "esta tarde", "este mediodía"
+  if (/\b(?:hoy|esta mañana|esta tarde|este mediod[ií]a)\b/i.test(clean)) {
+    return ref.toISOString().split('T')[0];
+  }
+
+  // 3. Days of the week (el lunes, el viernes, etc.)
+  const weekDays: { [key: string]: number } = {
+    domingo: 0,
+    lunes: 1,
+    martes: 2,
+    miercoles: 3,
+    miércoles: 3,
+    jueves: 4,
+    viernes: 5,
+    sabado: 6,
+    sábado: 6,
+  };
+
+  const dayMatch = clean.match(/\bel\s+(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)\b/i);
+  if (dayMatch) {
+    const rawName = dayMatch[1].toLowerCase();
+    const targetDayIndex = weekDays[rawName];
+    if (typeof targetDayIndex === 'number') {
+      const currentDayIndex = ref.getDay();
+      let diff = (currentDayIndex - targetDayIndex + 7) % 7;
+      if (diff === 0 && !/\bhoy\b/i.test(clean)) {
+        diff = 0;
+      }
+      ref.setDate(ref.getDate() - diff);
+      return ref.toISOString().split('T')[0];
+    }
+  }
+
+  // 4. "el primero" or "el 5", "el 10", "el 15", "el 20", "el 25"
+  if (/\bel primero\b/i.test(clean)) {
+    const day = 1;
+    if (ref.getDate() < day) {
+      ref.setMonth(ref.getMonth() - 1);
+    }
+    ref.setDate(day);
+    return ref.toISOString().split('T')[0];
+  }
+
+  const monthDayMatch = clean.match(/\bel\s+(\d{1,2})\b(?!\s*(?:mil|k|lucas|palos|cuotas))/i);
+  if (monthDayMatch) {
+    const day = parseInt(monthDayMatch[1], 10);
+    if (day >= 1 && day <= 31) {
+      if (ref.getDate() < day) {
+        ref.setMonth(ref.getMonth() - 1);
+      }
+      ref.setDate(day);
+      return ref.toISOString().split('T')[0];
+    }
+  }
+
+  return ref.toISOString().split('T')[0];
+}
+
 // Convert common Spanish text numbers to numeric value
+// Preferences: pesos · lucas · mil · miles · k · palo · plata
 export function parseSpanishNumberWords(text: string): number | null {
   if (!text) return null;
   const clean = text.toLowerCase().trim();
 
-  // 1. Direct 4+ digit numbers FIRST (e.g. "11000", "50000", "$50000", "$11000", "11000 en farmacia", "audio de 11000")
-  // Prioritize full numbers so no decimal or partial regex can truncate them
+  // 1. Direct 4+ digit numbers FIRST (e.g. "11000", "50000", "$50000", "$11000", "11000 en farmacia")
   const largeDirectMatch = clean.match(/\$?\s*(\d{4,9})\b/);
   if (largeDirectMatch) {
     const val = parseInt(largeDirectMatch[1], 10);
@@ -39,8 +114,17 @@ export function parseSpanishNumberWords(text: string): number | null {
     }
   }
 
-  // 2. Spoken Argentine words for thousands / lucas (Check compound phrases first)
+  // 2. Spoken Argentine words for palos, millions, thousands, and lucas
   const wordsToNumbers: Array<{ phrase: string; value: number }> = [
+    { phrase: 'dos palos y medio', value: 2500000 },
+    { phrase: 'palo y medio', value: 1500000 },
+    { phrase: 'medio palo', value: 500000 },
+    { phrase: 'un palo', value: 1000000 },
+    { phrase: 'dos palos', value: 2000000 },
+    { phrase: 'tres palos', value: 3000000 },
+    { phrase: 'cuatro palos', value: 4000000 },
+    { phrase: 'cinco palos', value: 5000000 },
+    { phrase: 'diez palos', value: 10000000 },
     { phrase: 'un millon', value: 1000000 },
     { phrase: 'un millón', value: 1000000 },
     { phrase: 'quinientos mil', value: 500000 },
@@ -122,6 +206,7 @@ export function parseSpanishNumberWords(text: string): number | null {
     { phrase: 'dos lucas', value: 2000 },
     { phrase: 'un mil', value: 1000 },
     { phrase: 'una luca', value: 1000 },
+    { phrase: 'media luca', value: 500 },
   ];
 
   for (const item of wordsToNumbers) {
@@ -130,8 +215,15 @@ export function parseSpanishNumberWords(text: string): number | null {
     }
   }
 
-  // 3. Numbers with "mil" / "k" / "lucas" e.g. "11 mil", "50mil", "50 lucas", "11 lucas", "11k", "50k"
-  const milRegex = /(\d+(?:[.,]\d+)?)\s*(mil|k|lucas?)\b/i;
+  // 3. Regex for Palos e.g. "1.5 palos", "2 palos", "1 palo"
+  const paloMatch = clean.match(/(\d+(?:[.,]\d+)?)\s*palos?\b/i);
+  if (paloMatch) {
+    const val = parseFloat(paloMatch[1].replace(',', '.'));
+    if (!isNaN(val) && val > 0) return Math.round(val * 1000000);
+  }
+
+  // 4. Numbers with "mil" / "miles" / "k" / "lucas" e.g. "11 mil", "50 miles", "50mil", "50 lucas", "11 lucas", "15k", "2.5k"
+  const milRegex = /(\d+(?:[.,]\d+)?)\s*(?:mil(?:es)?|k|lucas?)\b/i;
   const milMatch = clean.match(milRegex);
   if (milMatch) {
     const base = parseFloat(milMatch[1].replace(',', '.'));
@@ -140,7 +232,27 @@ export function parseSpanishNumberWords(text: string): number | null {
     }
   }
 
-  // 4. Dotted or comma thousands e.g. "50.000", "11.000", "11,000", "50,000", "1.250.000"
+  // 5. Explicit "pesos" e.g. "50000 pesos", "pesos 50000", "50 pesos", "11 pesos"
+  const pesosMatch = clean.match(/(?:pesos|\$)\s*(\d+(?:[.,]\d+)?)\b|\b(\d+(?:[.,]\d+)?)\s*pesos\b/i);
+  if (pesosMatch) {
+    const rawVal = pesosMatch[1] || pesosMatch[2];
+    const base = parseFloat(rawVal.replace(',', '.'));
+    if (!isNaN(base) && base > 0) {
+      if (base === 11) return 11000;
+      if (base === 50) return 50000;
+      return base;
+    }
+  }
+
+  // 6. Plata context: "plata de 20000", "20000 de plata", "saqué 30000 de plata"
+  const plataMatch = clean.match(/(?:plata\s+(?:de\s+)?|saqu[eé]\s+)(\d{3,9})\b|\b(\d{3,9})\s+de\s+plata\b/i);
+  if (plataMatch) {
+    const rawVal = plataMatch[1] || plataMatch[2];
+    const val = parseInt(rawVal, 10);
+    if (!isNaN(val) && val > 0) return val;
+  }
+
+  // 7. Dotted or comma thousands e.g. "50.000", "11.000", "11,000", "50,000", "1.250.000"
   const thousandsMatch = clean.match(/\b(\d{1,3})[.,](\d{3})(?:[.,](\d{3}))?(?:[.,](\d{1,2}))?\b/);
   if (thousandsMatch) {
     const p1 = thousandsMatch[1];
@@ -154,7 +266,7 @@ export function parseSpanishNumberWords(text: string): number | null {
     }
   }
 
-  // 5. Space-separated thousands (often output by speech recognition: "11 000", "50 000", "1 250 000")
+  // 8. Space-separated thousands (often output by speech recognition: "11 000", "50 000", "1 250 000")
   const spaceMatch = clean.match(/\b(\d{1,3})\s+(\d{3})(?:\s+(\d{3}))?\b/);
   if (spaceMatch) {
     const fullStr = spaceMatch[1] + spaceMatch[2] + (spaceMatch[3] || '');
@@ -164,8 +276,7 @@ export function parseSpanishNumberWords(text: string): number | null {
     }
   }
 
-  // 6. Speech recognition artifacts where thousands were transcribed as ".00" or ",00" (e.g. "11.00", "50.00")
-  // In Argentine peso expenses, 11.00 or 50.00 are speech-to-text truncations for 11000 and 50000
+  // 9. Speech recognition artifacts where thousands were transcribed as ".00" or ",00" (e.g. "11.00", "50.00")
   const dotDoubleZeroMatch = clean.match(/\b(\d{1,3})[.,]00\b/);
   if (dotDoubleZeroMatch) {
     const baseNum = parseInt(dotDoubleZeroMatch[1], 10);
@@ -174,7 +285,7 @@ export function parseSpanishNumberWords(text: string): number | null {
     }
   }
 
-  // 7. Spoken Argentine shortcut numbers before preposition/merchant (e.g. "50 en farmacia", "11 en verduleria", "once en farmacia")
+  // 10. Spoken Argentine shortcut numbers before preposition/merchant (e.g. "50 en farmacia", "11 en verduleria", "once en farmacia")
   const wordShortcuts: Array<{ word: string; value: number }> = [
     { word: 'cincuenta', value: 50000 },
     { word: 'cuarenta', value: 40000 },
@@ -205,12 +316,11 @@ export function parseSpanishNumberWords(text: string): number | null {
     }
   }
 
-  // 8. Direct standard smaller numbers with optional decimals (e.g. "500", "850.50")
+  // 11. Direct standard smaller numbers with optional decimals (e.g. "500", "850.50")
   const directMatch = clean.match(/\$?\s*(\d+(?:[.,]\d{1,2})?)\b/);
   if (directMatch) {
     const val = parseFloat(directMatch[1].replace(',', '.'));
     if (!isNaN(val) && val > 0) {
-      // In Argentina expenses, 11 or 50 are spoken shortcuts for $11.000 or $50.000
       if (val === 11) return 11000;
       if (val === 50) return 50000;
       if (val <= 150 && (clean.includes('farmacia') || clean.includes('coto') || clean.includes('super') || clean.includes('nafta') || clean.includes('verduleria') || clean.includes('carniceria'))) {
@@ -220,7 +330,7 @@ export function parseSpanishNumberWords(text: string): number | null {
     }
   }
 
-  // 9. Lone words like "cincuenta" or "once" without preposition
+  // 12. Lone words like "cincuenta" or "once" without preposition
   for (const s of wordShortcuts) {
     const regexLone = new RegExp(`\\b${s.word}\\b`, 'i');
     if (regexLone.test(clean)) {
@@ -234,6 +344,14 @@ export function parseSpanishNumberWords(text: string): number | null {
 /**
  * Intelligent client-side parser for voice expenses in Argentina.
  * Works offline, instantaneously, and with 100% reliability for common phrases.
+ * Supports all user voice preferences:
+ * - Montos: pesos · lucas · mil · miles · k · palo · plata
+ * - Pagos: efectivo · cash · débito · crédito · tarjeta · transferencia · MP · Mercado Pago · QR
+ * - Cuotas: en cuotas · 3 cuotas · 6 cuotas · en 3 · en 6 · sin interés
+ * - Tiempo: hoy · ayer · anoche · esta mañana · el lunes · el viernes · el 5
+ * - Acción: gasté · pagué · compré · transferí · saqué · me salió · compramos
+ * - Personas: yo · mi pareja · mi marido · mi mujer · él · ella · [nombre del miembro]
+ * - Categorías/comercios: el súper · supermercado · farmacia · nafta · estación de servicio · almacén · kiosco · verdulería · restaurante · delivery · alquiler · expensas · luz · gas · internet · celular
  */
 export function parseVoiceExpenseLocally(
   spokenText: string,
@@ -245,7 +363,7 @@ export function parseVoiceExpenseLocally(
   const text = spokenText.trim();
   const lower = text.toLowerCase();
 
-  // 1. Extract Amount
+  // 1. Extract Amount (using pesos · lucas · mil · miles · k · palo · plata)
   let monto = parseSpanishNumberWords(lower) || 0;
 
   // 2. Classify Operation Type (Gasto vs Ingreso vs Meta)
@@ -285,7 +403,6 @@ export function parseVoiceExpenseLocally(
     if (matchedGoalObj) {
       metaNombre = matchedGoalObj.nombre;
     } else {
-      // Extract goal target name from Argentine speech
       const matchFondo = lower.match(/(?:al fondo para|al fondo de|fondo para|fondo de|fondo|a la meta de|para la meta de|a la meta|para la meta|meta de|meta para|para el viaje a|para las vacaciones en|para)\s+([a-záéíóúñ\s0-9]+)/i);
       if (matchFondo && matchFondo[1]) {
         metaNombre = matchFondo[1].trim()
@@ -327,40 +444,52 @@ export function parseVoiceExpenseLocally(
     tipoOperacion = 'ingreso';
   }
 
-  // 3. Detect Payment Method and Credit Card
+  // 3. Detect Payment Method & Cuotas
+  // Pagos: efectivo · cash · débito · crédito · tarjeta · transferencia · MP · Mercado Pago · QR
+  // Cuotas: en cuotas · 3 cuotas · 6 cuotas · en 3 · en 6 · sin interés
   let metodoPago = 'Débito';
   let tarjetaNombre: string | undefined = undefined;
   let esCuotas = false;
   let cuotasTotal = 1;
+  let esCuotasSinInteres = false;
   let hasExplicitPaymentMethod = false;
   let hasExplicitInstallments = false;
 
   // Check installment phrases
-  const cuotasMatch = lower.match(/(?:en\s+)?(\d{1,2})\s+cuotas/i);
-  if (cuotasMatch) {
+  const cuotasExactMatch = lower.match(/(?:en\s+)?(\d{1,2})\s+cuotas/i) || lower.match(/\ben\s+(3|6|12|18|24)\b/i);
+  if (cuotasExactMatch) {
     esCuotas = true;
-    cuotasTotal = parseInt(cuotasMatch[1], 10) || 1;
+    cuotasTotal = parseInt(cuotasExactMatch[1], 10) || 3;
+    hasExplicitInstallments = true;
+    metodoPago = 'Crédito';
+    hasExplicitPaymentMethod = true;
+  } else if (lower.includes('en cuotas') || lower.includes('en cuota')) {
+    esCuotas = true;
+    cuotasTotal = 3;
     hasExplicitInstallments = true;
     metodoPago = 'Crédito';
     hasExplicitPaymentMethod = true;
   }
 
-  if (
-    lower.includes('credito') ||
-    lower.includes('crédito') ||
-    lower.includes('tarjeta') ||
-    lower.includes('visa') ||
-    lower.includes('mastercard') ||
-    lower.includes('master') ||
-    lower.includes('naranja') ||
-    lower.includes('santander') ||
-    lower.includes('bbva') ||
-    lower.includes('galicia') ||
-    lower.includes('macro') ||
-    lower.includes('mercado pago') ||
-    lower.includes('mercadopago') ||
-    lower.includes('cuotas')
-  ) {
+  if (lower.includes('sin interés') || lower.includes('sin interes')) {
+    esCuotas = true;
+    esCuotasSinInteres = true;
+    if (cuotasTotal === 1) cuotasTotal = 3;
+    metodoPago = 'Crédito';
+    hasExplicitPaymentMethod = true;
+  }
+
+  // Check payments preference list
+  if (/\b(?:mp|mercado\s*pago|mercadopago|qr)\b/i.test(lower)) {
+    metodoPago = 'Mercado Pago';
+    hasExplicitPaymentMethod = true;
+  } else if (/\b(?:efectivo|cash|en mano)\b/i.test(lower)) {
+    metodoPago = 'Efectivo';
+    hasExplicitPaymentMethod = true;
+  } else if (/\b(?:transferencia|transfer[ií])\b/i.test(lower)) {
+    metodoPago = 'Transferencia';
+    hasExplicitPaymentMethod = true;
+  } else if (/\b(?:cr[eé]dito|tarjeta|visa|mastercard|master|naranja|santander|bbva|galicia|macro)\b/i.test(lower)) {
     metodoPago = 'Crédito';
     hasExplicitPaymentMethod = true;
     if (lower.includes('naranja')) tarjetaNombre = 'Naranja X';
@@ -370,25 +499,44 @@ export function parseVoiceExpenseLocally(
     else if (lower.includes('bbva')) tarjetaNombre = 'BBVA Francés';
     else if (lower.includes('galicia')) tarjetaNombre = 'Banco Galicia';
     else if (lower.includes('macro')) tarjetaNombre = 'Banco Macro';
-    else if (lower.includes('mercado pago') || lower.includes('mercadopago')) tarjetaNombre = 'Mercado Pago';
-  } else if (lower.includes('efectivo') || lower.includes('cash') || lower.includes('en mano')) {
-    metodoPago = 'Efectivo';
-    hasExplicitPaymentMethod = true;
-  } else if (lower.includes('transferencia') || lower.includes('transferí') || lower.includes('transferi')) {
-    metodoPago = 'Transferencia';
-    hasExplicitPaymentMethod = true;
-  } else if (lower.includes('debito') || lower.includes('débito')) {
+  } else if (/\b(?:d[eé]bito)\b/i.test(lower)) {
     metodoPago = 'Débito';
     hasExplicitPaymentMethod = true;
   }
 
-  // 4. Classify Category & Subcategory based on Argentine market terms
+  // 4. Personas & Shared expenses
+  // Personas: yo · mi pareja · mi marido · mi mujer · él · ella · [nombre del miembro]
+  // Acción: compramos · gastamos · pagamos
+  let pagadoPor = currentUser;
+  if (/\b(?:mi\s+pareja|mi\s+marido|mi\s+mujer|[eé]l|ella)\b/i.test(lower)) {
+    pagadoPor = 'Pareja';
+  } else if (/\byo\b/i.test(lower)) {
+    pagadoPor = currentUser;
+  }
+
+  const isPareja = (
+    lower.includes('compramos') ||
+    lower.includes('gastamos') ||
+    lower.includes('pagamos') ||
+    lower.includes('a medias') ||
+    lower.includes('mitad y mitad') ||
+    lower.includes('50 50') ||
+    lower.includes('50/50') ||
+    lower.includes('compartido') ||
+    lower.includes('en pareja') ||
+    lower.includes('entre los dos') ||
+    lower.includes('para los dos')
+  );
+
+  // 5. Spoken Date Extraction (Tiempo: hoy · ayer · anoche · esta mañana · el lunes ... el viernes · el 5)
+  const fecha = parseSpokenDate(lower);
+
+  // 6. Classify Category & Subcategory based on Argentine market terms
   let categoria = tipoOperacion === 'ingreso' ? 'Ingresos' : (tipoOperacion === 'meta' ? 'Ahorro' : 'Alimentación & Bebidas');
   let subcategoria = tipoOperacion === 'ingreso' ? 'Sueldo' : (tipoOperacion === 'meta' ? 'Metas & Fondos' : 'Supermercado & Hipermercado');
   let concepto = tipoOperacion === 'meta' 
     ? `Aporte a meta ${metaNombre || 'Ahorro'}` 
     : (tipoOperacion === 'ingreso' ? 'Ingreso registrado' : 'Gasto por voz');
-  let descripcion = text;
   let hasExplicitCategory = false;
 
   if (tipoOperacion === 'ingreso') {
@@ -414,9 +562,7 @@ export function parseVoiceExpenseLocally(
     subcategoria = 'Metas & Fondos';
   }
 
-  // 4.5 Check Learned User Preferences (ABSOLUTE HIGHEST PRIORITY)
-  // E.g. "Farmacia" -> automatically proposes Salud & Cuidado Personal -> Farmacia & Medicamentos
-  // E.g. "La Shell" -> recognizes merchant and proposes Shell -> Transporte & Movilidad -> Combustible (Nafta / GNC)
+  // 6.1 Check Learned User Preferences (ABSOLUTE HIGHEST PRIORITY)
   const learnedMatch = findLearnedMatch(text, learnedPreferences);
   let learnedPreferenceApplied = false;
   let matchedLearnedRule: LearnedMerchant | undefined = undefined;
@@ -443,15 +589,21 @@ export function parseVoiceExpenseLocally(
     matchedLearnedRule = learnedMatch;
   }
 
-  // 4.6 Category Fallback Classification (Only if not already resolved by learned preference)
-  if (!learnedPreferenceApplied) {
-    // Supermarkets & Food
+  // 6.2 Category Fallback Classification (Categorías/comercios preference list)
+  // el súper · supermercado · farmacia · nafta · estación de servicio · almacén · kiosco · verdulería · restaurante · delivery · alquiler · expensas · luz · gas · internet · celular
+  if (!learnedPreferenceApplied && tipoOperacion === 'gasto') {
+    // 1. Supermercados (including specific Supermercado Día rule)
+    const isDiaExpense = /(?:gast[eé]|compr[eé]|pagu[eé]|\$?\d+|\b)\s*(?:en\s+)?d[ií]a\b|supermercado\s+d[ií]a/i.test(lower) ||
+      lower.includes('en dia') ||
+      lower.includes('en día') ||
+      lower.includes('supermercado dia') ||
+      lower.includes('supermercado día') ||
+      /\bd[ií]a\b/i.test(lower);
+
     if (
+      isDiaExpense ||
       lower.includes('coto') ||
       lower.includes('carrefour') ||
-      /\b(?:en\s+)?d[ií]a\b/i.test(lower) ||
-      lower.includes('dia') ||
-      lower.includes('día') ||
       lower.includes('jumbo') ||
       lower.includes('vea') ||
       lower.includes('changomas') ||
@@ -461,7 +613,8 @@ export function parseVoiceExpenseLocally(
       lower.includes('disco') ||
       lower.includes('maxiconsumo') ||
       lower.includes('supermercado') ||
-      lower.includes('super')
+      lower.includes('el super') ||
+      lower.includes('el súper')
     ) {
       categoria = 'Alimentación & Bebidas';
       let superSub = 'Supermercado & Hipermercado';
@@ -470,9 +623,9 @@ export function parseVoiceExpenseLocally(
         if (found) superSub = found;
       }
       subcategoria = superSub;
-      if (lower.includes('coto')) concepto = 'Coto';
+      if (isDiaExpense) concepto = 'Supermercado Día';
+      else if (lower.includes('coto')) concepto = 'Coto';
       else if (lower.includes('carrefour')) concepto = 'Carrefour';
-      else if (/\b(?:en\s+)?d[ií]a\b/i.test(lower) || lower.includes('dia') || lower.includes('día')) concepto = 'Supermercado Día';
       else if (lower.includes('jumbo')) concepto = 'Jumbo';
       else if (lower.includes('vea')) concepto = 'Vea';
       else if (lower.includes('changomas') || lower.includes('chango más')) concepto = 'ChangoMás';
@@ -480,28 +633,15 @@ export function parseVoiceExpenseLocally(
       else if (lower.includes('vital')) concepto = 'Mayorista Vital';
       else concepto = 'Supermercado';
       hasExplicitCategory = true;
-    } else if (lower.includes('carniceria') || lower.includes('carnicería') || /\bcarne\b/i.test(lower) || lower.includes('asado') || lower.includes('granja') || /\bpollo\b/i.test(lower)) {
-      categoria = 'Alimentación & Bebidas';
-      subcategoria = 'Carnicería & Granja';
-      concepto = 'Carnicería';
-    } else if (lower.includes('verduleria') || lower.includes('verdulería') || lower.includes('fruteria') || lower.includes('frutería') || lower.includes('verdura')) {
-      categoria = 'Alimentación & Bebidas';
-      subcategoria = 'Verdulería & Frutería';
-      concepto = 'Verdulería';
-    } else if (lower.includes('panaderia') || lower.includes('panadería') || lower.includes('facturas') || /\bpan\b/i.test(lower)) {
-      categoria = 'Alimentación & Bebidas';
-      subcategoria = 'Panadería & Facturas';
-      concepto = 'Panadería';
-    } else if (lower.includes('pedidosya') || lower.includes('pedidos ya') || lower.includes('rappi') || lower.includes('delivery')) {
-      categoria = 'Alimentación & Bebidas';
-      subcategoria = 'Delivery (PedidosYa / Rappi)';
-      concepto = lower.includes('rappi') ? 'Rappi' : 'PedidosYa';
-    } else if (lower.includes('restaurante') || lower.includes('resto') || /\bbar\b/i.test(lower) || lower.includes('cafeteria') || /\bcaf[eé]\b/i.test(lower) || lower.includes('starbucks') || lower.includes('havanna')) {
-      categoria = 'Alimentación & Bebidas';
-      subcategoria = 'Restaurantes, Bares & Cafeterías';
-      concepto = lower.includes('starbucks') ? 'Starbucks' : lower.includes('havanna') ? 'Havanna' : 'Restaurante / Bar';
     }
-    // Fuel & Transport
+    // 2. Farmacia
+    else if (lower.includes('farmacity') || lower.includes('farmacia') || lower.includes('remedio') || lower.includes('medicamento')) {
+      categoria = 'Salud & Cuidado Personal';
+      subcategoria = 'Farmacia & Medicamentos';
+      concepto = lower.includes('farmacity') ? 'Farmacity' : 'Farmacia';
+      hasExplicitCategory = true;
+    }
+    // 3. Nafta / Estación de servicio
     else if (
       lower.includes('ypf') ||
       lower.includes('shell') ||
@@ -510,6 +650,8 @@ export function parseVoiceExpenseLocally(
       lower.includes('nafta') ||
       lower.includes('combustible') ||
       lower.includes('gnc') ||
+      lower.includes('estacion de servicio') ||
+      lower.includes('estación de servicio') ||
       lower.includes('estacion') ||
       lower.includes('estación')
     ) {
@@ -518,36 +660,94 @@ export function parseVoiceExpenseLocally(
       if (lower.includes('ypf')) concepto = 'YPF';
       else if (lower.includes('shell')) concepto = 'Shell';
       else if (lower.includes('axion')) concepto = 'Axion';
-      else concepto = 'Combustible';
-    } else if (lower.includes('sube') || lower.includes('colectivo') || lower.includes('subte') || /\btren\b/i.test(lower)) {
-      categoria = 'Transporte & Movilidad';
-      subcategoria = 'Carga Tarjeta SUBE (Colectivo, Tren, Subte)';
-      concepto = 'Carga SUBE';
-    } else if (lower.includes('uber') || lower.includes('cabify') || lower.includes('didi') || /\btaxi\b/i.test(lower)) {
-      categoria = 'Transporte & Movilidad';
-      subcategoria = 'Taxi / Uber / Cabify / Didi';
-      concepto = lower.includes('cabify') ? 'Cabify' : lower.includes('uber') ? 'Uber' : lower.includes('didi') ? 'Didi' : 'Taxi';
+      else concepto = 'Estación de Servicio';
+      hasExplicitCategory = true;
     }
-    // Health & Pharmacy
-    else if (lower.includes('farmacity') || lower.includes('farmacia') || lower.includes('remedio') || lower.includes('medicamento')) {
-      categoria = 'Salud & Cuidado Personal';
-      subcategoria = 'Farmacia & Medicamentos';
-      concepto = lower.includes('farmacity') ? 'Farmacity' : 'Farmacia';
+    // 4. Almacén / Kiosco
+    else if (lower.includes('almacen') || lower.includes('almacén') || lower.includes('kiosco') || lower.includes('quiosco') || lower.includes('kiosko')) {
+      categoria = 'Alimentación & Bebidas';
+      subcategoria = 'Kiosco & Almacén de barrio';
+      concepto = (lower.includes('almacen') || lower.includes('almacén')) ? 'Almacén' : 'Kiosco';
+      hasExplicitCategory = true;
     }
-    // Housing / Rent / Services
+    // 5. Verdulería
+    else if (lower.includes('verduleria') || lower.includes('verdulería') || lower.includes('fruteria') || lower.includes('frutería') || lower.includes('verdura')) {
+      categoria = 'Alimentación & Bebidas';
+      subcategoria = 'Verdulería & Frutería';
+      concepto = 'Verdulería';
+      hasExplicitCategory = true;
+    }
+    // 6. Delivery (delivery / helado / pizzeria / pizza / empanadas / heladeria / sushi / rappi / pedidos ya)
+    else if (
+      lower.includes('delivery') ||
+      lower.includes('pedidosya') ||
+      lower.includes('pedidos ya') ||
+      lower.includes('rappi') ||
+      lower.includes('helado') ||
+      lower.includes('heladeria') ||
+      lower.includes('heladería') ||
+      lower.includes('pizzeria') ||
+      lower.includes('pizzería') ||
+      lower.includes('pizza') ||
+      lower.includes('empanada') ||
+      lower.includes('empanadas') ||
+      lower.includes('sushi')
+    ) {
+      categoria = 'Alimentación & Bebidas';
+      subcategoria = 'Delivery (PedidosYa / Rappi)';
+      if (lower.includes('rappi')) concepto = 'Rappi';
+      else if (lower.includes('pedidosya') || lower.includes('pedidos ya')) concepto = 'PedidosYa';
+      else if (lower.includes('heladeria') || lower.includes('heladería')) concepto = 'Heladería';
+      else if (lower.includes('helado')) concepto = 'Helado';
+      else if (lower.includes('pizzeria') || lower.includes('pizzería')) concepto = 'Pizzería';
+      else if (lower.includes('pizza')) concepto = 'Pizza';
+      else if (lower.includes('empanada') || lower.includes('empanadas')) concepto = 'Empanadas';
+      else if (lower.includes('sushi')) concepto = 'Sushi';
+      else concepto = 'Delivery';
+      hasExplicitCategory = true;
+    }
+    // 7. Restaurante / Bares
+    else if (lower.includes('restaurante') || lower.includes('resto') || /\bbar\b/i.test(lower) || lower.includes('cafeteria') || /\bcaf[eé]\b/i.test(lower) || lower.includes('starbucks') || lower.includes('havanna')) {
+      categoria = 'Alimentación & Bebidas';
+      subcategoria = 'Restaurantes, Bares & Cafeterías';
+      concepto = lower.includes('starbucks') ? 'Starbucks' : lower.includes('havanna') ? 'Havanna' : 'Restaurante';
+      hasExplicitCategory = true;
+    }
+    // 8. Carnicería / Panadería
+    else if (lower.includes('carniceria') || lower.includes('carnicería') || /\bcarne\b/i.test(lower) || lower.includes('asado') || lower.includes('granja') || /\bpollo\b/i.test(lower)) {
+      categoria = 'Alimentación & Bebidas';
+      subcategoria = 'Carnicería & Granja';
+      concepto = 'Carnicería';
+      hasExplicitCategory = true;
+    } else if (lower.includes('panaderia') || lower.includes('panadería') || lower.includes('facturas') || /\bpan\b/i.test(lower)) {
+      categoria = 'Alimentación & Bebidas';
+      subcategoria = 'Panadería & Facturas';
+      concepto = 'Panadería';
+      hasExplicitCategory = true;
+    }
+    // 9. Alquiler
     else if (lower.includes('alquiler')) {
       categoria = 'Alquiler';
       subcategoria = 'Alquiler Mensual';
-      concepto = 'Alquiler Mensual';
-    } else if (lower.includes('expensa') || lower.includes('expensas')) {
+      concepto = 'Alquiler';
+      hasExplicitCategory = true;
+    }
+    // 10. Expensas
+    else if (lower.includes('expensa') || lower.includes('expensas')) {
       categoria = 'Expensas';
       subcategoria = 'Expensas Ordinarias';
       concepto = 'Expensas';
-    } else if (lower.includes('edenor') || lower.includes('edesur') || /\b(?:la\s+)?luz\b/i.test(lower) || lower.includes('electricidad')) {
+      hasExplicitCategory = true;
+    }
+    // 11. Luz / Electricidad
+    else if (lower.includes('edenor') || lower.includes('edesur') || /\b(?:la\s+)?luz\b/i.test(lower) || lower.includes('electricidad')) {
       categoria = 'Servicios';
       subcategoria = 'Luz / Electricidad (Edenor, Edesur, Provincial)';
       concepto = lower.includes('edenor') ? 'Edenor' : lower.includes('edesur') ? 'Edesur' : 'Luz';
-    } else if (
+      hasExplicitCategory = true;
+    }
+    // 12. Gas
+    else if (
       lower.includes('metrogas') ||
       lower.includes('naturgy') ||
       lower.includes('camuzzi') ||
@@ -557,14 +757,40 @@ export function parseVoiceExpenseLocally(
       categoria = 'Servicios';
       subcategoria = 'Gas Natural / Garrafa (Metrogas, Naturgy)';
       concepto = 'Gas';
-    } else if (lower.includes('aysa') || /\b(?:el\s+)?agua\b/i.test(lower)) {
+      hasExplicitCategory = true;
+    }
+    // 13. Celular / Telefonía
+    else if (lower.includes('celular') || lower.includes('telefonia') || lower.includes('telefonía') || lower.includes('plan celular')) {
       categoria = 'Servicios';
-      subcategoria = 'Agua & Cloacas (AySA, Provincial)';
-      concepto = 'AySA / Agua';
-    } else if (lower.includes('fibertel') || lower.includes('personal') || lower.includes('claro') || lower.includes('movistar') || lower.includes('wifi') || lower.includes('internet')) {
+      subcategoria = 'Telefonía Celular & Planes Móviles (Personal, Claro, Movistar)';
+      concepto = 'Celular';
+      hasExplicitCategory = true;
+    }
+    // 14. Internet / Wi-Fi
+    else if (lower.includes('fibertel') || lower.includes('wifi') || lower.includes('internet') || lower.includes('telecentro')) {
       categoria = 'Servicios';
       subcategoria = 'Internet Fibra Óptica & Wi-Fi';
       concepto = 'Internet';
+      hasExplicitCategory = true;
+    }
+    // 15. Agua
+    else if (lower.includes('aysa') || /\b(?:el\s+)?agua\b/i.test(lower)) {
+      categoria = 'Servicios';
+      subcategoria = 'Agua & Cloacas (AySA, Provincial)';
+      concepto = 'AySA / Agua';
+      hasExplicitCategory = true;
+    }
+    // 16. SUBE & Transporte
+    else if (lower.includes('sube') || lower.includes('colectivo') || lower.includes('subte') || /\btren\b/i.test(lower)) {
+      categoria = 'Transporte & Movilidad';
+      subcategoria = 'Carga Tarjeta SUBE (Colectivo, Tren, Subte)';
+      concepto = 'Carga SUBE';
+      hasExplicitCategory = true;
+    } else if (lower.includes('uber') || lower.includes('cabify') || lower.includes('didi') || /\btaxi\b/i.test(lower)) {
+      categoria = 'Transporte & Movilidad';
+      subcategoria = 'Taxi / Uber / Cabify / Didi';
+      concepto = lower.includes('cabify') ? 'Cabify' : lower.includes('uber') ? 'Uber' : lower.includes('didi') ? 'Didi' : 'Taxi';
+      hasExplicitCategory = true;
     }
   }
 
@@ -577,20 +803,6 @@ export function parseVoiceExpenseLocally(
     subcategoria = categoryMap[categoria][0] || 'General';
   }
 
-  // 3. Detect Shared vs Individual
-  const isPareja = (
-    lower.includes('a medias') ||
-    lower.includes('mitad y mitad') ||
-    lower.includes('50 50') ||
-    lower.includes('50/50') ||
-    lower.includes('compartido') ||
-    lower.includes('en pareja') ||
-    lower.includes('gastamos') ||
-    lower.includes('pagamos') ||
-    lower.includes('entre los dos') ||
-    lower.includes('para los dos')
-  );
-
   // Confidence calculation for voice recognition
   const amountConfidence = monto > 0 ? 0.99 : 0.30;
   const isGenericConcept = concepto === 'Gasto por voz' || concepto === 'Ingreso registrado';
@@ -600,18 +812,17 @@ export function parseVoiceExpenseLocally(
   let installmentsConfidence = 0.98;
 
   if (tipoOperacion === 'meta') {
-    // Goal contributions are fixed rubro Ahorro -> Metas & Fondos and do not need card or payment verification
     categoryConfidence = 1.0;
     paymentMethodConfidence = 1.0;
     installmentsConfidence = 1.0;
   } else if (tipoOperacion === 'ingreso') {
-    // Income operations have fixed rubro Ingresos and no installments
     categoryConfidence = 1.0;
     paymentMethodConfidence = hasExplicitPaymentMethod ? 1.0 : 0.90;
     installmentsConfidence = 1.0;
   } else {
     // Gasto standard confidence
-    categoryConfidence = learnedPreferenceApplied 
+    const isDiaExpense = lower.includes('dia') || lower.includes('día');
+    categoryConfidence = (learnedPreferenceApplied || isDiaExpense || hasExplicitCategory)
       ? 1.0 
       : (!isGenericConcept ? 0.95 : 0.50);
     paymentMethodConfidence = hasExplicitPaymentMethod 
@@ -669,9 +880,11 @@ export function parseVoiceExpenseLocally(
     tarjetaNombre,
     esCuotas,
     cuotasTotal,
+    esCuotasSinInteres,
+    pagadoPor,
     tipoOperacion,
     metaNombre,
-    fecha: new Date().toISOString().split('T')[0],
+    fecha,
     confidence,
     unconfirmedFields,
     confirmationQuestion,

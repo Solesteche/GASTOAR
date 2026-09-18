@@ -172,10 +172,10 @@ export const BudgetAlertsSection: React.FC<BudgetAlertsSectionProps> = ({
           </div>
 
           {/* Explanatory helper */}
-          <div className="text-[11px] text-slate-600 bg-white/80 p-3 rounded-xl border border-slate-200/70 flex items-start gap-2">
-            <HelpCircle className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-            <span>
-              <strong>¿Cómo funciona el semáforo?</strong> Se mostrará 🟢 <strong>Verde</strong> si llevás gastado menos del {selectedThreshold}%, 🟡 <strong>Amarillo</strong> al alcanzar entre el {selectedThreshold}% y el 99%, y 🔴 <strong>Rojo</strong> si superás el 100% de tu presupuesto.
+          <div className="text-[10px] sm:text-[11px] leading-tight sm:leading-normal text-slate-600 bg-white/85 py-1.5 px-2.5 sm:p-3 rounded-lg sm:rounded-xl border border-slate-200/70 flex items-start gap-1.5 sm:gap-2 shadow-2xs">
+            <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-600 shrink-0 mt-0.5" />
+            <span className="leading-snug sm:leading-normal">
+              <strong className="text-slate-800 font-bold">¿Cómo funciona el sistema de alertas?</strong> Se mostrará 🟢 <strong>Verde</strong> si llevás gastado menos del {selectedThreshold}%, 🟡 <strong>Amarillo</strong> al alcanzar entre el {selectedThreshold}% y el 99%, y 🔴 <strong>Rojo</strong> si superás el 100% de tu presupuesto.
             </span>
           </div>
         </div>

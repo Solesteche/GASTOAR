@@ -203,8 +203,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           {/* 4. Vencimientos */}
           <button
             onClick={() => onSelectTab('card_alerts')}
-            className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer ${
-              activeTab === 'card_alerts' ? 'text-[#7928CA] font-black scale-105' : 'text-slate-400 hover:text-slate-700'
+            className={`flex flex-col items-center justify-center p-1.5 rounded-2xl transition-all cursor-pointer ${
+              activeTab === 'card_alerts' ? 'bg-[#F4EEFF] text-[#7C3AED] font-black px-3.5' : 'text-slate-400 hover:text-slate-700'
             }`}
             title="Vencimientos"
           >

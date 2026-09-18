@@ -643,8 +643,30 @@ ${existingGoals.map((g: any) => `- Meta: "${g.nombre || g}"`).join('\n')}\n`;
     const systemPrompt = `Eres un asistente inteligente de finanzas personales y de pareja en Argentina para la aplicación GastoAR.
 Tu función es interpretar gastos, ingresos y aportes a metas grabados por voz o audios de WhatsApp.
 ${learnedPrompt}${goalsPrompt}
+TAXONOMÍA Y PREFERENCIAS CLAVE DE VOZ EN ARGENTINA:
+- Montos: pesos · lucas · mil · miles · k · palo · plata (ej. "50 lucas", "11k", "2 palos", "50000 pesos", "saqué 20000 de plata")
+- Pagos: efectivo · cash · débito · crédito · tarjeta · transferencia · MP · Mercado Pago · QR
+- Cuotas: en cuotas · 3 cuotas · 6 cuotas · en 3 · en 6 · sin interés -> metodoPago: "Crédito", esCuotas: true, cuotasTotal: N (por defecto 3 si no se especifica)
+- Tiempo: hoy · ayer · anoche · esta mañana · el lunes · el viernes · el 5 -> calcular fecha correcta YYYY-MM-DD
+- Acción: gasté · pagué · compré · transferí · saqué · me salió · compramos (si dice "compramos" o "gastamos", tipoGasto: "pareja", division: "50_50")
+- Personas: yo · mi pareja · mi marido · mi mujer · él · ella · [nombre del miembro] -> asignar pagadoPor
+- Categorías/comercios:
+  * "el súper", "supermercado", "coto", "carrefour", "dia", "en dia", "día" -> Categoría: "Alimentación & Bebidas", Subcategoría: "Supermercado & Hipermercado"
+  * "farmacia", "farmacity" -> Categoría: "Salud & Cuidado Personal", Subcategoría: "Farmacia & Medicamentos"
+  * "nafta", "estación de servicio", "ypf", "shell", "axion" -> Categoría: "Transporte & Movilidad", Subcategoría: "Combustible (Nafta / GNC)"
+  * "almacén", "kiosco" -> Categoría: "Alimentación & Bebidas", Subcategoría: "Kiosco & Almacén de barrio"
+  * "verdulería", "frutería" -> Categoría: "Alimentación & Bebidas", Subcategoría: "Verdulería & Frutería"
+  * "restaurante", "bar", "café" -> Categoría: "Alimentación & Bebidas", Subcategoría: "Restaurantes, Bares & Cafeterías"
+  * "delivery", "pedidosya", "pedidos ya", "rappi", "helado", "heladeria", "heladería", "pizzeria", "pizzería", "pizza", "empanadas", "sushi" -> Categoría: "Alimentación & Bebidas", Subcategoría: "Delivery (PedidosYa / Rappi)"
+  * "alquiler" -> Categoría: "Alquiler", Subcategoría: "Alquiler Mensual"
+  * "expensas" -> Categoría: "Expensas", Subcategoría: "Expensas Ordinarias"
+  * "luz", "edenor", "edesur" -> Categoría: "Servicios", Subcategoría: "Luz / Electricidad (Edenor, Edesur, Provincial)"
+  * "gas", "metrogas", "naturgy" -> Categoría: "Servicios", Subcategoría: "Gas Natural / Garrafa (Metrogas, Naturgy)"
+  * "internet", "fibertel", "wifi" -> Categoría: "Servicios", Subcategoría: "Internet Fibra Óptica & Wi-Fi"
+  * "celular", "planes móviles", "personal", "claro", "movistar" -> Categoría: "Servicios", Subcategoría: "Telefonía Celular & Planes Móviles (Personal, Claro, Movistar)"
+
 Ejemplos de frases:
-- "gasté 50000 en dia" / "gaste 50000 en dia" / "50000 en dia" -> tipoOperacion: "gasto", monto: 50000, concepto: "Supermercado Día", categoria: "Alimentación & Bebidas", subcategoria: "Supermercado & Hipermercado"
+- "gasté 50000 en dia" / "gaste 50000 en dia" / "50000 en dia" -> tipoOperacion: "gasto", monto: 50000, concepto: "Supermercado Día", categoria: "Alimentación & Bebidas", subcategoria: "Supermercado & Hipermercado" (NUNCA asignar a Servicios!).
 - "gasté 50000 en coto" -> tipoOperacion: "gasto", monto: 50000, concepto: "Coto", categoria: "Alimentación & Bebidas", subcategoria: "Supermercado & Hipermercado"
 - "50000 en farmacia con la visa" -> tipoOperacion: "gasto", monto: 50000, metodoPago: "Crédito", tarjetaNombre: "Visa", categoria: "Salud & Cuidado Personal", subcategoria: "Farmacia & Medicamentos"
 - "50 en farmacia" -> tipoOperacion: "gasto", monto: 50000, concepto: "Farmacia", categoria: "Salud & Cuidado Personal", subcategoria: "Farmacia & Medicamentos"
@@ -667,16 +689,17 @@ REGLAS CRÍTICAS DE NÚMEROS Y MONTOS EN ARGENTINA:
 - Si el usuario menciona una tarjeta (Visa, Mastercard, Naranja, BBVA, Santander, etc.), metodoPago debe ser "Crédito" y tarjetaNombre debe ser el nombre de la tarjeta.
 
 REGLAS ESTRICTAS DE CLASIFICACIÓN PARA ARGENTINA:
-- Si menciona Día, Dia, "en dia", "en día", "supermercado dia" o cualquier compra en dia -> Concepto: "Supermercado Día", Categoría: "Alimentación & Bebidas", Subcategoría: "Supermercado & Hipermercado" (o subcategoría de supermercado).
+- Si menciona delivery, helado, pizzeria, pizzería, pizza, empanadas, heladeria, heladería, sushi, rappi, pedidos ya, pedidosya -> Categoría: "Alimentación & Bebidas", Subcategoría: "Delivery (PedidosYa / Rappi)".
+- Si menciona Día, Dia, "en dia", "en día", "supermercado dia" o cualquier compra en dia -> Concepto: "Supermercado Día", Categoría: "Alimentación & Bebidas", Subcategoría: "Supermercado & Hipermercado" (NUNCA Servicios!).
 - Si menciona Coto, Carrefour, ChangoMás, Jumbo, Vea, Makro, Vital, Maxiconsumo, Disco o "el super" -> Categoría: "Alimentación & Bebidas", Subcategoría: "Supermercado & Hipermercado".
-- Si menciona carnicería, granja, verdulería, panadería, kiosco -> Categoría: "Alimentación & Bebidas" con su respectiva subcategoría.
-- Si menciona YPF, Shell, Axion, Puma, combustible, nafta, GNC -> Categoría: "Transporte & Movilidad", Subcategoría: "Combustible (Nafta / GNC)".
+- Si menciona carnicería, granja, verdulería, panadería, kiosco, almacén -> Categoría: "Alimentación & Bebidas" con su respectiva subcategoría.
+- Si menciona YPF, Shell, Axion, Puma, combustible, nafta, GNC, estación de servicio -> Categoría: "Transporte & Movilidad", Subcategoría: "Combustible (Nafta / GNC)".
 - Si menciona SUBE, colectivo, subte, tren -> Categoría: "Transporte & Movilidad", Subcategoría: "Carga Tarjeta SUBE (Colectivo, Tren, Subte)".
 - Si menciona Uber, Cabify, Taxi, Didi -> Categoría: "Transporte & Movilidad", Subcategoría: "Taxi / Uber / Cabify / Didi".
 - Si menciona Farmacity, farmacia, remedios -> Categoría: "Salud & Cuidado Personal", Subcategoría: "Farmacia & Medicamentos".
 - Si menciona alquiler -> Categoría: "Alquiler", Subcategoría: "Alquiler Mensual".
 - Si menciona expensas -> Categoría: "Expensas", Subcategoría: "Expensas Ordinarias".
-- Si menciona luz, Edenor, Edesur, gas, Metrogas, agua, AySA, internet, Fibertel, Personal, Claro, Movistar -> Categoría: "Servicios".
+- Si menciona luz, Edenor, Edesur, gas, Metrogas, agua, AySA, internet, Fibertel, Personal, Claro, Movistar, celular -> Categoría: "Servicios".
 - Si menciona fondo para, al fondo, a la meta, aporte a meta, ahorro para, para mendoza, fondo mendoza -> tipoOperacion: "meta", categoria: "Ahorro", subcategoria: "Metas & Fondos".
 - Si menciona sueldo, cobro, ingreso, cobré, honorarios, aguinaldo -> tipoOperacion: "ingreso", categoria: "Ingresos".
 
@@ -1027,6 +1050,73 @@ Usuarios de la cuenta: ${JSON.stringify(userNames || ["Yo", "Mi Pareja"])}.`;
       subcategoria = "Carnicería & Granja";
       hasExplicitCat = true;
       concepto = "Carnicería";
+    } else if (tipoOperacion === 'gasto' && (lower.includes("kiosco") || lower.includes("quiosco") || lower.includes("almacen") || lower.includes("almacén"))) {
+      categoria = "Alimentación & Bebidas";
+      subcategoria = "Kiosco & Almacén de barrio";
+      hasExplicitCat = true;
+      concepto = lower.includes("almacen") || lower.includes("almacén") ? "Almacén" : "Kiosco";
+    } else if (tipoOperacion === 'gasto' && (
+      lower.includes("delivery") ||
+      lower.includes("pedidosya") ||
+      lower.includes("pedidos ya") ||
+      lower.includes("rappi") ||
+      lower.includes("helado") ||
+      lower.includes("heladeria") ||
+      lower.includes("heladería") ||
+      lower.includes("pizzeria") ||
+      lower.includes("pizzería") ||
+      lower.includes("pizza") ||
+      lower.includes("empanada") ||
+      lower.includes("empanadas") ||
+      lower.includes("sushi")
+    )) {
+      categoria = "Alimentación & Bebidas";
+      subcategoria = "Delivery (PedidosYa / Rappi)";
+      hasExplicitCat = true;
+      if (lower.includes("rappi")) concepto = "Rappi";
+      else if (lower.includes("pedidosya") || lower.includes("pedidos ya")) concepto = "PedidosYa";
+      else if (lower.includes("heladeria") || lower.includes("heladería")) concepto = "Heladería";
+      else if (lower.includes("helado")) concepto = "Helado";
+      else if (lower.includes("pizzeria") || lower.includes("pizzería")) concepto = "Pizzería";
+      else if (lower.includes("pizza")) concepto = "Pizza";
+      else if (lower.includes("empanada") || lower.includes("empanadas")) concepto = "Empanadas";
+      else if (lower.includes("sushi")) concepto = "Sushi";
+      else concepto = "Delivery";
+    } else if (tipoOperacion === 'gasto' && (lower.includes("restaurante") || lower.includes("resto") || lower.includes("bar") || lower.includes("cafeteria") || lower.includes("café"))) {
+      categoria = "Alimentación & Bebidas";
+      subcategoria = "Restaurantes, Bares & Cafeterías";
+      hasExplicitCat = true;
+      concepto = "Restaurante";
+    } else if (tipoOperacion === 'gasto' && lower.includes("alquiler")) {
+      categoria = "Alquiler";
+      subcategoria = "Alquiler Mensual";
+      hasExplicitCat = true;
+      concepto = "Alquiler";
+    } else if (tipoOperacion === 'gasto' && (lower.includes("expensa") || lower.includes("expensas"))) {
+      categoria = "Expensas";
+      subcategoria = "Expensas Ordinarias";
+      hasExplicitCat = true;
+      concepto = "Expensas";
+    } else if (tipoOperacion === 'gasto' && (lower.includes("edenor") || lower.includes("edesur") || lower.includes("luz") || lower.includes("electricidad"))) {
+      categoria = "Servicios";
+      subcategoria = "Luz / Electricidad (Edenor, Edesur, Provincial)";
+      hasExplicitCat = true;
+      concepto = "Luz";
+    } else if (tipoOperacion === 'gasto' && (lower.includes("gas") || lower.includes("metrogas") || lower.includes("naturgy"))) {
+      categoria = "Servicios";
+      subcategoria = "Gas Natural / Garrafa (Metrogas, Naturgy)";
+      hasExplicitCat = true;
+      concepto = "Gas";
+    } else if (tipoOperacion === 'gasto' && (lower.includes("celular") || lower.includes("telefonia") || lower.includes("telefonía"))) {
+      categoria = "Servicios";
+      subcategoria = "Telefonía Celular & Planes Móviles (Personal, Claro, Movistar)";
+      hasExplicitCat = true;
+      concepto = "Celular";
+    } else if (tipoOperacion === 'gasto' && (lower.includes("internet") || lower.includes("wifi") || lower.includes("fibertel"))) {
+      categoria = "Servicios";
+      subcategoria = "Internet Fibra Óptica & Wi-Fi";
+      hasExplicitCat = true;
+      concepto = "Internet";
     } else if (tipoOperacion === 'gasto' && (lower.includes("sube") || lower.includes("colectivo") || lower.includes("subte"))) {
       categoria = "Transporte & Movilidad";
       subcategoria = "Carga Tarjeta SUBE (Colectivo, Tren, Subte)";

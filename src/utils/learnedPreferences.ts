@@ -178,6 +178,292 @@ export const DEFAULT_LEARNED_MERCHANTS: LearnedMerchant[] = [
     frequency: 4,
     lastUsed: Date.now(),
     source: 'auto_learned'
+  },
+  {
+    id: 'el-super',
+    keyword: 'el super',
+    merchantName: 'Supermercado',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Supermercado & Hipermercado',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'supermercado',
+    keyword: 'supermercado',
+    merchantName: 'Supermercado',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Supermercado & Hipermercado',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'nafta',
+    keyword: 'nafta',
+    merchantName: 'Estación de Servicio',
+    categoria: 'Transporte & Movilidad',
+    subcategoria: 'Combustible (Nafta / GNC)',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'estacion-de-servicio',
+    keyword: 'estacion de servicio',
+    merchantName: 'Estación de Servicio',
+    categoria: 'Transporte & Movilidad',
+    subcategoria: 'Combustible (Nafta / GNC)',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'almacen',
+    keyword: 'almacen',
+    merchantName: 'Almacén',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Kiosco & Almacén de barrio',
+    defaultMetodoPago: 'Efectivo',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'kiosco',
+    keyword: 'kiosco',
+    merchantName: 'Kiosco',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Kiosco & Almacén de barrio',
+    defaultMetodoPago: 'Efectivo',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'verduleria',
+    keyword: 'verduleria',
+    merchantName: 'Verdulería',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Verdulería & Frutería',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'restaurante',
+    keyword: 'restaurante',
+    merchantName: 'Restaurante',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Restaurantes, Bares & Cafeterías',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'delivery',
+    keyword: 'delivery',
+    merchantName: 'Delivery',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Delivery (PedidosYa / Rappi)',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'rappi',
+    keyword: 'rappi',
+    merchantName: 'Rappi',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Delivery (PedidosYa / Rappi)',
+    defaultMetodoPago: 'Crédito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'pedidos-ya',
+    keyword: 'pedidos ya',
+    merchantName: 'PedidosYa',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Delivery (PedidosYa / Rappi)',
+    defaultMetodoPago: 'Crédito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'helado',
+    keyword: 'helado',
+    merchantName: 'Helado',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Delivery (PedidosYa / Rappi)',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'heladeria',
+    keyword: 'heladeria',
+    merchantName: 'Heladería',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Delivery (PedidosYa / Rappi)',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'heladeria-accent',
+    keyword: 'heladería',
+    merchantName: 'Heladería',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Delivery (PedidosYa / Rappi)',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'pizzeria',
+    keyword: 'pizzeria',
+    merchantName: 'Pizzería',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Delivery (PedidosYa / Rappi)',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'pizzeria-accent',
+    keyword: 'pizzería',
+    merchantName: 'Pizzería',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Delivery (PedidosYa / Rappi)',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'pizza',
+    keyword: 'pizza',
+    merchantName: 'Pizza',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Delivery (PedidosYa / Rappi)',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'empanadas',
+    keyword: 'empanadas',
+    merchantName: 'Empanadas',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Delivery (PedidosYa / Rappi)',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'empanada',
+    keyword: 'empanada',
+    merchantName: 'Empanadas',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Delivery (PedidosYa / Rappi)',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'sushi',
+    keyword: 'sushi',
+    merchantName: 'Sushi',
+    categoria: 'Alimentación & Bebidas',
+    subcategoria: 'Delivery (PedidosYa / Rappi)',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'alquiler',
+    keyword: 'alquiler',
+    merchantName: 'Alquiler',
+    categoria: 'Alquiler',
+    subcategoria: 'Alquiler Mensual',
+    defaultMetodoPago: 'Transferencia',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'expensas',
+    keyword: 'expensas',
+    merchantName: 'Expensas',
+    categoria: 'Expensas',
+    subcategoria: 'Expensas Ordinarias',
+    defaultMetodoPago: 'Transferencia',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'luz',
+    keyword: 'luz',
+    merchantName: 'Luz',
+    categoria: 'Servicios',
+    subcategoria: 'Luz / Electricidad (Edenor, Edesur, Provincial)',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'gas',
+    keyword: 'gas',
+    merchantName: 'Gas',
+    categoria: 'Servicios',
+    subcategoria: 'Gas Natural / Garrafa (Metrogas, Naturgy)',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'internet',
+    keyword: 'internet',
+    merchantName: 'Internet',
+    categoria: 'Servicios',
+    subcategoria: 'Internet Fibra Óptica & Wi-Fi',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
+  },
+  {
+    id: 'celular',
+    keyword: 'celular',
+    merchantName: 'Celular',
+    categoria: 'Servicios',
+    subcategoria: 'Telefonía Celular & Planes Móviles (Personal, Claro, Movistar)',
+    defaultMetodoPago: 'Débito',
+    frequency: 10,
+    lastUsed: Date.now(),
+    source: 'manual'
   }
 ];
 
@@ -264,6 +550,26 @@ export function getLearnedPreferences(): LearnedMerchant[] {
           source: 'manual'
         });
         needsSave = true;
+      }
+
+      // Ensure delivery subcategory keywords are explicitly enforced
+      const deliveryKeywords = ['delivery', 'helado', 'pizzeria', 'pizzería', 'pizza', 'empanadas', 'empanada', 'heladeria', 'heladería', 'sushi', 'rappi', 'pedidos ya', 'pedidosya'];
+      for (const kw of deliveryKeywords) {
+        const itemIdx = list.findIndex(p => p.keyword.toLowerCase().trim() === kw);
+        if (itemIdx >= 0) {
+          if (list[itemIdx].categoria !== 'Alimentación & Bebidas' || !list[itemIdx].subcategoria.toLowerCase().includes('delivery')) {
+            list[itemIdx].categoria = 'Alimentación & Bebidas';
+            list[itemIdx].subcategoria = 'Delivery (PedidosYa / Rappi)';
+            needsSave = true;
+          }
+        }
+      }
+
+      for (const def of DEFAULT_LEARNED_MERCHANTS) {
+        if (!list.some(p => p.keyword === def.keyword)) {
+          list.push(def);
+          needsSave = true;
+        }
       }
 
       if (needsSave) {

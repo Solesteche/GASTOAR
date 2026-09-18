@@ -1,6 +1,8 @@
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
+  setPersistence,
+  browserLocalPersistence,
   GoogleAuthProvider, 
   signInWithPopup, 
   signOut as firebaseSignOut,
@@ -32,7 +34,14 @@ import { Budgets, Transaction, UserAccount } from '../types';
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
+
+// Forzar la persistencia local en el navegador/dispositivo para acelerar y mantener el inicio de sesión
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error('Error al configurar la persistencia de autenticación:', error);
+});
+
 export const googleProvider = new GoogleAuthProvider();
+export { onAuthStateChanged, setPersistence, browserLocalPersistence };
 
 // 2. Error Handler with strict FirestoreErrorInfo JSON serialization
 export enum OperationType {
