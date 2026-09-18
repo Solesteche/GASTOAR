@@ -76,7 +76,7 @@ export const GastoArIcon: React.FC<{ size?: number | string; className?: string 
 /**
  * GastoAR Complete Brand Logo
  * Includes Icon + "GastoAR" (Crisp White in Dark Mode / Deep Plum #2E0854 in Light Mode)
- * + Tagline "Registrá. Controlá. Ahorrá." + Violet Accent Bar
+ * + Tagline "Registra, Controla, Ahorra" + Violet Accent Bar
  */
 export const GastoArBrand: React.FC<GastoArLogoProps> = ({
   size = 'md',
@@ -142,13 +142,13 @@ export const GastoArBrand: React.FC<GastoArLogoProps> = ({
           </span>
         </div>
 
-        {/* Slogan / Tagline: Registrá. Controlá. Ahorrá. */}
+        {/* Slogan / Tagline: Registra, Controla, Ahorra */}
         {showTagline && (
           <div className="flex flex-col items-start mt-0.5">
             <span className={`font-bold tracking-normal leading-tight ${config.taglineSize} ${
               isDarkCanvas ? 'text-purple-200' : 'text-slate-700 dark:text-slate-300'
             }`}>
-              Registrá. Controlá. Ahorrá.
+              Registra, Controla, Ahorra
             </span>
 
             {/* Violet to Orange Official Accent Line */}
@@ -184,7 +184,7 @@ export const GastoArHeroBrand: React.FC<{ className?: string }> = ({ className =
 
       {/* Slogan */}
       <p className="text-xs sm:text-sm font-bold text-purple-200 mt-2 tracking-wide">
-        Registrá. Controlá. Ahorrá.
+        Registra, Controla, Ahorra
       </p>
 
       {/* Official Gradient Accent Bar */}

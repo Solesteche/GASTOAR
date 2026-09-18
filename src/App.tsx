@@ -99,6 +99,19 @@ import {
   TrialExpiredBlockedScreen 
 } from './components/TrialExpiredBlockedScreen';
 import { 
+  MobileScreensViewerModal,
+  ScreenId
+} from './components/mobileScreens/MobileScreensViewerModal';
+import { 
+  ProfileScreen 
+} from './components/mobileScreens/ProfileScreen';
+import { 
+  SettingsScreen 
+} from './components/mobileScreens/SettingsScreen';
+import { 
+  MobileSubscriptionScreen 
+} from './components/mobileScreens/MobileSubscriptionScreen';
+import { 
   FirebaseCloudSyncModal 
 } from './components/FirebaseCloudSyncModal';
 import { 
@@ -408,7 +421,9 @@ export default function App() {
   });
 
   // UI States
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'installments' | 'card_alerts' | 'couple_balance' | 'budgets' | 'categories' | 'ai' | 'settlement' | 'goals' | 'subscriptions' | 'admin_subscriptions'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'installments' | 'card_alerts' | 'couple_balance' | 'budgets' | 'categories' | 'ai' | 'settlement' | 'goals' | 'subscriptions' | 'admin_subscriptions' | 'charts' | 'profile' | 'settings' | 'mobile_screens'>('dashboard');
+  const [isMobileScreensModalOpen, setIsMobileScreensModalOpen] = useState<boolean>(false);
+  const [mobileScreensInitialScreen, setMobileScreensInitialScreen] = useState<ScreenId>('home');
 
   // Sync route path with activeTab if user accesses specific route
   useEffect(() => {
@@ -423,6 +438,9 @@ export default function App() {
     else if (raw === 'subscriptions' || raw === 'suscripciones') setActiveTab('subscriptions');
     else if (raw === 'admin_subscriptions' || raw === 'admin') setActiveTab('admin_subscriptions');
     else if (raw === 'transactions' || raw === 'gastos') setActiveTab('transactions');
+    else if (raw === 'profile' || raw === 'perfil') setActiveTab('profile');
+    else if (raw === 'settings' || raw === 'configuracion' || raw === 'ajustes') setActiveTab('settings');
+    else if (raw === 'mobile_screens' || raw === 'pantallas') setIsMobileScreensModalOpen(true);
     else if (raw === 'dashboard') setActiveTab('dashboard');
   }, [location.pathname]);
   const [activeMode, setActiveMode] = useState<ExpenseMode>(() => {
@@ -1030,6 +1048,21 @@ export default function App() {
     showToast('Caja de meta eliminada', 'info');
   };
 
+  const handleExportData = () => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(transactions, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `gastoar_export_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('Datos exportados exitosamente en formato JSON', 'success');
+    } catch {
+      showToast('Error al exportar datos', 'error');
+    }
+  };
+
   const handleAddContribution = (goalId: string, contribution: Omit<GoalContribution, 'id'>) => {
     setGoals(prev => prev.map(g => {
       if (g.id !== goalId) return g;
@@ -1442,6 +1475,7 @@ export default function App() {
       localStorage.setItem('control_gastos_budgets_v5', JSON.stringify({ categories: {}, subcategories: {} }));
       localStorage.setItem('control_gastos_goals_v1', JSON.stringify([]));
       localStorage.setItem('control_gastos_settlements_v3', JSON.stringify([]));
+      localStorage.setItem('gastoar_vencimientos_alerts_v5', JSON.stringify([]));
       localStorage.setItem('gastoar_vencimientos_alerts_v4', JSON.stringify([]));
       localStorage.setItem('gastoar_vencimientos_alerts_v3', JSON.stringify([]));
       localStorage.setItem('gastoar_card_alerts_v2', JSON.stringify([]));
@@ -1531,6 +1565,7 @@ export default function App() {
       localStorage.setItem('control_gastos_budgets_v5', JSON.stringify({ categories: {}, subcategories: {} }));
       localStorage.setItem('control_gastos_goals_v1', JSON.stringify([]));
       localStorage.setItem('control_gastos_settlements_v3', JSON.stringify([]));
+      localStorage.setItem('gastoar_vencimientos_alerts_v5', JSON.stringify([]));
       localStorage.setItem('gastoar_vencimientos_alerts_v4', JSON.stringify([]));
       localStorage.setItem('gastoar_vencimientos_alerts_v3', JSON.stringify([]));
       localStorage.setItem('gastoar_card_alerts_v2', JSON.stringify([]));
@@ -1646,37 +1681,92 @@ export default function App() {
             isAuthenticated ? (
               <Navigate to={(location.state as any)?.from?.pathname || '/'} replace />
             ) : (
-              <AuthLandingPage
-                onLogin={async (email, pass) => {
-                  const res = await handleLogin(email, pass);
-                  if (res.success) {
-                    navigate((location.state as any)?.from?.pathname || '/', { replace: true });
-                  }
-                  return res;
-                }}
-                onRegister={async (data) => {
-                  const res = await handleRegister(data);
-                  if (res.success) {
-                    navigate((location.state as any)?.from?.pathname || '/', { replace: true });
-                  }
-                  return res;
-                }}
-                onGoogleLogin={async () => {
-                  const res = await handleGoogleLogin();
-                  if (res.success) {
-                    navigate((location.state as any)?.from?.pathname || '/', { replace: true });
-                  }
-                  return res;
-                }}
-                onGuestDemo={() => {
-                  handleGuestDemo();
-                  navigate('/', { replace: true });
-                }}
-                onOpenAdminPanel={() => {
-                  handleOpenAdminPanel();
-                  navigate('/admin', { replace: true });
-                }}
-              />
+              <>
+                <AuthLandingPage
+                  onLogin={async (email, pass) => {
+                    const res = await handleLogin(email, pass);
+                    if (res.success) {
+                      navigate((location.state as any)?.from?.pathname || '/', { replace: true });
+                    }
+                    return res;
+                  }}
+                  onRegister={async (data) => {
+                    const res = await handleRegister(data);
+                    if (res.success) {
+                      navigate((location.state as any)?.from?.pathname || '/', { replace: true });
+                    }
+                    return res;
+                  }}
+                  onGoogleLogin={async () => {
+                    const res = await handleGoogleLogin();
+                    if (res.success) {
+                      navigate((location.state as any)?.from?.pathname || '/', { replace: true });
+                    }
+                    return res;
+                  }}
+                  onGuestDemo={() => {
+                    handleGuestDemo();
+                    navigate('/', { replace: true });
+                  }}
+                  onOpenAdminPanel={() => {
+                    handleOpenAdminPanel();
+                    navigate('/admin', { replace: true });
+                  }}
+                  onOpenMobileScreens={() => setIsMobileScreensModalOpen(true)}
+                />
+                {/* Also allow opening Mobile Screens viewer on public landing */}
+                <MobileScreensViewerModal
+                  isOpen={isMobileScreensModalOpen}
+                  onClose={() => setIsMobileScreensModalOpen(false)}
+                  initialScreen={mobileScreensInitialScreen}
+                  userAccount={currentUserAccount}
+                  profile={profile}
+                  transactions={transactions}
+                  subscription={activeUserSub}
+                  isDarkMode={isDarkMode}
+                  onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+                  onNavigateToTab={(tab) => {
+                    setIsMobileScreensModalOpen(false);
+                    if (tab === 'login' || tab === 'register') {
+                      // stays on auth landing page
+                    } else {
+                      // demo mode or authenticated
+                      handleGuestDemo();
+                      navigate('/', { replace: true });
+                      setActiveTab(tab as any);
+                    }
+                  }}
+                  onOpenNewExpense={() => {
+                    setIsMobileScreensModalOpen(false);
+                    handleGuestDemo();
+                    navigate('/', { replace: true });
+                    setEditingTransaction(null);
+                    setInitialIsCuotas(false);
+                    setTxModalInitialType('gasto');
+                    setIsTxModalOpen(true);
+                  }}
+                  onOpenNewIncome={() => {
+                    setIsMobileScreensModalOpen(false);
+                    handleGuestDemo();
+                    navigate('/', { replace: true });
+                    setIsIncomeModalOpen(true);
+                  }}
+                  onOpenVoiceExpense={() => {
+                    setIsMobileScreensModalOpen(false);
+                    handleGuestDemo();
+                    navigate('/', { replace: true });
+                    setIsAiModalOpen(true);
+                  }}
+                  onOpenCloudSync={() => {
+                    setIsMobileScreensModalOpen(false);
+                    handleGuestDemo();
+                    navigate('/', { replace: true });
+                    setIsCloudSyncModalOpen(true);
+                  }}
+                  onLogout={handleLogout}
+                  onShowToast={showToast}
+                />
+              </>
             )
           }
         />
@@ -1719,6 +1809,7 @@ export default function App() {
         onOpenLogoDownload={() => setIsLogoModalOpen(true)}
         debtInfo={debtInfo}
         onLogout={handleLogout}
+        onOpenMobileScreens={() => setIsMobileScreensModalOpen(true)}
         isAdmin={isAdmin}
         isDemoMode={isDemoMode}
         onExitDemo={handleExitDemo}
@@ -1744,6 +1835,7 @@ export default function App() {
           onOpenAiModal={() => setIsAiModalOpen(true)}
           onNavigateHome={() => setActiveTab('dashboard')}
           onToggleSidebar={() => setIsSidebarOpenMobile(prev => !prev)}
+          onOpenMobileScreens={() => setIsMobileScreensModalOpen(true)}
           isSidebarPinned={isSidebarPinned}
           isDemoMode={isDemoMode}
           onExitDemo={handleExitDemo}
@@ -1960,6 +2052,43 @@ export default function App() {
             />
           )}
 
+          {/* TAB 10: MI PERFIL (Pantalla 6) */}
+          {activeTab === 'profile' && (
+            <div className="max-w-md mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-purple-100">
+              <ProfileScreen
+                userAccount={currentUserAccount}
+                profile={profile}
+                subscription={activeUserSub}
+                onUpdateProfile={(data) => {
+                  setProfile(prev => ({ ...prev, ...data }));
+                  showToast('Perfil actualizado con éxito', 'success');
+                }}
+                onNavigateToTab={(tab) => setActiveTab(tab as any)}
+                onOpenCloudSync={() => setIsCloudSyncModalOpen(true)}
+                onLogout={handleLogout}
+                onShowToast={showToast}
+              />
+            </div>
+          )}
+
+          {/* TAB 11: CONFIGURACIÓN (Pantalla 7) */}
+          {activeTab === 'settings' && (
+            <div className="max-w-md mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-purple-100">
+              <SettingsScreen
+                userAccount={currentUserAccount}
+                profile={profile}
+                isDarkMode={isDarkMode}
+                onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+                onUpdateProfile={(data) => {
+                  setProfile(prev => ({ ...prev, ...data }));
+                }}
+                onExportData={handleExportData}
+                onLogout={handleLogout}
+                onShowToast={showToast}
+              />
+            </div>
+          )}
+
         </main>
       </div>
 
@@ -1973,6 +2102,7 @@ export default function App() {
         }}
         onOpenVoiceExpense={() => setIsAiModalOpen(true)}
         onToggleSidebar={() => setIsSidebarOpenMobile(prev => !prev)}
+        onOpenMobileScreens={() => setIsMobileScreensModalOpen(true)}
         hasDebt={debtInfo.debtAmount > 0}
       />
 
@@ -2151,6 +2281,44 @@ export default function App() {
         profile={profile}
         budgets={budgets}
         onUpgradePlan={() => { setIsDiagnosisModalOpen(false); setActiveTab('subscriptions'); }}
+      />
+
+      {/* 8 Essential Mobile Screens Viewer Modal */}
+      <MobileScreensViewerModal
+        isOpen={isMobileScreensModalOpen}
+        onClose={() => setIsMobileScreensModalOpen(false)}
+        initialScreen={mobileScreensInitialScreen}
+        userAccount={currentUserAccount}
+        profile={profile}
+        transactions={transactions}
+        subscription={activeUserSub}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+        onNavigateToTab={(tab) => {
+          setIsMobileScreensModalOpen(false);
+          setActiveTab(tab as any);
+        }}
+        onOpenNewExpense={() => {
+          setIsMobileScreensModalOpen(false);
+          setEditingTransaction(null);
+          setInitialIsCuotas(false);
+          setTxModalInitialType('gasto');
+          setIsTxModalOpen(true);
+        }}
+        onOpenNewIncome={() => {
+          setIsMobileScreensModalOpen(false);
+          setIsIncomeModalOpen(true);
+        }}
+        onOpenVoiceExpense={() => {
+          setIsMobileScreensModalOpen(false);
+          setIsAiModalOpen(true);
+        }}
+        onOpenCloudSync={() => {
+          setIsMobileScreensModalOpen(false);
+          setIsCloudSyncModalOpen(true);
+        }}
+        onLogout={handleLogout}
+        onShowToast={showToast}
       />
                 </div>
               )}

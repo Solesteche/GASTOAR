@@ -30,6 +30,7 @@ import {
   Phone,
   AlertCircle,
   HelpCircle,
+  Smartphone,
   X
 } from 'lucide-react';
 import { BillingCycle, CoupleProfile, SubscriptionPlan, SubscriptionPlanId, UserAccount } from '../types';
@@ -65,6 +66,7 @@ interface AuthLandingPageProps {
   onGoogleLogin?: () => Promise<{ success: boolean; error?: string }>;
   onGuestDemo: () => void;
   onOpenAdminPanel?: () => void;
+  onOpenMobileScreens?: () => void;
 }
 
 export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
@@ -75,6 +77,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
   onGoogleLogin,
   onGuestDemo,
   onOpenAdminPanel,
+  onOpenMobileScreens,
 }) => {
   const [tab, setTab] = useState<'login' | 'register'>(initialTab);
 
@@ -497,6 +500,19 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
         />
 
         <div className="flex items-center gap-2 sm:gap-3">
+          {onOpenMobileScreens && (
+            <button
+              type="button"
+              onClick={onOpenMobileScreens}
+              className="text-xs font-bold text-purple-300 hover:text-white px-3 py-2 rounded-xl bg-purple-950/50 hover:bg-purple-900/60 border border-purple-800/60 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+              title="Explorar el diseño de las 8 pantallas móviles"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-purple-400" />
+              <span className="hidden sm:inline">8 Pantallas Móviles</span>
+              <span className="sm:hidden">Móvil</span>
+            </button>
+          )}
+
           <a
             href="#planes"
             className="text-xs font-semibold text-slate-300 hover:text-white px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 transition-all flex items-center gap-1 cursor-pointer"

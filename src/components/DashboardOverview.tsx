@@ -728,10 +728,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   // Upcoming bills / vencimientos
   const upcomingBills = useMemo(() => {
     try {
-      const savedV4 = localStorage.getItem('gastoar_vencimientos_alerts_v4') || localStorage.getItem('gastoar_vencimientos_alerts_v3');
-      if (savedV4) {
-        const parsed = JSON.parse(savedV4);
+      const savedV5 = localStorage.getItem('gastoar_vencimientos_alerts_v5') || localStorage.getItem('gastoar_vencimientos_alerts_v4') || localStorage.getItem('gastoar_vencimientos_alerts_v3');
+      if (savedV5) {
+        const parsed = JSON.parse(savedV5);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          const demoIds = ['e1', 's1', 's3', 'a1', 's4', 's2', 'c1', 'c2'];
           const todayDate = new Date();
           const curDay = todayDate.getDate();
           const iconMap: Record<string, string> = {
@@ -742,7 +743,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             otro: '📄',
           };
           const unpaid = parsed
-            .filter((item: any) => !item.paidThisMonth && item.name)
+            .filter((item: any) => !item.paidThisMonth && item.name && (isDemoMode || !demoIds.includes(item.id)))
             .map((item: any) => {
               const dueDay = item.dueDay || 1;
               const daysLeft = dueDay - curDay;

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Bell, BellRing, Building2, Calendar, CalendarClock, Check,
   CheckCircle2, ChevronLeft, ChevronRight, Clock, Copy,
@@ -39,6 +39,8 @@ interface AlertsSectionProps {
   onOpenCalendarModal?: () => void;
 }
 
+const DEMO_ITEM_IDS = ['e1', 's1', 's3', 'a1', 's4', 's2', 'c1', 'c2'];
+
 const DEFAULT_ALERT_ITEMS: DueAlertItem[] = [
   { id: 'e1', category: 'expensas', name: 'Expensas', provider: 'Consorcio', dueDay: 10, estimatedAmount: 135000, paymentCode: '04928103940129', autoDebit: false, reminderDaysBeforeDue: 2 },
   { id: 's1', category: 'servicio', name: 'Luz', provider: 'Edenor', dueDay: 12, estimatedAmount: 38000, paymentCode: 'Cod. Banelco: 88492019', autoDebit: true, reminderDaysBeforeDue: 2 },
@@ -63,6 +65,8 @@ const CATEGORY_META: Record<AlertItemCategory, { label: string; Icon: React.Elem
 
 export const AlertsSection: React.FC<AlertsSectionProps> = ({
   profile,
+  transactions,
+  isDemoMode = false,
   onShowToast,
   onOpenTransactionModal,
   onOpenCalendarModal
@@ -70,15 +74,37 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   const [items, setItems] = useState<DueAlertItem[]>(() => {
     try {
       const saved = localStorage.getItem('gastoar_vencimientos_alerts_v5');
-      if (saved) {
+      if (saved !== null) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          if (!isDemoMode) {
+            // Usuario real: filtrar estrictamente cualquier residuo de items de demo
+            return parsed.filter((it: DueAlertItem) => it && it.id && !DEMO_ITEM_IDS.includes(it.id));
+          }
+          return parsed;
+        }
       }
     } catch (e) {
       console.error(e);
     }
-    return DEFAULT_ALERT_ITEMS;
+    // Solo ofrecer datos de demo si el modo demo está explícitamente activo
+    return isDemoMode ? DEFAULT_ALERT_ITEMS : [];
   });
+
+  // Limpiar residuos de demo si el usuario pasa a modo real
+  useEffect(() => {
+    if (!isDemoMode) {
+      setItems(prev => {
+        const hasDemoItems = prev.some(it => it && DEMO_ITEM_IDS.includes(it.id));
+        if (hasDemoItems) {
+          const cleaned = prev.filter(it => it && !DEMO_ITEM_IDS.includes(it.id));
+          localStorage.setItem('gastoar_vencimientos_alerts_v5', JSON.stringify(cleaned));
+          return cleaned;
+        }
+        return prev;
+      });
+    }
+  }, [isDemoMode]);
 
   const now = new Date();
   const currentDay = now.getDate();
@@ -107,6 +133,8 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   const [formAutoDebit, setFormAutoDebit] = useState(false);
   const [formLastDigits, setFormLastDigits] = useState('');
   const [formReminderDue, setFormReminderDue] = useState(3);
+  const [isCustomReminder, setIsCustomReminder] = useState(false);
+  const [customReminderDays, setCustomReminderDays] = useState('');
   const [formNotes, setFormNotes] = useState('');
 
   const saveItems = (updated: DueAlertItem[]) => {
@@ -126,6 +154,8 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
     setFormAutoDebit(false);
     setFormLastDigits('');
     setFormReminderDue(3);
+    setIsCustomReminder(false);
+    setCustomReminderDays('');
     setFormNotes('');
     setIsModalOpen(true);
   };
@@ -141,7 +171,11 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
     setFormPaymentCode(item.paymentCode || '');
     setFormAutoDebit(Boolean(item.autoDebit));
     setFormLastDigits(item.lastDigits || '');
-    setFormReminderDue(item.reminderDaysBeforeDue || 3);
+    const rem = item.reminderDaysBeforeDue !== undefined ? item.reminderDaysBeforeDue : 3;
+    const isStandard = [0, 1, 2, 3, 5, 7, 10].includes(rem);
+    setFormReminderDue(rem);
+    setIsCustomReminder(!isStandard);
+    setCustomReminderDays(!isStandard ? String(rem) : '');
     setFormNotes(item.notes || '');
     setIsModalOpen(true);
   };
@@ -158,6 +192,8 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
     setFormAutoDebit(false);
     setFormLastDigits('');
     setFormReminderDue(3);
+    setIsCustomReminder(false);
+    setCustomReminderDays('');
     setFormNotes('');
     setIsModalOpen(true);
   };
@@ -171,6 +207,10 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
     const due = Math.min(31, Math.max(1, Number(formDueDay) || 10));
     const close = formCloseDay ? Math.min(31, Math.max(1, Number(formCloseDay) || 20)) : undefined;
     const amount = formEstimatedAmount ? Number(formEstimatedAmount.replace(/[^0-9.]/g, '')) : undefined;
+    const finalReminder = isCustomReminder
+      ? Math.max(0, Math.min(30, Number(customReminderDays) || 0))
+      : formReminderDue;
+
     const common = {
       category: formCategory,
       name: formName.trim(),
@@ -181,7 +221,7 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
       paymentCode: formPaymentCode.trim() || undefined,
       autoDebit: formAutoDebit,
       lastDigits: formCategory === 'tarjeta' ? formLastDigits.trim() || undefined : undefined,
-      reminderDaysBeforeDue: formReminderDue || 3,
+      reminderDaysBeforeDue: finalReminder,
       notes: formNotes.trim() || undefined
     };
 
@@ -225,6 +265,33 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
     localStorage.setItem('gastoar_vencimientos_notif_v1', 'true');
     onShowToast('Notificaciones activadas en este dispositivo.', 'success');
   };
+
+  // Verificación diaria de recordatorios en base a la anticipación configurada
+  useEffect(() => {
+    if (!notificationsEnabled || !('Notification' in window) || Notification.permission !== 'granted') return;
+    const notifKey = `gastoar_notif_sent_${currentYear}_${currentMonth}_${currentDay}`;
+    if (localStorage.getItem(notifKey)) return;
+
+    const dueToRemind = items.filter(item => {
+      if (item.paidThisMonth) return false;
+      const rem = item.reminderDaysBeforeDue !== undefined ? item.reminderDaysBeforeDue : 3;
+      const daysUntilDue = item.dueDay - currentDay;
+      return daysUntilDue >= 0 && daysUntilDue <= rem;
+    });
+
+    if (dueToRemind.length > 0) {
+      localStorage.setItem(notifKey, 'true');
+      const listNames = dueToRemind.map(i => `${i.name} (vence día ${i.dueDay})`).join(', ');
+      try {
+        new Notification('GastoAR • Recordatorio de Pago', {
+          body: `Tenés ${dueToRemind.length} vencimiento(s) para abonar: ${listNames}.`,
+          icon: '/favicon.ico'
+        });
+      } catch (e) {
+        console.warn('Error al disparar notificación:', e);
+      }
+    }
+  }, [notificationsEnabled, items, currentDay, currentMonth, currentYear]);
 
   const stats = useMemo(() => {
     const pending = items.filter(i => !i.paidThisMonth);
@@ -345,10 +412,18 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
             </div>
           </div>
 
-          {/* Center: Due Date with Calendar Icon */}
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-[#F95420] shrink-0">
-            <Calendar className="w-3.5 h-3.5 text-[#F95420]" />
-            <span className="whitespace-nowrap">{formatDueDateString(item.dueDay)}</span>
+          {/* Center: Due Date with Calendar Icon and Reminder pill */}
+          <div className="flex flex-col items-end sm:items-center gap-1 shrink-0">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-[#F95420]">
+              <Calendar className="w-3.5 h-3.5 text-[#F95420]" />
+              <span className="whitespace-nowrap">{formatDueDateString(item.dueDay)}</span>
+            </div>
+            {item.reminderDaysBeforeDue !== undefined && (
+              <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">
+                <Bell className="w-2.5 h-2.5 text-[#F95420]" />
+                <span>{item.reminderDaysBeforeDue === 0 ? 'Aviso el día' : `Aviso -${item.reminderDaysBeforeDue}d`}</span>
+              </span>
+            )}
           </div>
 
           {/* Right: Amount + Chevron */}
@@ -363,6 +438,33 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
         {/* Expanded actions panel */}
         {expanded && (
           <div className="mt-3 pt-3 border-t border-slate-100 space-y-2.5">
+            {/* Payment reminder info */}
+            <div className="p-2.5 rounded-xl bg-orange-50/60 border border-orange-100 flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-orange-100 text-[#F95420] flex items-center justify-center shrink-0">
+                  <BellRing className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <p className="text-[9px] uppercase font-extrabold text-orange-800">Anticipación del recordatorio</p>
+                  <p className="font-bold text-slate-800 text-[11px] sm:text-xs">
+                    {item.reminderDaysBeforeDue === 0
+                      ? `Aviso programado el mismo día ${item.dueDay} del vencimiento`
+                      : `Aviso programado ${item.reminderDaysBeforeDue || 3} ${(item.reminderDaysBeforeDue || 3) === 1 ? 'día' : 'días'} antes (Día ${Math.max(1, item.dueDay - (item.reminderDaysBeforeDue || 3))} de cada mes)`}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openEdit(item);
+                }}
+                className="text-[11px] font-bold text-[#F95420] hover:underline cursor-pointer shrink-0"
+              >
+                Cambiar
+              </button>
+            </div>
+
             {item.notes && (
               <div className="p-2.5 rounded-xl bg-slate-50 text-[11px] text-slate-600 border border-slate-100">
                 <span className="font-bold text-slate-700">Nota: </span>
@@ -819,15 +921,26 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
                 <div className="w-12 h-12 rounded-2xl bg-orange-50 text-[#F95420] mx-auto flex items-center justify-center">
                   <CalendarClock className="w-6 h-6" />
                 </div>
-                <h3 className="mt-3 text-sm font-black text-slate-800">No hay vencimientos para mostrar</h3>
-                <p className="mt-1 text-xs text-slate-500">Agregá tu primer vencimiento o elegí una plantilla rápida.</p>
-                <button
-                  type="button"
-                  onClick={() => openCreate()}
-                  className="mt-4 px-4 py-2.5 rounded-xl bg-[#F95420] text-white text-xs font-extrabold cursor-pointer active:scale-95"
-                >
-                  + Agregar vencimiento
-                </button>
+                <h3 className="mt-3 text-sm font-black text-slate-800">No hay vencimientos registrados</h3>
+                <p className="mt-1 text-xs text-slate-500">Agregá tus servicios, tarjetas o alquileres para llevar el control.</p>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openCreate()}
+                    className="px-4 py-2.5 rounded-xl bg-[#F95420] text-white text-xs font-extrabold cursor-pointer active:scale-95 shadow-sm hover:bg-[#E04412]"
+                  >
+                    + Agregar vencimiento
+                  </button>
+                  {isDemoMode && (
+                    <button
+                      type="button"
+                      onClick={() => saveItems(DEFAULT_ALERT_ITEMS)}
+                      className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
+                    >
+                      Cargar ejemplos de prueba
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </section>
@@ -975,6 +1088,122 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
                 >
                   <span className={`block w-5 h-5 rounded-full bg-white transition-transform ${formAutoDebit ? 'translate-x-5' : ''}`} />
                 </button>
+              </div>
+
+              {/* Anticipación del recordatorio */}
+              <div className="rounded-2xl bg-orange-50/70 border border-orange-100 p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Bell className="w-4 h-4 text-[#F95420]" />
+                    <span className="text-xs font-black text-slate-800">Anticipación del recordatorio</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-[#F95420] bg-white px-2 py-0.5 rounded-full border border-orange-200">
+                    {isCustomReminder
+                      ? `${customReminderDays || '0'} días antes`
+                      : formReminderDue === 0
+                      ? 'Mismo día'
+                      : `${formReminderDue} ${formReminderDue === 1 ? 'día' : 'días'} antes`}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Elegí con cuántos días de anticipación querés recibir la alerta o aviso para abonar:
+                </p>
+
+                {/* Anticipation pill options */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 pt-1">
+                  {[
+                    { value: 0, label: 'Mismo día' },
+                    { value: 1, label: '1 día antes' },
+                    { value: 2, label: '2 días antes' },
+                    { value: 3, label: '3 días antes' },
+                    { value: 5, label: '5 días antes' },
+                    { value: 7, label: '1 semana' },
+                    { value: 10, label: '10 días' },
+                  ].map(opt => {
+                    const active = !isCustomReminder && formReminderDue === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                          setIsCustomReminder(false);
+                          setFormReminderDue(opt.value);
+                        }}
+                        className={`py-2 px-2 rounded-xl text-xs font-bold transition-all text-center cursor-pointer border ${
+                          active
+                            ? 'bg-[#F95420] text-white border-[#F95420] shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-orange-300 hover:bg-orange-50/50'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomReminder(true);
+                      if (!customReminderDays) setCustomReminderDays('4');
+                    }}
+                    className={`py-2 px-2 rounded-xl text-xs font-bold transition-all text-center cursor-pointer border ${
+                      isCustomReminder
+                        ? 'bg-[#F95420] text-white border-[#F95420] shadow-xs'
+                        : 'bg-white text-slate-700 border-slate-200 hover:border-orange-300 hover:bg-orange-50/50'
+                    }`}
+                  >
+                    Personalizado
+                  </button>
+                </div>
+
+                {/* Custom numeric input */}
+                {isCustomReminder && (
+                  <div className="pt-1">
+                    <label className="text-[11px] font-bold text-slate-700 block">
+                      Ingresá la cantidad de días de anticipación (0 a 30):
+                      <div className="relative mt-1">
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          max={30}
+                          value={customReminderDays}
+                          onChange={e => {
+                            const val = e.target.value;
+                            if (val === '') {
+                              setCustomReminderDays('');
+                            } else {
+                              const n = Math.min(30, Math.max(0, parseInt(val, 10) || 0));
+                              setCustomReminderDays(String(n));
+                            }
+                          }}
+                          placeholder="Ej. 4"
+                          className="w-full px-3 py-2 rounded-xl bg-white border border-orange-200 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-orange-200"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">
+                          días antes
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                )}
+
+                {/* Calculated preview text */}
+                <div className="p-2 rounded-xl bg-white border border-orange-100/70 text-[11px] text-slate-600 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-[#F95420] shrink-0" />
+                  <span>
+                    {(() => {
+                      const due = Math.min(31, Math.max(1, Number(formDueDay) || 10));
+                      const remDays = isCustomReminder
+                        ? Math.max(0, Math.min(30, Number(customReminderDays) || 0))
+                        : formReminderDue;
+                      if (remDays === 0) {
+                        return `Te avisará el mismo día ${due} de cada mes.`;
+                      }
+                      const notifDay = Math.max(1, due - remDays);
+                      return `Vence el día ${due}. Te avisará con ${remDays} ${remDays === 1 ? 'día' : 'días'} de anticipación (día ${notifDay} de cada mes).`;
+                    })()}
+                  </span>
+                </div>
               </div>
 
               <label className="text-[11px] sm:text-xs font-extrabold text-slate-700 block">
