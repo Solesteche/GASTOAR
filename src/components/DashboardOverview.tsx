@@ -182,8 +182,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   // Calculate live daily score
   const dailyScore = useMemo(() => {
-    return computeDailyFinancialScore(transactions, budgets, scoreHistory, todayStr);
-  }, [transactions, budgets, scoreHistory, todayStr]);
+    return computeDailyFinancialScore(transactions, budgets, scoreHistory, todayStr, vencimientos);
+  }, [transactions, budgets, scoreHistory, todayStr, vencimientos]);
 
   const isScoreUnlockedToday = useMemo(() => {
     return Boolean(scoreHistory[todayStr]?.unlockedAt);
@@ -1438,10 +1438,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       <DailyScoreModal
         isOpen={isScoreModalOpen}
         onClose={() => setIsScoreModalOpen(false)}
-        dailyScore={dailyScore}
-        isUnlocked={isScoreUnlockedToday}
-        onFinalizeDay={handleFinalizeDay}
-        scoreHistory={scoreHistory}
+        score={dailyScore}
+        history={scoreHistory}
+        onFinalize={handleFinalizeDay}
+        isFinalized={isScoreUnlockedToday}
       />
 
     </div>

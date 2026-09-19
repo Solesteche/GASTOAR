@@ -1,361 +1,466 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  ChevronLeft, 
-  Award, 
-  Sparkles, 
-  Camera, 
-  Clock, 
-  Star, 
-  Lock, 
-  CheckCircle2, 
-  Flame, 
-  TrendingUp, 
-  AlertTriangle, 
-  Lightbulb, 
-  ArrowRight,
-  RefreshCw,
-  Share2
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import {
+  Flame, ChevronDown, Lightbulb, X, CheckCircle2,
+  TrendingUp, Target, Calendar, Zap, Bell, PiggyBank
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { DailyFinancialScore } from '../types';
+import {
+  DailyFinancialScore,
+  ScoreDimension,
+  TIER_CONFIG,
+  ScoreHistory,
+} from '../utils/scoreEngine';
 
-interface DailyScoreModalProps {
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+
+export interface DailyScoreModalProps {
   isOpen: boolean;
   onClose: () => void;
-  dailyScore: DailyFinancialScore;
-  isUnlocked: boolean;
-  onFinalizeDay: () => void;
-  scoreHistory?: Record<string, DailyFinancialScore>;
+  score?: DailyFinancialScore;
+  dailyScore?: DailyFinancialScore;
+  history?: ScoreHistory;
+  scoreHistory?: ScoreHistory;
+  onFinalize?: () => void;
+  onFinalizeDay?: () => void;
+  isFinalized?: boolean;
+  isUnlocked?: boolean;
 }
 
-export const DailyScoreModal: React.FC<DailyScoreModalProps> = ({
-  isOpen,
-  onClose,
-  dailyScore,
-  isUnlocked,
-  onFinalizeDay,
-  scoreHistory = {},
-}) => {
-  const [isRevealing, setIsRevealing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'score' | 'history'>('score');
+type Tab = 'dimensions' | 'history';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const DIMENSION_ICONS: Record<string, React.ReactNode> = {
+  budget:      <Target className="w-4 h-4" />,
+  consistency: <Calendar className="w-4 h-4" />,
+  savings:     <PiggyBank className="w-4 h-4" />,
+  speed:       <Zap className="w-4 h-4" />,
+  bills:       <Bell className="w-4 h-4" />,
+  trend:       <TrendingUp className="w-4 h-4" />,
+};
+
+const DIM_COLORS: Record<string, string> = {
+  budget:      '#7C3AED',
+  consistency: '#2563EB',
+  savings:     '#059669',
+  speed:       '#D97706',
+  bills:       '#059669',
+  trend:       '#7C3AED',
+};
+
+const TIER_STYLES: Record<string, { ring: string; badge: string; text: string }> = {
+  excelente: { ring: '#059669', badge: 'bg-emerald-100 text-emerald-800', text: 'text-emerald-700' },
+  muy_bien:  { ring: '#7C3AED', badge: 'bg-purple-100 text-purple-800',   text: 'text-purple-700' },
+  bien:      { ring: '#2563EB', badge: 'bg-blue-100 text-blue-800',       text: 'text-blue-700'   },
+  regular:   { ring: '#D97706', badge: 'bg-amber-100 text-amber-800',     text: 'text-amber-700'  },
+  critico:   { ring: '#DC2626', badge: 'bg-red-100 text-red-800',         text: 'text-red-700'    },
+};
+
+function getBarColor(pct: number) {
+  if (pct >= 80) return '#059669';
+  if (pct >= 55) return '#D97706';
+  return '#DC2626';
+}
+
+function getHistoryBarColor(score: number) {
+  if (score >= 75) return '#7C3AED';
+  if (score >= 60) return '#2563EB';
+  if (score >= 40) return '#D97706';
+  return '#DC2626';
+}
+
+function nDaysAgo(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  const pad = (x: number) => x.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function formatShortDate(dateKey: string): string {
+  const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const d = new Date(dateKey + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.round((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+  if (diff === 0) return 'Hoy';
+  if (diff === 1) return 'Ayer';
+  return days[d.getDay()];
+}
+
+// ─── Sub-componentes ──────────────────────────────────────────────────────────
+
+/** Anillo SVG animado */
+const ScoreRing: React.FC<{ score: number; ringColor: string }> = ({ score, ringColor }) => {
+  const r = 28;
+  const circ = 2 * Math.PI * r;
+  const [displayed, setDisplayed] = useState(0);
 
   useEffect(() => {
-    if (isOpen && isUnlocked) {
-      // Fire subtle celebratory confetti if opened already unlocked
-      try {
-        confetti({
-          particleCount: 40,
-          spread: 60,
-          origin: { y: 0.6 },
-          colors: ['#f95420', '#c084fc', '#38bdf8', '#fbbf24']
-        });
-      } catch {}
-    }
-  }, [isOpen, isUnlocked]);
+    let cur = 0;
+    const step = () => {
+      cur = Math.min(cur + 2, score);
+      setDisplayed(cur);
+      if (cur < score) requestAnimationFrame(step);
+    };
+    const t = setTimeout(() => requestAnimationFrame(step), 150);
+    return () => clearTimeout(t);
+  }, [score]);
 
-  if (!isOpen) return null;
-
-  const handleUnlockClick = () => {
-    setIsRevealing(true);
-    try {
-      confetti({
-        particleCount: 100,
-        spread: 80,
-        origin: { y: 0.5 },
-        colors: ['#f95420', '#a855f7', '#38bdf8', '#fbbf24', '#34d399']
-      });
-    } catch {}
-
-    setTimeout(() => {
-      onFinalizeDay();
-      setIsRevealing(false);
-    }, 600);
-  };
-
-  // Recent 7 days history array
-  const last7DaysScores = (Object.values(scoreHistory) as DailyFinancialScore[])
-    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-    .slice(0, 7)
-    .reverse();
+  const filled = (displayed / 100) * circ;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div 
-        className="w-full max-w-md bg-gradient-to-b from-[#1c0733] via-[#240a44] to-[#120324] border border-purple-500/30 rounded-[32px] text-white shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
-        onClick={e => e.stopPropagation()}
-      >
-        
-        {/* Header matching Screenshot 2 */}
-        <div className="px-5 py-4 border-b border-purple-900/50 flex items-center justify-between">
-          <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-purple-200 transition-colors cursor-pointer"
-            title="Volver"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-
-          <div className="text-center flex-1 pr-9">
-            <h2 className="text-base font-extrabold text-white tracking-tight flex items-center justify-center gap-1.5">
-              <span>Tu Score diario</span>
-            </h2>
-          </div>
-        </div>
-
-        {/* Scrollable Body */}
-        <div className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
-
-          {/* STATE 1: LOCKED / PRE-FINALIZATION (Matching Image Screen 2) */}
-          {!isUnlocked ? (
-            <div className="text-center space-y-6">
-              
-              {/* Glowing Golden Trophy */}
-              <div className="relative mx-auto w-32 h-32 flex items-center justify-center">
-                {/* Multi-layered glow */}
-                <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/30 via-orange-500/20 to-purple-600/30 rounded-full blur-2xl animate-pulse" />
-                <div className="w-28 h-28 rounded-full bg-gradient-to-b from-[#3b1266] to-[#20073b] border-2 border-amber-400/50 shadow-[0_0_30px_rgba(245,158,11,0.25)] flex items-center justify-center relative">
-                  <div className="text-5xl animate-bounce duration-1000">
-                    🏆
-                  </div>
-                  <Sparkles className="w-6 h-6 text-amber-300 absolute -top-1 -right-1 animate-spin" style={{ animationDuration: '6s' }} />
-                </div>
-              </div>
-
-              {/* Headings */}
-              <div className="space-y-1.5">
-                <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-snug">
-                  ¡Finaliza tu día y desbloquea<br />tu Score financiero!
-                </h3>
-                <p className="text-xs sm:text-sm text-purple-200/75 max-w-xs mx-auto">
-                  El score se calcula en base a tus hábitos financieros diarios.
-                </p>
-              </div>
-
-              {/* Checklist Cards (Matching Screenshot 2) */}
-              <div className="space-y-2.5 text-left">
-                
-                <div className="p-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-purple-500/20 flex items-center gap-3.5 transition-all">
-                  <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center text-purple-300 shrink-0">
-                    <Camera className="w-5 h-5" />
-                  </div>
-                  <div className="text-xs">
-                    <p className="font-bold text-white">Revisa que tus gastos estén cargados</p>
-                    <p className="text-[11px] text-purple-300/70">Asegurate de incluir todas tus compras y pagos de hoy.</p>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-purple-500/20 flex items-center gap-3.5 transition-all">
-                  <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-300 shrink-0">
-                    <Clock className="w-5 h-5" />
-                  </div>
-                  <div className="text-xs">
-                    <p className="font-bold text-white">El score se calcula una vez por día</p>
-                    <p className="text-[11px] text-purple-300/70">Refleja tu disciplina y respeto del límite diario.</p>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-purple-500/20 flex items-center gap-3.5 transition-all">
-                  <div className="w-9 h-9 rounded-xl bg-orange-500/20 border border-orange-400/30 flex items-center justify-center text-orange-300 shrink-0">
-                    <Star className="w-5 h-5" />
-                  </div>
-                  <div className="text-xs">
-                    <p className="font-bold text-white">Volvé mañana para mejorar tu score</p>
-                    <p className="text-[11px] text-purple-300/70">Construí una racha de ahorro y control de finanzas.</p>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Action Button: Finalizar el día 🔒 (Matching Image) */}
-              <button
-                type="button"
-                onClick={handleUnlockClick}
-                disabled={isRevealing}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#F95420] via-[#FF6B3D] to-[#F95420] hover:from-[#E04412] hover:to-[#F95420] text-white font-black text-sm sm:text-base shadow-xl shadow-orange-500/30 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer border border-white/15"
-              >
-                {isRevealing ? (
-                  <RefreshCw className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    <span>Finalizar el día</span>
-                    <Lock className="w-4 h-4 ml-0.5" />
-                  </>
-                )}
-              </button>
-
-            </div>
-          ) : (
-            /* STATE 2: UNLOCKED / SCORE REVEALED */
-            <div className="space-y-6 animate-in fade-in duration-300">
-              
-              {/* Big Score Visual Circle */}
-              <div className="text-center relative">
-                <div className="relative mx-auto w-36 h-36 flex items-center justify-center">
-                  <div className="absolute inset-0 bg-gradient-to-tr from-orange-500/25 via-purple-600/30 to-emerald-500/25 rounded-full blur-2xl" />
-                  
-                  {/* Circular Score Gauge */}
-                  <svg viewBox="0 0 100 100" className="w-36 h-36 -rotate-90 transform">
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="transparent"
-                      stroke="rgba(255,255,255,0.1)"
-                      strokeWidth="8"
-                    />
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="transparent"
-                      stroke={dailyScore.color}
-                      strokeWidth="8"
-                      strokeDasharray="251.2"
-                      strokeDashoffset={`${251.2 - (dailyScore.score / 100) * 251.2}`}
-                      strokeLinecap="round"
-                      className="transition-all duration-1000 ease-out"
-                    />
-                  </svg>
-
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                    <span className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-none">
-                      {dailyScore.score}
-                    </span>
-                    <span className="text-[11px] font-bold text-purple-200 mt-0.5">de 100</span>
-                  </div>
-                </div>
-
-                <div className="mt-3 space-y-1">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black border" style={{
-                    backgroundColor: `${dailyScore.color}20`,
-                    borderColor: `${dailyScore.color}50`,
-                    color: dailyScore.color
-                  }}>
-                    <span>{dailyScore.ratingEmoji}</span>
-                    <span>{dailyScore.rating}</span>
-                  </div>
-                  <p className="text-xs text-purple-200/80">
-                    {dailyScore.dailySpent === 0 
-                      ? '¡Día impecable sin gastos! Presupuesto preservado al 100%.' 
-                      : dailyScore.isWithinLimit
-                      ? `Gastaste $${dailyScore.dailySpent.toLocaleString('es-AR')} dentro de tu límite de $${dailyScore.dailyLimit.toLocaleString('es-AR')}.`
-                      : `Gastaste $${dailyScore.dailySpent.toLocaleString('es-AR')} (superó el límite sugerido de $${dailyScore.dailyLimit.toLocaleString('es-AR')}).`
-                    }
-                  </p>
-                </div>
-              </div>
-
-              {/* Racha Badge */}
-              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-orange-500/20 via-purple-600/20 to-orange-500/20 border border-orange-500/30 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-orange-500/30 flex items-center justify-center text-orange-300 text-lg">
-                    🔥
-                  </div>
-                  <div>
-                    <p className="font-extrabold text-white">Racha Financiera</p>
-                    <p className="text-[11px] text-orange-200/80">{dailyScore.streakDays} días consecutivos finalizados</p>
-                  </div>
-                </div>
-                <span className="font-black text-sm text-orange-300 bg-orange-500/20 px-2.5 py-1 rounded-xl border border-orange-400/30">
-                  +{dailyScore.breakdown.streak.score} pts
-                </span>
-              </div>
-
-              {/* Breakdown List */}
-              <div className="space-y-2.5">
-                <p className="text-[11px] font-extrabold uppercase tracking-wider text-purple-300/60 px-1">
-                  Desglose de Puntos
-                </p>
-
-                {/* 1. Límite */}
-                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-white flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      {dailyScore.breakdown.limit.label}
-                    </span>
-                    <span className="font-extrabold text-purple-200">
-                      {dailyScore.breakdown.limit.score} / {dailyScore.breakdown.limit.maxScore}
-                    </span>
-                  </div>
-                  <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-emerald-400 h-full rounded-full transition-all duration-500" 
-                      style={{ width: `${(dailyScore.breakdown.limit.score / dailyScore.breakdown.limit.maxScore) * 100}%` }}
-                    />
-                  </div>
-                  <p className="text-[10.5px] text-purple-300/70">{dailyScore.breakdown.limit.description}</p>
-                </div>
-
-                {/* 2. Registro */}
-                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-white flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-sky-400" />
-                      {dailyScore.breakdown.logging.label}
-                    </span>
-                    <span className="font-extrabold text-purple-200">
-                      {dailyScore.breakdown.logging.score} / {dailyScore.breakdown.logging.maxScore}
-                    </span>
-                  </div>
-                  <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-sky-400 h-full rounded-full transition-all duration-500" 
-                      style={{ width: `${(dailyScore.breakdown.logging.score / dailyScore.breakdown.logging.maxScore) * 100}%` }}
-                    />
-                  </div>
-                  <p className="text-[10.5px] text-purple-300/70">{dailyScore.breakdown.logging.description}</p>
-                </div>
-
-                {/* 3. Ritmo de Presupuesto */}
-                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-white flex items-center gap-1.5">
-                      <TrendingUp className="w-3.5 h-3.5 text-purple-400" />
-                      {dailyScore.breakdown.budgetPacing.label}
-                    </span>
-                    <span className="font-extrabold text-purple-200">
-                      {dailyScore.breakdown.budgetPacing.score} / {dailyScore.breakdown.budgetPacing.maxScore}
-                    </span>
-                  </div>
-                  <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-purple-400 h-full rounded-full transition-all duration-500" 
-                      style={{ width: `${(dailyScore.breakdown.budgetPacing.score / dailyScore.breakdown.budgetPacing.maxScore) * 100}%` }}
-                    />
-                  </div>
-                  <p className="text-[10.5px] text-purple-300/70">{dailyScore.breakdown.budgetPacing.description}</p>
-                </div>
-
-              </div>
-
-              {/* Smart Tip for Tomorrow */}
-              <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-start gap-2.5 text-xs">
-                <Lightbulb className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-bold text-amber-200">Consejo para mañana</p>
-                  <p className="text-[11px] text-amber-100/80 leading-relaxed mt-0.5">{dailyScore.tip}</p>
-                </div>
-              </div>
-
-              {/* Close & Recalculate Actions */}
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-[#F95420] to-[#FF6B3D] hover:from-[#E04412] hover:to-[#F95420] text-white font-bold text-xs shadow-lg shadow-orange-500/25 active:scale-95 transition-all text-center cursor-pointer"
-                >
-                  ¡Genial, gracias!
-                </button>
-              </div>
-
-            </div>
-          )}
-
-        </div>
-
+    <div className="relative w-[72px] h-[72px] flex-shrink-0">
+      <svg width={72} height={72} viewBox="0 0 72 72">
+        <circle cx={36} cy={36} r={r} fill="none" stroke="#F3F4F6" strokeWidth={8} />
+        <circle
+          cx={36} cy={36} r={r}
+          fill="none"
+          stroke={ringColor}
+          strokeWidth={8}
+          strokeDasharray={`${filled} ${circ}`}
+          strokeLinecap="round"
+          transform="rotate(-90 36 36)"
+          style={{ transition: 'stroke-dasharray 0.05s linear' }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-xl font-bold text-slate-900 leading-none">{displayed}</span>
+        <span className="text-[10px] text-slate-400 font-medium">/ 100</span>
       </div>
     </div>
   );
 };
+
+/** Card de dimensión expandible */
+const DimCard: React.FC<{ dim: ScoreDimension; darkMode?: boolean }> = ({ dim, darkMode }) => {
+  const [expanded, setExpanded] = useState(false);
+  const [barWidth, setBarWidth] = useState(0);
+  const color = DIM_COLORS[dim.key] || '#7C3AED';
+  const barColor = getBarColor(dim.pct);
+
+  useEffect(() => {
+    const t = setTimeout(() => setBarWidth(dim.pct), 100);
+    return () => clearTimeout(t);
+  }, [dim.pct]);
+
+  return (
+    <div
+      className={`rounded-xl border p-3 mb-2 transition-all duration-200 cursor-pointer
+        ${darkMode
+          ? 'bg-slate-800/60 border-slate-700/50'
+          : 'bg-slate-50 border-slate-200/80'
+        }`}
+      onClick={() => setExpanded(v => !v)}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-2.5">
+        <span
+          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: color + '18', color }}
+        >
+          {DIMENSION_ICONS[dim.key] || dim.emoji}
+        </span>
+        <span className={`text-[13px] font-medium flex-1 ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+          {dim.label}
+        </span>
+        <span className="text-[12px] font-semibold tabular-nums" style={{ color }}>
+          {dim.points}/{dim.maxPoints}
+        </span>
+        <ChevronDown
+          className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+        />
+      </div>
+
+      {/* Barra de progreso */}
+      <div className={`h-1.5 rounded-full overflow-hidden mb-2 ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}>
+        <div
+          className="h-full rounded-full"
+          style={{
+            width: `${barWidth}%`,
+            background: barColor,
+            transition: 'width 0.6s ease',
+          }}
+        />
+      </div>
+
+      {/* Feedback */}
+      <p className={`text-[11px] leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+        {dim.feedback}
+      </p>
+
+      {/* Tip expandible */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div
+              className={`mt-2.5 p-2.5 rounded-lg flex items-start gap-2
+                ${darkMode ? 'bg-slate-700/60' : 'bg-white'}`}
+              style={{ borderLeft: `2px solid ${color}` }}
+            >
+              <Lightbulb className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color }} />
+              <p className={`text-[11px] leading-relaxed ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                {dim.tip}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+/** Gráfico de barras de historial */
+const HistoryChart: React.FC<{ history: ScoreHistory; darkMode?: boolean }> = ({ history, darkMode }) => {
+  const today = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const todayKey = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const key = nDaysAgo(6 - i);
+    const entry = history[key];
+    const val = entry?.total ?? entry?.score ?? null;
+    return {
+      key,
+      label: key === todayKey ? 'Hoy' : formatShortDate(key),
+      score: val,
+      isToday: key === todayKey,
+    };
+  });
+
+  return (
+    <div className="px-4 pt-3 pb-1">
+      <p className={`text-[11px] mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+        Últimos 7 días — scores diarios
+      </p>
+      <div className="flex items-end gap-2 h-20">
+        {days.map(d => {
+          const heightPct = d.score !== null ? Math.round((d.score / 100) * 100) : 0;
+          const color = d.score !== null ? getHistoryBarColor(d.score) : '#E5E7EB';
+          return (
+            <div key={d.key} className="flex-1 flex flex-col items-center gap-1">
+              <span
+                className="text-[10px] font-medium tabular-nums"
+                style={{ color: d.score !== null ? color : '#9CA3AF' }}
+              >
+                {d.score !== null ? d.score : '—'}
+              </span>
+              <div
+                className="w-full rounded-t-[4px] min-h-[4px] transition-all duration-500"
+                style={{
+                  height: `${heightPct}%`,
+                  background: color,
+                  opacity: d.isToday ? 1 : 0.5,
+                }}
+              />
+              <span
+                className="text-[9px]"
+                style={{
+                  color: d.isToday
+                    ? (darkMode ? '#F3F4F6' : '#111827')
+                    : '#9CA3AF',
+                  fontWeight: d.isToday ? 600 : 400,
+                }}
+              >
+                {d.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Promedio semanal */}
+      {(() => {
+        const validScores = days.filter(d => d.score !== null).map(d => d.score as number);
+        if (validScores.length === 0) return null;
+        const avg = Math.round(validScores.reduce((s, n) => s + n, 0) / validScores.length);
+        return (
+          <div className={`mt-3 pt-3 border-t flex items-center justify-between
+            ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+            <span className={`text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              Promedio semanal
+            </span>
+            <span
+              className="text-[13px] font-semibold"
+              style={{ color: getHistoryBarColor(avg) }}
+            >
+              {avg} pts
+            </span>
+          </div>
+        );
+      })()}
+    </div>
+  );
+};
+
+// ─── Modal principal ──────────────────────────────────────────────────────────
+
+export const DailyScoreModal: React.FC<DailyScoreModalProps> = ({
+  isOpen,
+  onClose,
+  score,
+  dailyScore,
+  history = {},
+  scoreHistory = {},
+  onFinalize,
+  onFinalizeDay,
+  isFinalized = false,
+  isUnlocked = false,
+}) => {
+  const [activeTab, setActiveTab] = useState<Tab>('dimensions');
+  const actualScore = score || dailyScore;
+  const actualHistory = Object.keys(history).length > 0 ? history : scoreHistory;
+  const actualFinalize = onFinalize || onFinalizeDay || (() => {});
+  const actualFinalized = isFinalized || isUnlocked;
+  const [finalized, setFinalized] = useState(actualFinalized);
+  const sheetRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setFinalized(actualFinalized);
+    setActiveTab('dimensions');
+  }, [isOpen, actualFinalized]);
+
+  // Cerrar al presionar Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [isOpen, onClose]);
+
+  const handleFinalize = () => {
+    try {
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#7C3AED', '#9333EA', '#059669', '#F59E0B']
+      });
+    } catch {}
+    setFinalized(true);
+    actualFinalize();
+  };
+
+  if (!isOpen || !actualScore) return null;
+
+  const currentScoreVal = actualScore.total ?? actualScore.score ?? 0;
+  const tierKey = actualScore.tier || 'bien';
+  const tier = TIER_CONFIG[tierKey] || TIER_CONFIG.bien;
+  const styles = TIER_STYLES[tierKey] || TIER_STYLES.bien;
+  const streakDays = actualScore.streak ?? actualScore.streakDays ?? 0;
+
+  // Detectar dark mode
+  const isDark = document.documentElement.classList.contains('dark');
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center"
+      style={{ background: 'rgba(0,0,0,0.5)' }}
+      onClick={onClose}
+    >
+      <motion.div
+        ref={sheetRef}
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        onClick={e => e.stopPropagation()}
+        className={`w-full max-w-sm rounded-t-2xl overflow-hidden shadow-2xl
+          ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}
+        style={{ maxHeight: '92vh' }}
+      >
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-1">
+          <div className={`w-8 h-1 rounded-full ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
+        </div>
+
+        {/* Header */}
+        <div className={`px-4 pb-4 border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+          <div className="flex items-start gap-3 mb-3">
+            <ScoreRing score={currentScoreVal} ringColor={styles.ring} />
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${styles.badge}`}>
+                  <span>{tier.emoji}</span>
+                  <span>{tier.label}</span>
+                </span>
+                <button onClick={onClose} className="ml-auto p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer">
+                  <X className="w-4 h-4 text-slate-400" />
+                </button>
+              </div>
+              <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                {tier.message}
+              </p>
+              {streakDays > 0 && (
+                <div className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                  <Flame className="w-3 h-3" />
+                  <span className="text-[10px] font-semibold">
+                    {streakDays} {streakDays === 1 ? 'día' : 'días'} de racha
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className={`flex rounded-xl p-1 ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+            {(['dimensions', 'history'] as Tab[]).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer
+                  ${activeTab === tab
+                    ? isDark ? 'bg-slate-700 text-slate-100' : 'bg-white text-slate-900 shadow-sm'
+                    : isDark ? 'text-slate-400' : 'text-slate-500'
+                  }`}
+              >
+                {tab === 'dimensions' ? 'Dimensiones' : 'Historial'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Body scrollable */}
+        <div className="overflow-y-auto" style={{ maxHeight: '44vh', scrollbarWidth: 'none' }}>
+          {activeTab === 'dimensions' && (
+            <div className="px-4 pt-3 pb-2">
+              {(actualScore.dimensions || []).map(dim => (
+                <DimCard key={dim.key} dim={dim} darkMode={isDark} />
+              ))}
+            </div>
+          )}
+          {activeTab === 'history' && (
+            <HistoryChart history={actualHistory} darkMode={isDark} />
+          )}
+        </div>
+
+        {/* CTA */}
+        <div className={`px-4 pb-8 pt-3 border-t ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+          {finalized ? (
+            <div className="w-full py-3.5 rounded-xl flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700">
+              <CheckCircle2 className="w-4 h-4" />
+              <span className="text-sm font-semibold">Día finalizado — score guardado</span>
+            </div>
+          ) : (
+            <button
+              onClick={handleFinalize}
+              className="w-full py-3.5 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.98] shadow-md shadow-purple-500/20 cursor-pointer"
+              style={{ background: 'linear-gradient(135deg, #7C3AED, #9333EA)' }}
+            >
+              Finalizar día y guardar score
+            </button>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+export default DailyScoreModal;

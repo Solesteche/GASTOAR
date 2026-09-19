@@ -248,23 +248,45 @@ export interface ScoreCategoryBreakdown {
   status: 'perfect' | 'good' | 'warning' | 'bad';
 }
 
+export interface ScoreDimension {
+  key: string;
+  label: string;
+  emoji: string;
+  points: number;      // puntos obtenidos
+  maxPoints: number;   // puntos máximos
+  pct: number;         // 0–100
+  feedback: string;    // mensaje específico
+  tip: string;         // acción concreta para mejorar
+}
+
+export type ScoreTier =
+  | 'excelente'   // 90–100
+  | 'muy_bien'    // 75–89
+  | 'bien'        // 60–74
+  | 'regular'     // 40–59
+  | 'critico';    // 0–39
+
 export interface DailyFinancialScore {
   date: string; // YYYY-MM-DD
-  score: number; // 0 to 100
-  rating: 'Excelente' | 'Muy Bueno' | 'Bueno' | 'Regular' | 'Atención';
+  total: number; // 0–100
+  score: number; // 0 to 100 (alias for total)
+  tier: ScoreTier;
+  rating: string;
   ratingEmoji: string;
   color: string;
-  dailySpent: number;
-  dailyLimit: number;
-  isWithinLimit: boolean;
+  dimensions: ScoreDimension[];
+  streak: number;
   streakDays: number;
-  breakdown: {
+  dailySpent?: number;
+  dailyLimit?: number;
+  isWithinLimit?: boolean;
+  breakdown?: {
     limit: ScoreCategoryBreakdown;
     logging: ScoreCategoryBreakdown;
     budgetPacing: ScoreCategoryBreakdown;
     streak: ScoreCategoryBreakdown;
   };
-  tip: string;
+  tip?: string;
   unlockedAt?: number;
 }
 
