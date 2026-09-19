@@ -149,7 +149,8 @@ import {
   SubscriptionPlanId,
   Transaction,
   UserAccount,
-  UserSubscription
+  UserSubscription,
+  Vencimiento
 } from './types';
 import { 
   DEFAULT_BUDGETS, 
@@ -419,6 +420,74 @@ export default function App() {
     }
     return isDemo ? DEFAULT_GOALS : [];
   });
+
+  // ─── Vencimientos ─────────────────────────────────────────────────────────────
+  const [vencimientos, setVencimientos] = useState<Vencimiento[]>(() => {
+    const saved = localStorage.getItem('gastoar_vencimientos_v1');
+    if (saved) {
+      try { return JSON.parse(saved); } catch {}
+    }
+    // Datos iniciales de ejemplo (se pueden borrar luego)
+    const today = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const addDays = (d: Date, days: number) => {
+      const r = new Date(d);
+      r.setDate(r.getDate() + days);
+      return `${r.getFullYear()}-${pad(r.getMonth() + 1)}-${pad(r.getDate())}`;
+    };
+    return [
+      {
+        id: 'v1',
+        icon: '💳',
+        title: 'Tarjeta Visa',
+        cat: 'Tarjeta de crédito',
+        amount: 85000,
+        dueDate: addDays(today, 3),
+        isRecurring: true,
+      },
+      {
+        id: 'v2',
+        icon: '🏢',
+        title: 'Expensas',
+        cat: 'Hogar',
+        amount: 135000,
+        dueDate: addDays(today, 5),
+        isRecurring: true,
+      },
+      {
+        id: 'v3',
+        icon: '💧',
+        title: 'AySA',
+        cat: 'Servicios',
+        amount: 28500,
+        dueDate: addDays(today, 8),
+        isRecurring: true,
+      },
+      {
+        id: 'v4',
+        icon: '🌐',
+        title: 'Internet',
+        cat: 'Servicios',
+        amount: 12000,
+        dueDate: addDays(today, 11),
+        isRecurring: true,
+      },
+      {
+        id: 'v5',
+        icon: '🏠',
+        title: 'Alquiler',
+        cat: 'Vivienda',
+        amount: 650000,
+        dueDate: addDays(today, 14),
+        isRecurring: true,
+      },
+    ];
+  });
+
+  // Persistir vencimientos
+  useEffect(() => {
+    localStorage.setItem('gastoar_vencimientos_v1', JSON.stringify(vencimientos));
+  }, [vencimientos]);
 
   // UI States
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'installments' | 'card_alerts' | 'couple_balance' | 'budgets' | 'categories' | 'ai' | 'settlement' | 'goals' | 'subscriptions' | 'admin_subscriptions' | 'charts' | 'profile' | 'settings' | 'mobile_screens'>('dashboard');
@@ -1046,6 +1115,35 @@ export default function App() {
   const handleDeleteGoal = (id: string) => {
     setGoals(prev => prev.filter(g => g.id !== id));
     showToast('Caja de meta eliminada', 'info');
+  };
+
+  // ─── Handlers de Vencimientos ─────────────────────────────────────────────────
+
+  const handleAddVencimiento = (v: Omit<Vencimiento, 'id'>) => {
+    const newV: Vencimiento = { ...v, id: 'venc-' + Date.now() };
+    setVencimientos(prev => [...prev, newV].sort((a, b) => a.dueDate.localeCompare(b.dueDate)));
+    showToast(`Vencimiento "${v.title}" agregado`, 'success');
+  };
+
+  const handleMarkVencimientoPaid = (id: string) => {
+    setVencimientos(prev => prev.map(v => {
+      if (v.id !== id) return v;
+      // Si es recurrente, avanzar al próximo mes en lugar de eliminar
+      if (v.isRecurring) {
+        const next = new Date(v.dueDate);
+        next.setMonth(next.getMonth() + 1);
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        const nextDate = `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}`;
+        return { ...v, dueDate: nextDate, isPaid: false };
+      }
+      return { ...v, isPaid: true };
+    }));
+    showToast('Vencimiento marcado como pagado ✓', 'success');
+  };
+
+  const handleDeleteVencimiento = (id: string) => {
+    setVencimientos(prev => prev.filter(v => v.id !== id));
+    showToast('Vencimiento eliminado', 'info');
   };
 
   const handleExportData = () => {
@@ -2020,6 +2118,10 @@ export default function App() {
                   }));
                   setActiveTab('transactions');
                 }}
+                vencimientos={vencimientos}
+                onMarkVencimientoPaid={handleMarkVencimientoPaid}
+                onDeleteVencimiento={handleDeleteVencimiento}
+                onAddVencimiento={handleAddVencimiento}
               />
             </div>
           )}

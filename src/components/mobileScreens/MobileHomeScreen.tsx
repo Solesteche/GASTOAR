@@ -136,8 +136,15 @@ export const MobileHomeScreen: React.FC<MobileHomeScreenProps> = ({
           </div>
 
           <div className="mt-4 pt-3 border-t border-white/15 flex items-center justify-between text-xs">
-            <span className="text-purple-200">Saldo Disponible</span>
-            <span className="font-extrabold text-white">
+            <div className="flex items-center gap-1.5">
+              <span className="text-purple-200">Saldo Disponible</span>
+              {balance < 0 && (
+                <span className="text-[9px] font-bold bg-rose-500/30 text-rose-200 border border-rose-400/30 px-1.5 py-0.5 rounded-full">
+                  Déficit
+                </span>
+              )}
+            </div>
+            <span className={`font-extrabold ${balance < 0 ? 'text-rose-200' : 'text-white'}`}>
               {formatCurrency(balance, profile?.currency || 'ARS')}
             </span>
           </div>

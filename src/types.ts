@@ -268,3 +268,16 @@ export interface DailyFinancialScore {
   unlockedAt?: number;
 }
 
+// ─── Vencimiento ──────────────────────────────────────────────────────────────
+export interface Vencimiento {
+  id: string;
+  icon: string;           // emoji, ej: "💳"
+  title: string;          // nombre, ej: "Tarjeta Visa"
+  cat: string;            // categoría, ej: "Tarjeta de crédito"
+  amount: number;         // monto en ARS
+  dueDate: string;        // ISO date "YYYY-MM-DD"
+  isPaid?: boolean;       // si ya fue pagado
+  isRecurring?: boolean;  // si se repite cada mes
+  notes?: string;         // nota opcional
+}
+

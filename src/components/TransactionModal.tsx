@@ -95,6 +95,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [calcMode, setCalcMode] = useState<'total' | 'por_cuota'>('total');
   const [montoPorCuotaInput, setMontoPorCuotaInput] = useState<string>('');
 
+  // Estado de errores de validación
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   useEffect(() => {
     if (editingTransaction) {
       const isInc = editingTransaction.tipoTransaccion === 'ingreso';
@@ -174,6 +178,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setPrimerMesCuota(defaultFirstPay.substring(0, 7));
       setMontoPorCuotaInput('');
     }
+    setFormErrors({});
+    setIsSubmitting(false);
   }, [editingTransaction, isOpen, categoryMap, profile, initialIsCuotas, initialTransactionType]);
 
   const handleCategoryChange = (newCat: string) => {
@@ -259,65 +265,99 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // ── Validación con feedback ──────────────────────────────────────────────
+    const errors: Record<string, string> = {};
     const numMonto = parseFloat(monto);
-    if (!concepto.trim() || isNaN(numMonto) || numMonto <= 0) {
-      return;
+
+    if (!concepto.trim()) {
+      errors.concepto = 'Ingresá el concepto o comercio';
+    }
+    if (isNaN(numMonto) || numMonto <= 0) {
+      errors.monto = 'Ingresá un monto mayor a $0';
+    }
+    if (!tipoTransaccion || (tipoTransaccion === 'gasto' && !categoria)) {
+      errors.categoria = 'Seleccioná una categoría';
+    }
+    if (!fecha) {
+      errors.fecha = 'Seleccioná la fecha';
+    }
+    if (esCuotas && cuotasTotal < 2) {
+      errors.cuotas = 'Las cuotas deben ser 2 o más';
     }
 
-    if (tipoTransaccion === 'ingreso') {
-      onSave({
-        id: editingTransaction ? editingTransaction.id : undefined,
-        concepto: concepto.trim(),
-        descripcion: descripcion.trim() || undefined,
-        monto: numMonto,
-        moneda: profile.currency || 'ARS',
-        categoria: 'Ingresos',
-        subcategoria: subcategoria || concepto.trim(),
-        fecha: fecha || new Date().toISOString().split('T')[0],
-        tipo,
-        tipoTransaccion: 'ingreso',
-        pagadoPor, // Quién cobró o recibió el dinero
-        metodoPago: metodoPago || 'Transferencia',
-        inputMethod: editingTransaction?.inputMethod || 'manual',
-        audioTranscription: editingTransaction?.audioTranscription,
-        confidence: editingTransaction?.confidence,
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      // Scroll al primer error
+      const firstErrorKey = Object.keys(errors)[0];
+      document.getElementById(`field-${firstErrorKey}`)?.scrollIntoView({
+        behavior: 'smooth', block: 'center'
       });
       return;
     }
 
-    // Expense submit
-    const isInstallmentActive = esCuotas && (cuotasTotal > 1 || metodoPago === 'Crédito');
-    const finalMontoCuota = isInstallmentActive 
-      ? (parseFloat(montoPorCuotaInput) || numMonto / (cuotasTotal || 1))
-      : undefined;
+    setFormErrors({});
+    setIsSubmitting(true);
 
-    onSave({
-      id: editingTransaction ? editingTransaction.id : undefined,
-      concepto: concepto.trim(),
-      descripcion: descripcion.trim(),
-      monto: numMonto,
-      moneda: profile.currency || 'ARS',
-      categoria: categoria || Object.keys(categoryMap)[0] || 'Alimentación',
-      subcategoria: subcategoria || categoryMap[categoria]?.[0] || 'General',
-      fecha: fecha || new Date().toISOString().split('T')[0],
-      tipo,
-      tipoTransaccion: 'gasto',
-      pagadoPor,
-      splitType: tipo === 'pareja' ? splitType : undefined,
-      user1Percent: tipo === 'pareja' && splitType === 'custom_percent' ? user1Percent : undefined,
-      user2Percent: tipo === 'pareja' && splitType === 'custom_percent' ? user2Percent : undefined,
-      metodoPago: isInstallmentActive ? 'Crédito' : metodoPago,
-      esCuotas: isInstallmentActive,
-      cuotasTotal: isInstallmentActive ? cuotasTotal : undefined,
-      cuotaActual: isInstallmentActive ? cuotaActual : undefined,
-      montoCuota: finalMontoCuota,
-      tarjetaNombre: isInstallmentActive ? tarjetaNombre.trim() : undefined,
-      primerMesCuota: isInstallmentActive ? (fechaPrimerPago ? fechaPrimerPago.substring(0, 7) : primerMesCuota) : undefined,
-      fechaPrimerPago: isInstallmentActive ? fechaPrimerPago : undefined,
-      inputMethod: editingTransaction?.inputMethod || 'manual',
-      audioTranscription: editingTransaction?.audioTranscription,
-      confidence: editingTransaction?.confidence,
-    });
+    try {
+      // ── INGRESO ─────────────────────────────────────────────────────────────
+      if (tipoTransaccion === 'ingreso') {
+        onSave({
+          id: editingTransaction ? editingTransaction.id : undefined,
+          concepto: concepto.trim(),
+          descripcion: descripcion.trim() || undefined,
+          monto: numMonto,
+          moneda: profile.currency || 'ARS',
+          categoria: 'Ingresos',
+          subcategoria: subcategoria || concepto.trim(),
+          fecha: fecha || new Date().toISOString().split('T')[0],
+          tipo,
+          tipoTransaccion: 'ingreso',
+          pagadoPor, // Quién cobró o recibió el dinero
+          metodoPago: metodoPago || 'Transferencia',
+          inputMethod: editingTransaction?.inputMethod || 'manual',
+          audioTranscription: editingTransaction?.audioTranscription,
+          confidence: editingTransaction?.confidence,
+        });
+        return;
+      }
+
+      // ── GASTO ────────────────────────────────────────────────────────────────
+      const isInstallmentActive = esCuotas && (cuotasTotal > 1 || metodoPago === 'Crédito');
+      const finalMontoCuota = isInstallmentActive 
+        ? (parseFloat(montoPorCuotaInput) || numMonto / (cuotasTotal || 1))
+        : undefined;
+
+      onSave({
+        id: editingTransaction ? editingTransaction.id : undefined,
+        concepto: concepto.trim(),
+        descripcion: descripcion.trim(),
+        monto: numMonto,
+        moneda: profile.currency || 'ARS',
+        categoria: categoria || Object.keys(categoryMap)[0] || 'Alimentación',
+        subcategoria: subcategoria || categoryMap[categoria]?.[0] || 'General',
+        fecha: fecha || new Date().toISOString().split('T')[0],
+        tipo,
+        tipoTransaccion: 'gasto',
+        pagadoPor,
+        splitType: tipo === 'pareja' ? splitType : undefined,
+        user1Percent: tipo === 'pareja' && splitType === 'custom_percent' ? user1Percent : undefined,
+        user2Percent: tipo === 'pareja' && splitType === 'custom_percent' ? user2Percent : undefined,
+        metodoPago: isInstallmentActive ? 'Crédito' : metodoPago,
+        esCuotas: isInstallmentActive,
+        cuotasTotal: isInstallmentActive ? cuotasTotal : undefined,
+        cuotaActual: isInstallmentActive ? cuotaActual : undefined,
+        montoCuota: finalMontoCuota,
+        tarjetaNombre: isInstallmentActive ? tarjetaNombre.trim() : undefined,
+        primerMesCuota: isInstallmentActive ? (fechaPrimerPago ? fechaPrimerPago.substring(0, 7) : primerMesCuota) : undefined,
+        fechaPrimerPago: isInstallmentActive ? fechaPrimerPago : undefined,
+        inputMethod: editingTransaction?.inputMethod || 'manual',
+        audioTranscription: editingTransaction?.audioTranscription,
+        confidence: editingTransaction?.confidence,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!isOpen) return null;
