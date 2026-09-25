@@ -22,9 +22,9 @@ import {
   ExternalLink,
   WalletCards
 } from 'lucide-react';
-import { CoupleProfile, UserAccount, UserSubscription } from '../../types';
-import { SUBSCRIPTION_PLANS } from '../../data/subscriptionPlans';
-import { formatCurrency, formatDateEs } from '../../utils/formatters';
+import { CoupleProfile, UserAccount, UserSubscription } from './types';
+import { SUBSCRIPTION_PLANS } from './data/subscriptionPlans';
+import { formatCurrency, formatDateEs } from './utils/formatters';
 
 interface ProfileScreenProps {
   onBack?: () => void;

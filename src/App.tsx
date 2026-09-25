@@ -1898,7 +1898,7 @@ export default function App() {
         profile={profile}
         onOpenTransactionModal={() => { setEditingTransaction(null); setInitialIsCuotas(false); setTxModalInitialType('gasto'); setIsTxModalOpen(true); }}
         onOpenIncomeModal={() => setIsIncomeModalOpen(true)}
-        onOpenProfileModal={() => setIsProfileModalOpen(true)}
+        onOpenProfileModal={() => setActiveTab('profile')}
         onOpenCategoryModal={() => setIsCategoryModalOpen(true)}
         onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
         onOpenAiModal={() => setIsAiModalOpen(true)}
@@ -1929,7 +1929,7 @@ export default function App() {
             setIsTxModalOpen(true); 
           }}
           onOpenIncomeModal={() => setIsIncomeModalOpen(true)}
-          onOpenProfileModal={() => setIsProfileModalOpen(true)}
+          onOpenProfileModal={() => setActiveTab('profile')}
           onOpenAiModal={() => setIsAiModalOpen(true)}
           onNavigateHome={() => setActiveTab('dashboard')}
           onToggleSidebar={() => setIsSidebarOpenMobile(prev => !prev)}
@@ -2165,6 +2165,7 @@ export default function App() {
                   setProfile(prev => ({ ...prev, ...data }));
                   showToast('Perfil actualizado con éxito', 'success');
                 }}
+                onUpdateAccount={handleUpdateAccount}
                 onNavigateToTab={(tab) => setActiveTab(tab as any)}
                 onOpenCloudSync={() => setIsCloudSyncModalOpen(true)}
                 onLogout={handleLogout}
