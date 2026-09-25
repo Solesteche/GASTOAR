@@ -1,6 +1,8 @@
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
+  setPersistence,
+  browserLocalPersistence,
   GoogleAuthProvider, 
   signInWithPopup, 
   signOut as firebaseSignOut,
@@ -23,7 +25,9 @@ import {
   getDocFromServer,
   query,
   orderBy,
-  serverTimestamp
+  serverTimestamp,
+  onSnapshot,
+  Unsubscribe
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Budgets, Transaction, UserAccount } from '../types';
@@ -32,8 +36,14 @@ import { Budgets, Transaction, UserAccount } from '../types';
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
+
+// Forzar la persistencia local en el navegador/dispositivo para acelerar y mantener el inicio de sesión
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error('Error al configurar la persistencia de autenticación:', error);
+});
+
 export const googleProvider = new GoogleAuthProvider();
-export { onAuthStateChanged };
+export { onAuthStateChanged, setPersistence, browserLocalPersistence };
 
 // 2. Error Handler with strict FirestoreErrorInfo JSON serialization
 export enum OperationType {
@@ -224,6 +234,36 @@ export async function getBudgetsFromFirestore(userId: string): Promise<Budgets |
 }
 
 /**
+ * Escucha en tiempo real los presupuestos del usuario.
+ * Path: /users/{userId}/presupuestos/actual
+ */
+export function listenToBudgets(
+  userId: string,
+  onUpdate: (budgets: Budgets) => void,
+  onError?: (err: unknown) => void
+): Unsubscribe {
+  return onSnapshot(
+    doc(db, 'users', userId, 'presupuestos', 'actual'),
+    (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        onUpdate({
+          categories: data.categories || {},
+          subcategories: data.subcategories || {},
+          alertThresholdPercent: data.alertThresholdPercent,
+          projectionGrowthPercent: data.projectionGrowthPercent,
+          lastProjectedDate: data.updatedAt
+        });
+      }
+    },
+    (error) => {
+      console.warn('Realtime listener error on budgets:', error);
+      onError?.(error);
+    }
+  );
+}
+
+/**
  * Estado que no forma parte de un movimiento individual. Mantenerlo en
  * Firestore evita que un dispositivo nuevo dependa de localStorage o de la
  * carpeta temporal de un servidor serverless.
@@ -249,6 +289,29 @@ export async function getAppStateFromFirestore(userId: string): Promise<Record<s
   } catch (err) {
     handleFirestoreError(err, OperationType.GET, path);
   }
+}
+
+/**
+ * Escucha cambios en tiempo real del estado de la aplicación (PC <-> Celular).
+ * Path: /users/{userId}/estado/actual
+ */
+export function listenToAppState(
+  userId: string,
+  onUpdate: (state: Record<string, unknown>) => void,
+  onError?: (err: unknown) => void
+): Unsubscribe {
+  return onSnapshot(
+    doc(db, 'users', userId, 'estado', 'actual'),
+    (snap) => {
+      if (snap.exists()) {
+        onUpdate(snap.data() as Record<string, unknown>);
+      }
+    },
+    (error) => {
+      console.warn('Realtime listener error on appState:', error);
+      onError?.(error);
+    }
+  );
 }
 
 /**
@@ -337,6 +400,40 @@ export async function getMonthMovementsFromFirestore(userId: string, mesKey: str
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, collectionPath);
   }
+}
+
+/**
+ * Escucha en tiempo real los movimientos de un mes (PC <-> Celular).
+ * Al registrar un gasto en la PC, el celular lo recibe inmediatamente, y viceversa.
+ * Path: /users/{userId}/movimientos/{mesKey}/items
+ */
+export function listenToMonthMovements(
+  userId: string,
+  mesKey: string,
+  onUpdate: (transactions: Transaction[]) => void,
+  onError?: (err: unknown) => void
+): Unsubscribe {
+  const itemsCollection = collection(db, 'users', userId, 'movimientos', mesKey, 'items');
+  return onSnapshot(
+    itemsCollection,
+    (snap) => {
+      const results: Transaction[] = [];
+      snap.forEach((docSnap) => {
+        results.push(docSnap.data() as Transaction);
+      });
+      // Ordenar en memoria descendente por fecha y fecha de creación
+      results.sort((a, b) => {
+        const dateDiff = (b.fecha || '').localeCompare(a.fecha || '');
+        if (dateDiff !== 0) return dateDiff;
+        return (b.createdAt || 0) - (a.createdAt || 0);
+      });
+      onUpdate(results);
+    },
+    (error) => {
+      console.warn(`Realtime listener error on movimientos ${mesKey}:`, error);
+      onError?.(error);
+    }
+  );
 }
 
 /**
@@ -471,3 +568,7 @@ export async function signInWithGoogle(): Promise<FirebaseUser | null> {
 export async function logOutFirebase(): Promise<void> {
   await firebaseSignOut(auth);
 }
+
+export { onSnapshot };
+export type { Unsubscribe };
+

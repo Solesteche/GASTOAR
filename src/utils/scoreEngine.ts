@@ -1,229 +1,364 @@
-import { Budgets, DailyFinancialScore, ScoreCategoryBreakdown, Transaction } from '../types';
+// scoreEngine.ts — Sistema de score financiero multidimensional GastoAR
+// Reemplazar el archivo completo
 
-export function getTodayDateString(): string {
+import { Transaction, Budgets, DailyFinancialScore, ScoreDimension, ScoreTier } from '../types';
+
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+
+export type { ScoreDimension, ScoreTier, DailyFinancialScore };
+
+export interface ScoreHistory {
+  [dateKey: string]: DailyFinancialScore;
+}
+
+// ─── Helper: fecha de hoy ─────────────────────────────────────────────────────
+
+export const getTodayDateString = (): string => {
   const d = new Date();
   const pad = (n: number) => n.toString().padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
+};
 
-export function computeDailyFinancialScore(
-  transactions: Transaction[],
+// ─── Tier según puntaje ───────────────────────────────────────────────────────
+
+export const getTier = (score: number): ScoreTier => {
+  if (score >= 90) return 'excelente';
+  if (score >= 75) return 'muy_bien';
+  if (score >= 60) return 'bien';
+  if (score >= 40) return 'regular';
+  return 'critico';
+};
+
+export const TIER_CONFIG: Record<ScoreTier, {
+  label: string; emoji: string; color: string; bg: string; message: string;
+}> = {
+  excelente: {
+    label: 'Excelente', emoji: '🏆',
+    color: '#059669', bg: '#D1FAE5',
+    message: '¡Sos un ejemplo de finanzas sanas!',
+  },
+  muy_bien: {
+    label: 'Muy bien', emoji: '🥇',
+    color: '#7C3AED', bg: '#EDE9FE',
+    message: 'Estás en el buen camino, seguí así.',
+  },
+  bien: {
+    label: 'Bien', emoji: '💪',
+    color: '#2563EB', bg: '#DBEAFE',
+    message: 'Controlás bien tus gastos.',
+  },
+  regular: {
+    label: 'Regular', emoji: '⚠️',
+    color: '#D97706', bg: '#FEF3C7',
+    message: 'Hay algunas categorías que merecen atención.',
+  },
+  critico: {
+    label: 'Crítico', emoji: '🚨',
+    color: '#DC2626', bg: '#FEE2E2',
+    message: 'Tus gastos superan los límites. Revisá el presupuesto.',
+  },
+};
+
+// ─── Motor principal ──────────────────────────────────────────────────────────
+
+export const computeDailyFinancialScore = (
+  transactions: Transaction[] = [],
   budgets: Budgets,
-  history: Record<string, DailyFinancialScore> = {},
-  targetDate: string = getTodayDateString()
-): DailyFinancialScore {
-  const now = new Date();
-  const parts = targetDate.split('-').map(Number);
-  const year = parts[0] || now.getFullYear();
-  const month = (parts[1] || now.getMonth() + 1) - 1; // 0-indexed
-  const day = parts[2] || now.getDate();
+  history: ScoreHistory = {},
+  today: string = getTodayDateString(),
+  vencimientos: Array<{ dueDate: string; isPaid?: boolean }> = [],
+): DailyFinancialScore => {
 
-  const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
-  const daysElapsed = Math.max(1, Math.min(totalDaysInMonth, day));
-  const daysRemaining = Math.max(1, totalDaysInMonth - daysElapsed + 1);
+  const dimensions: ScoreDimension[] = [];
 
-  const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-  
-  // Transactions for the whole month
-  const monthTxs = (transactions || []).filter(t => t.fecha && t.fecha.startsWith(monthPrefix));
-  const monthExpenses = monthTxs.filter(t => t.tipoTransaccion !== 'ingreso');
-  const monthIncomes = monthTxs.filter(t => t.tipoTransaccion === 'ingreso');
+  // ── 1. Control de presupuesto (30 pts) ──────────────────────────────────────
+  const monthStart = today.substring(0, 7) + '-01';
+  const monthTxs = (transactions || []).filter(
+    t => t.tipoTransaccion !== 'ingreso' && t.fecha >= monthStart && t.fecha <= today
+  );
+  const catSpend: Record<string, number> = {};
+  monthTxs.forEach(t => {
+    catSpend[t.categoria] = (catSpend[t.categoria] || 0) + t.monto;
+  });
 
-  const totalMonthExpenses = monthExpenses.reduce((acc, t) => acc + (t.monto || 0), 0);
-  const totalMonthIncomes = monthIncomes.reduce((acc, t) => acc + (t.monto || 0), 0);
+  const cats = Object.entries(budgets?.categories || {});
+  let budgetPts = 30;
+  let worstCat = '';
+  let worstPct = 0;
 
-  // General Budget
+  if (cats.length > 0) {
+    cats.forEach(([cat, limit]) => {
+      const spent = catSpend[cat] || 0;
+      const pct = limit > 0 ? spent / limit : 0;
+      if (pct > worstPct) { worstPct = pct; worstCat = cat; }
+      if (pct > 1.0) budgetPts -= 10;       // superó el límite
+      else if (pct > 0.9) budgetPts -= 5;   // cerca del límite
+      else if (pct > 0.75) budgetPts -= 2;  // en seguimiento
+    });
+    budgetPts = Math.max(0, budgetPts);
+  }
+
+  dimensions.push({
+    key: 'budget',
+    label: 'Control de presupuesto',
+    emoji: '🎯',
+    points: budgetPts,
+    maxPoints: 30,
+    pct: Math.round((budgetPts / 30) * 100),
+    feedback: budgetPts >= 25
+      ? 'Tus categorías están bajo control'
+      : worstCat
+        ? `"${worstCat}" superó el ${Math.round(worstPct * 100)}% del presupuesto`
+        : 'Revisá tus límites por categoría',
+    tip: budgetPts < 20
+      ? `Ajustá el presupuesto de "${worstCat}" o reducí gastos ahí`
+      : 'Seguí así con tus límites actuales',
+  });
+
+  // ── 2. Consistencia de registro (20 pts) ────────────────────────────────────
+  // Cuántos de los últimos 7 días tuvo al menos 1 movimiento registrado
+  const daysWithActivity = new Set(
+    (transactions || [])
+      .filter(t => t.fecha >= nDaysAgo(7, today) && t.fecha <= today)
+      .map(t => t.fecha)
+  ).size;
+
+  const consistencyPts = Math.round((daysWithActivity / 7) * 20);
+
+  // Racha actual
+  const streak = computeStreak(history, today);
+
+  dimensions.push({
+    key: 'consistency',
+    label: 'Consistencia',
+    emoji: '📅',
+    points: consistencyPts,
+    maxPoints: 20,
+    pct: Math.round((consistencyPts / 20) * 100),
+    feedback: daysWithActivity >= 6
+      ? `Registraste gastos ${daysWithActivity} de los últimos 7 días 🔥`
+      : `Solo ${daysWithActivity}/7 días con movimientos registrados`,
+    tip: daysWithActivity < 5
+      ? 'Intentá registrar cada gasto el mismo día que ocurre'
+      : 'Mantené el hábito — ¡ya tenés una racha de ' + streak + ' días!',
+  });
+
+  // ── 3. Ahorro neto del mes (20 pts) ─────────────────────────────────────────
+  const totalIncome = (transactions || [])
+    .filter(t => t.tipoTransaccion === 'ingreso' && t.fecha >= monthStart)
+    .reduce((s, t) => s + t.monto, 0);
+
+  const totalExpenses = monthTxs.reduce((s, t) => s + t.monto, 0);
+
+  let savingsPts = 0;
+  let savingsRate = 0;
+  if (totalIncome > 0) {
+    savingsRate = (totalIncome - totalExpenses) / totalIncome;
+    if (savingsRate >= 0.3)      savingsPts = 20;  // ahorra 30%+
+    else if (savingsRate >= 0.2) savingsPts = 16;
+    else if (savingsRate >= 0.1) savingsPts = 12;
+    else if (savingsRate >= 0)   savingsPts = 8;   // no ahorra pero no se endeuda
+    else                          savingsPts = 0;  // gastó más de lo que ingresó
+  } else {
+    // Sin ingresos cargados → puntos neutros para no penalizar
+    savingsPts = 10;
+  }
+
+  dimensions.push({
+    key: 'savings',
+    label: 'Ahorro neto',
+    emoji: '💰',
+    points: savingsPts,
+    maxPoints: 20,
+    pct: Math.round((savingsPts / 20) * 100),
+    feedback: totalIncome === 0
+      ? 'Cargá tus ingresos para calcular tu tasa de ahorro'
+      : savingsRate >= 0.2
+        ? `¡Ahorrás el ${Math.round(savingsRate * 100)}% de tus ingresos!`
+        : savingsRate >= 0
+          ? `Ahorrás el ${Math.round(savingsRate * 100)}% — la meta es 20%`
+          : 'Gastaste más de lo que ingresaste este mes',
+    tip: savingsRate < 0.1 && totalIncome > 0
+      ? 'Intentá recortar en la categoría de mayor gasto para llegar al 10% de ahorro'
+      : 'Meta sugerida: destinar el 20% del sueldo al ahorro',
+  });
+
+  // ── 4. Velocidad de registro (10 pts) ───────────────────────────────────────
+  // ¿Cuántos gastos se registraron el mismo día o al día siguiente?
+  const recentTxs = (transactions || []).filter(
+    t => t.tipoTransaccion !== 'ingreso' && t.fecha >= nDaysAgo(7, today)
+  );
+  const sameOrNextDay = recentTxs.filter(t => {
+    if (!t.createdAt) return true; // sin timestamp → beneficio de la duda
+    const created = new Date(t.createdAt).toISOString().split('T')[0];
+    const diff = daysBetween(t.fecha, created);
+    return diff <= 1;
+  }).length;
+
+  const speedPts = recentTxs.length === 0
+    ? 5  // neutro si no hay txs recientes
+    : Math.round((sameOrNextDay / recentTxs.length) * 10);
+
+  dimensions.push({
+    key: 'speed',
+    label: 'Registro en tiempo real',
+    emoji: '⚡',
+    points: speedPts,
+    maxPoints: 10,
+    pct: Math.round((speedPts / 10) * 100),
+    feedback: speedPts >= 8
+      ? 'Registrás los gastos al instante — excelente hábito'
+      : 'Algunos gastos se registraron días después',
+    tip: 'Registrá cada gasto con GastoAR justo después de pagarlo',
+  });
+
+  // ── 5. Vencimientos al día (10 pts) ─────────────────────────────────────────
+  const overdueCount = (vencimientos || []).filter(v => {
+    if (v.isPaid) return false;
+    return v.dueDate < today;
+  }).length;
+
+  const vencPts = overdueCount === 0 ? 10 : Math.max(0, 10 - overdueCount * 4);
+
+  dimensions.push({
+    key: 'bills',
+    label: 'Vencimientos al día',
+    emoji: '🔔',
+    points: vencPts,
+    maxPoints: 10,
+    pct: Math.round((vencPts / 10) * 100),
+    feedback: overdueCount === 0
+      ? 'No tenés pagos vencidos — ¡todo al día!'
+      : `Tenés ${overdueCount} pago${overdueCount > 1 ? 's' : ''} vencido${overdueCount > 1 ? 's' : ''}`,
+    tip: overdueCount > 0
+      ? 'Marcá los pagos como realizados en la sección Vencimientos'
+      : 'Configurá alertas para no olvidar los próximos vencimientos',
+  });
+
+  // ── 6. Tendencia vs semana anterior (10 pts) ────────────────────────────────
+  const thisWeekSpend = (transactions || [])
+    .filter(t => t.tipoTransaccion !== 'ingreso'
+      && t.fecha >= nDaysAgo(7, today) && t.fecha <= today)
+    .reduce((s, t) => s + t.monto, 0);
+
+  const lastWeekStart = nDaysAgo(14, today);
+  const lastWeekEnd = nDaysAgo(8, today);
+  const lastWeekSpend = (transactions || [])
+    .filter(t => t.tipoTransaccion !== 'ingreso'
+      && t.fecha >= lastWeekStart && t.fecha <= lastWeekEnd)
+    .reduce((s, t) => s + t.monto, 0);
+
+  let trendPts = 5; // neutro por defecto
+  let trendPct = 0;
+  if (lastWeekSpend > 0) {
+    trendPct = ((thisWeekSpend - lastWeekSpend) / lastWeekSpend) * 100;
+    if (trendPct <= -20)      trendPts = 10;  // gastó 20%+ menos
+    else if (trendPct <= -10) trendPts = 8;
+    else if (trendPct <= 0)   trendPts = 6;
+    else if (trendPct <= 10)  trendPts = 4;
+    else                       trendPts = 0;  // gastó 10%+ más
+  }
+
+  dimensions.push({
+    key: 'trend',
+    label: 'Tendencia semanal',
+    emoji: '📈',
+    points: trendPts,
+    maxPoints: 10,
+    pct: Math.round((trendPts / 10) * 100),
+    feedback: lastWeekSpend === 0
+      ? 'Sin datos de semana anterior para comparar'
+      : trendPct <= 0
+        ? `Gastaste ${Math.abs(Math.round(trendPct))}% menos que la semana pasada 💚`
+        : `Gastaste ${Math.round(trendPct)}% más que la semana pasada`,
+    tip: trendPts < 6
+      ? 'Intentá reducir gastos en categorías variables (salidas, compras)'
+      : 'Mantené esta tendencia y tu score seguirá subiendo',
+  });
+
+  // ── Total ────────────────────────────────────────────────────────────────────
+  const total = Math.round(
+    dimensions.reduce((s, d) => s + d.points, 0)
+  );
+
+  const tier = getTier(total);
+  const cfg = TIER_CONFIG[tier];
   const catBudgets = Object.values(budgets?.categories || {}).reduce<number>((acc, v) => acc + (Number(v) || 0), 0);
-  const generalBudget = catBudgets > 0 ? catBudgets : (totalMonthIncomes > 0 ? totalMonthIncomes : 200000);
-
-  // Today's expenses
-  const todayTxs = monthExpenses.filter(t => t.fecha === targetDate);
-  const todaySpent = todayTxs.reduce((acc, t) => acc + (t.monto || 0), 0);
-
-  // Monthly Remaining and Recommended Daily Limit
-  const remainingBudget = Math.max(0, generalBudget - (totalMonthExpenses - todaySpent));
-  const recommendedDailyLimit = Math.max(1000, Math.round(remainingBudget / daysRemaining));
-
-  // 1. Cumplimiento del Límite Diario (Max 40 pts)
-  let limitScore = 40;
-  let limitStatus: ScoreCategoryBreakdown['status'] = 'perfect';
-  let limitDesc = '¡Excelente! Mantuviste tus gastos dentro del límite recomendado para hoy.';
-
-  if (todaySpent === 0) {
-    limitScore = 40;
-    limitStatus = 'perfect';
-    limitDesc = 'Día sin gastos registrados. ¡Ahorro total del límite diario!';
-  } else if (todaySpent <= recommendedDailyLimit) {
-    limitScore = 40;
-    limitStatus = 'perfect';
-    limitDesc = `Gastaste $${Math.round(todaySpent).toLocaleString('es-AR')} de los $${Math.round(recommendedDailyLimit).toLocaleString('es-AR')} disponibles.`;
-  } else if (todaySpent <= recommendedDailyLimit * 1.15) {
-    limitScore = 32;
-    limitStatus = 'good';
-    limitDesc = 'Leve exceso del límite diario, pero completamente controlable.';
-  } else if (todaySpent <= recommendedDailyLimit * 1.35) {
-    limitScore = 20;
-    limitStatus = 'warning';
-    limitDesc = 'Gastos por encima del promedio diario recomendado.';
-  } else if (todaySpent <= recommendedDailyLimit * 1.7) {
-    limitScore = 10;
-    limitStatus = 'warning';
-    limitDesc = 'Superaste el límite diario considerablemente.';
-  } else {
-    limitScore = 4;
-    limitStatus = 'bad';
-    limitDesc = 'Exceso significativo del límite diario.';
-  }
-
-  // 2. Disciplina de Registro y Categorización (Max 25 pts)
-  let loggingScore = 25;
-  let loggingStatus: ScoreCategoryBreakdown['status'] = 'perfect';
-  let loggingDesc = 'Movimientos registrados con detalle, categorías y método de pago.';
-
-  if (todayTxs.length > 0) {
-    const withCategory = todayTxs.filter(t => t.categoria && t.categoria !== 'Sin Categoría').length;
-    const withPayment = todayTxs.filter(t => t.metodoPago).length;
-    const ratio = (withCategory + withPayment) / (todayTxs.length * 2);
-    if (ratio >= 0.9) {
-      loggingScore = 25;
-      loggingStatus = 'perfect';
-      loggingDesc = `${todayTxs.length} gasto(s) categorizados con precisión total.`;
-    } else {
-      loggingScore = Math.round(15 + ratio * 10);
-      loggingStatus = 'good';
-      loggingDesc = 'Algunos gastos no tienen categoría o método asignado.';
-    }
-  } else {
-    loggingScore = 25;
-    loggingStatus = 'perfect';
-    loggingDesc = 'Día cerrado sin compras pendientes de registro.';
-  }
-
-  // 3. Ritmo de Presupuesto Mensual & Ahorro (Max 25 pts)
-  const expectedPacing = daysElapsed / totalDaysInMonth; // 0 to 1
-  const actualPacing = generalBudget > 0 ? (totalMonthExpenses / generalBudget) : 0;
-  
-  let budgetScore = 25;
-  let budgetStatus: ScoreCategoryBreakdown['status'] = 'perfect';
-  let budgetDesc = 'Tu ritmo de gasto mensual está alineado o por debajo del presupuesto.';
-
-  if (actualPacing <= expectedPacing + 0.05) {
-    budgetScore = 25;
-    budgetStatus = 'perfect';
-    budgetDesc = `Ritmo óptimo: has consumido el ${Math.round(actualPacing * 100)}% del presupuesto en el día ${daysElapsed} del mes.`;
-  } else if (actualPacing <= expectedPacing + 0.15) {
-    budgetScore = 18;
-    budgetStatus = 'good';
-    budgetDesc = 'Consumo levemente acelerado respecto a los días transcurridos.';
-  } else if (actualPacing <= expectedPacing + 0.3) {
-    budgetScore = 10;
-    budgetStatus = 'warning';
-    budgetDesc = 'El ritmo de gastos supera la proyección proporcional del mes.';
-  } else {
-    budgetScore = 4;
-    budgetStatus = 'bad';
-    budgetDesc = 'Presupuesto mensual comprometido o cerca del límite.';
-  }
-
-  // 4. Racha de Días Finalizados / Streak (Max 10 pts)
-  // Calculate consecutive days finalized in history
-  let streak = 1;
-  const yesterday = new Date(year, month, day - 1);
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  const yStr = `${yesterday.getFullYear()}-${pad(yesterday.getMonth() + 1)}-${pad(yesterday.getDate())}`;
-  
-  if (history[yStr] && history[yStr].score >= 60) {
-    streak = (history[yStr].streakDays || 1) + 1;
-  }
-
-  let streakScore = Math.min(10, 2 + streak * 2);
-  let streakStatus: ScoreCategoryBreakdown['status'] = streak >= 3 ? 'perfect' : 'good';
-  let streakDesc = streak > 1 
-    ? `🔥 Racha de ${streak} días consecutivos cuidando tus finanzas.`
-    : '¡Primer día de tu racha financiera! Mantenela mañana.';
-
-  // Total Score (0-100)
-  const totalScore = Math.min(100, Math.max(10, limitScore + loggingScore + budgetScore + streakScore));
-
-  // Determine Rating & Color
-  let rating: DailyFinancialScore['rating'] = 'Excelente';
-  let ratingEmoji = '🏆';
-  let color = '#10b981'; // Emerald
-
-  if (totalScore >= 90) {
-    rating = 'Excelente';
-    ratingEmoji = '🏆';
-    color = '#10b981';
-  } else if (totalScore >= 78) {
-    rating = 'Muy Bueno';
-    ratingEmoji = '⭐';
-    color = '#38bdf8';
-  } else if (totalScore >= 65) {
-    rating = 'Bueno';
-    ratingEmoji = '👍';
-    color = '#f59e0b';
-  } else if (totalScore >= 50) {
-    rating = 'Regular';
-    ratingEmoji = '⚖️';
-    color = '#fb923c';
-  } else {
-    rating = 'Atención';
-    ratingEmoji = '⚠️';
-    color = '#f43f5e';
-  }
-
-  // Actionable tip for tomorrow
-  const tips = [
-    'Evitá gastos impulsivos revisando el límite diario antes de salir a comprar.',
-    'Planificá las comidas de la semana para reducir el gasto hormiga en delivery.',
-    'Anotá los gastos en el momento exacto para no olvidar ningún ticket.',
-    'Si hoy gastaste de más, compensá los próximos 2 días ajustando gastos prescindibles.',
-    'Excelente control: considerá destinar el sobrante de hoy a tu meta de ahorro.',
-    'Revisá tus suscripciones activas para dar de baja las que no estés utilizando.',
-    'Aprovechá los descuentos con débito o billeteras virtuales en días puntuales.',
-  ];
-  const tip = tips[(day + totalScore) % tips.length];
+  const generalBudget = catBudgets > 0 ? catBudgets : (totalIncome > 0 ? totalIncome : 200000);
 
   return {
-    date: targetDate,
-    score: totalScore,
-    rating,
-    ratingEmoji,
-    color,
-    dailySpent: Math.round(todaySpent),
-    dailyLimit: recommendedDailyLimit,
-    isWithinLimit: todaySpent <= recommendedDailyLimit,
-    streakDays: streak,
+    date: today,
+    total: Math.min(100, Math.max(0, total)),
+    score: Math.min(100, Math.max(0, total)), // compatibility alias
+    tier,
+    rating: cfg.label,                       // compatibility alias
+    ratingEmoji: cfg.emoji,                   // compatibility alias
+    color: cfg.color,                         // compatibility alias
+    dimensions,
+    streak,
+    streakDays: streak,                       // compatibility alias
+    unlockedAt: history[today]?.unlockedAt,
+    tip: dimensions.find(d => d.points < d.maxPoints)?.tip || dimensions[0]?.tip || '¡Excelente trabajo financiero!',
+    dailySpent: totalExpenses,
+    dailyLimit: Math.round(generalBudget / 30),
+    isWithinLimit: totalExpenses <= Math.round(generalBudget / 30),
     breakdown: {
       limit: {
-        score: limitScore,
-        maxScore: 40,
-        label: 'Límite Diario',
-        description: limitDesc,
-        status: limitStatus,
+        score: dimensions[0]?.points || 0,
+        maxScore: dimensions[0]?.maxPoints || 30,
+        label: dimensions[0]?.label || 'Presupuesto',
+        description: dimensions[0]?.feedback || '',
+        status: (dimensions[0]?.pct >= 80 ? 'perfect' : dimensions[0]?.pct >= 50 ? 'good' : 'warning'),
       },
       logging: {
-        score: loggingScore,
-        maxScore: 25,
-        label: 'Registro & Hábitos',
-        description: loggingDesc,
-        status: loggingStatus,
+        score: dimensions[1]?.points || 0,
+        maxScore: dimensions[1]?.maxPoints || 20,
+        label: dimensions[1]?.label || 'Consistencia',
+        description: dimensions[1]?.feedback || '',
+        status: (dimensions[1]?.pct >= 80 ? 'perfect' : dimensions[1]?.pct >= 50 ? 'good' : 'warning'),
       },
       budgetPacing: {
-        score: budgetScore,
-        maxScore: 25,
-        label: 'Ritmo de Presupuesto',
-        description: budgetDesc,
-        status: budgetStatus,
+        score: dimensions[2]?.points || 0,
+        maxScore: dimensions[2]?.maxPoints || 20,
+        label: dimensions[2]?.label || 'Ahorro neto',
+        description: dimensions[2]?.feedback || '',
+        status: (dimensions[2]?.pct >= 80 ? 'perfect' : dimensions[2]?.pct >= 50 ? 'good' : 'warning'),
       },
       streak: {
-        score: streakScore,
+        score: Math.min(10, streak * 2),
         maxScore: 10,
-        label: 'Racha Consecutiva',
-        description: streakDesc,
-        status: streakStatus,
-      },
-    },
-    tip,
+        label: 'Racha',
+        description: `${streak} días consecutivos`,
+        status: streak >= 3 ? 'perfect' : 'good',
+      }
+    }
   };
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function nDaysAgo(n: number, from: string): string {
+  const d = new Date(from + 'T00:00:00');
+  d.setDate(d.getDate() - n);
+  const pad = (x: number) => x.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function daysBetween(a: string, b: string): number {
+  return Math.abs(
+    (new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24)
+  );
+}
+
+function computeStreak(history: ScoreHistory, today: string): number {
+  let streak = 0;
+  let date = today;
+  while (true) {
+    const entry = history[date];
+    if (!entry || (entry.total ?? entry.score ?? 0) < 60) break;
+    streak++;
+    date = nDaysAgo(1, date);
+    if (streak > 365) break; // seguro
+  }
+  return streak;
 }

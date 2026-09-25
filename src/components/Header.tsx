@@ -7,7 +7,8 @@ import {
   ArrowUpRight, 
   LogOut,
   HelpCircle,
-  Mic
+  Mic,
+  Smartphone
 } from 'lucide-react';
 import { CoupleProfile, ExpenseMode } from '../types';
 import { GastoArBrand } from './GastoArLogo';
@@ -27,6 +28,7 @@ interface HeaderProps {
   onExitDemo?: () => void;
   cloudSyncStatus?: 'synced' | 'syncing' | 'offline' | 'error';
   onOpenCloudSync?: () => void;
+  onOpenMobileScreens?: () => void;
   isDarkMode?: boolean;
 }
 
@@ -44,6 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
   onExitDemo,
   cloudSyncStatus = 'synced',
   onOpenCloudSync,
+  onOpenMobileScreens,
   isDarkMode = false,
 }) => {
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -188,6 +191,17 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Quick Action Buttons for Gasto & Ingreso */}
           <div className="hidden md:flex items-center gap-2">
+            {onOpenMobileScreens && (
+              <button
+                type="button"
+                onClick={onOpenMobileScreens}
+                className="px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#7928CA] border border-purple-200/90 font-bold text-xs transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                title="Ver las 8 pantallas móviles"
+              >
+                <Smartphone className="w-3.5 h-3.5 text-[#7928CA]" />
+                <span>8 Pantallas</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={handleOpenGasto}

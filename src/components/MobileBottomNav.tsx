@@ -15,7 +15,11 @@ import {
   Bell,
   CalendarClock,
   X,
-  Mic
+  Mic,
+  Smartphone,
+  User,
+  Settings,
+  BadgePercent
 } from 'lucide-react';
 
 interface MobileBottomNavProps {
@@ -23,6 +27,7 @@ interface MobileBottomNavProps {
   onSelectTab: (tab: any) => void;
   onOpenVoiceExpense: () => void;
   onToggleSidebar?: () => void;
+  onOpenMobileScreens?: () => void;
   hasDebt: boolean;
 }
 
@@ -31,6 +36,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   onSelectTab,
   onOpenVoiceExpense,
   onToggleSidebar,
+  onOpenMobileScreens,
   hasDebt,
 }) => {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
@@ -159,6 +165,53 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 </div>
                 <span>Gasto por Voz</span>
               </button>
+
+              <button
+                onClick={() => {
+                  setIsMoreOpen(false);
+                  if (onOpenMobileScreens) {
+                    onOpenMobileScreens();
+                  } else {
+                    onSelectTab('mobile_screens');
+                  }
+                }}
+                className="p-3 rounded-2xl border bg-gradient-to-tr from-purple-500 to-indigo-600 text-white flex flex-col items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+              >
+                <div className="w-9 h-9 rounded-xl bg-white/20 text-white flex items-center justify-center">
+                  <Smartphone className="w-4.5 h-4.5" />
+                </div>
+                <span className="font-black text-[11px]">8 Pantallas</span>
+              </button>
+
+              <button
+                onClick={() => handleMoreItemClick('profile')}
+                className="p-3 rounded-2xl border bg-slate-50 border-slate-200 text-slate-700 flex flex-col items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-xl bg-purple-100 text-[#7928CA] flex items-center justify-center">
+                  <User className="w-4.5 h-4.5" />
+                </div>
+                <span>Mi Perfil</span>
+              </button>
+
+              <button
+                onClick={() => handleMoreItemClick('settings')}
+                className="p-3 rounded-2xl border bg-slate-50 border-slate-200 text-slate-700 flex flex-col items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center">
+                  <Settings className="w-4.5 h-4.5" />
+                </div>
+                <span>Ajustes</span>
+              </button>
+
+              <button
+                onClick={() => handleMoreItemClick('subscriptions')}
+                className="p-3 rounded-2xl border bg-amber-50 border-amber-200 text-amber-900 flex flex-col items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                  <BadgePercent className="w-4.5 h-4.5" />
+                </div>
+                <span>Plan PRO</span>
+              </button>
             </div>
           </div>
         </div>
@@ -203,8 +256,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           {/* 4. Vencimientos */}
           <button
             onClick={() => onSelectTab('card_alerts')}
-            className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer ${
-              activeTab === 'card_alerts' ? 'text-[#7928CA] font-black scale-105' : 'text-slate-400 hover:text-slate-700'
+            className={`flex flex-col items-center justify-center p-1.5 rounded-2xl transition-all cursor-pointer ${
+              activeTab === 'card_alerts' ? 'bg-[#F4EEFF] text-[#7C3AED] font-black px-3.5' : 'text-slate-400 hover:text-slate-700'
             }`}
             title="Vencimientos"
           >

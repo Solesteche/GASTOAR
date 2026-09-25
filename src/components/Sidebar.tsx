@@ -25,7 +25,8 @@ import {
   Bell,
   ArrowUpRight,
   CalendarClock,
-  Mic
+  Mic,
+  Smartphone
 } from 'lucide-react';
 import { CoupleProfile, ExpenseMode } from '../types';
 import { GastoArBrand, GastoArIcon } from './GastoArLogo';
@@ -35,7 +36,7 @@ interface SidebarProps {
   isPinned: boolean;
   onTogglePin: () => void;
   onCloseMobile: () => void;
-  activeTab: 'dashboard' | 'transactions' | 'couple_balance' | 'installments' | 'budgets' | 'categories' | 'ai' | 'settlement' | 'goals' | 'subscriptions' | 'admin_subscriptions';
+  activeTab: string;
   onSelectTab: (tab: any) => void;
   activeMode: ExpenseMode;
   onModeChange: (mode: ExpenseMode) => void;
@@ -47,6 +48,7 @@ interface SidebarProps {
   onOpenBudgetModal: () => void;
   onOpenAiModal: () => void;
   onOpenCardAlerts?: () => void;
+  onOpenMobileScreens?: () => void;
   onOpenSettlementModal: () => void;
   onOpenLogoDownload?: () => void;
   debtInfo: { debtAmount: number; whoOwesWhom: string };
@@ -74,6 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenBudgetModal,
   onOpenAiModal,
   onOpenCardAlerts,
+  onOpenMobileScreens,
   onOpenSettlementModal,
   onOpenLogoDownload,
   debtInfo,
@@ -101,6 +104,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'goals', label: 'Metas & Cajas', icon: Target, badge: null },
     { id: 'categories', label: 'Categorías y Subcategorías', icon: FolderPlus, badge: null },
     { id: 'ai', label: 'Gasto por Voz', icon: Mic, badge: 'IA', isModal: true },
+    { id: 'mobile_screens', label: '8 Pantallas Móviles', icon: Smartphone, badge: '8 Vistas', isModal: true },
+    { id: 'profile', label: 'Mi Perfil', icon: User, badge: null },
+    { id: 'settings', label: 'Configuración', icon: Settings, badge: null },
+    { id: 'subscriptions', label: 'Suscripción PRO', icon: BadgePercent, badge: 'PRO' },
   ];
 
   const adminItem = { id: 'admin_subscriptions', label: 'Panel Admin Clientes', icon: ShieldCheck, badge: 'Admin' };
@@ -269,6 +276,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onClick={() => {
                     if (isAiButton) {
                       onOpenAiModal();
+                    } else if (item.id === 'mobile_screens' && onOpenMobileScreens) {
+                      onOpenMobileScreens();
                     } else {
                       onSelectTab(item.id);
                     }

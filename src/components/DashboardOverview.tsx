@@ -24,7 +24,7 @@ import {
   Cell, 
   ResponsiveContainer 
 } from 'recharts';
-import { Budgets, CategoryColors, CategoryMap, CoupleProfile, DailyFinancialScore, ExpenseMode, Transaction } from '../types';
+import { Budgets, CategoryColors, CategoryMap, CoupleProfile, DailyFinancialScore, ExpenseMode, Transaction, Vencimiento } from '../types';
 import { computeDailyFinancialScore, getTodayDateString } from '../utils/scoreEngine';
 import { DailyScoreModal } from './DailyScoreModal';
 
@@ -49,6 +49,10 @@ interface DashboardOverviewProps {
   onOpenBudgetModal?: () => void;
   onNavigateTab?: (tab: any) => void;
   onSelectCategory?: (category: string) => void;
+  vencimientos?: Vencimiento[];
+  onMarkVencimientoPaid?: (id: string) => void;
+  onDeleteVencimiento?: (id: string) => void;
+  onAddVencimiento?: (v: Omit<Vencimiento, 'id'>) => void;
 }
 
 const CATEGORY_EMOJIS: Record<string, string> = {
@@ -108,6 +112,7 @@ const MONTH_NAMES = [
 ];
 
 function billBadge(days: number) {
+  if (days < 0) return { bg: "#FEE2E2", color: "#DC2626" };
   if (days <= 3) return { bg: P_LIGHT, color: P };
   if (days <= 7) return { bg: "#FEF3C7", color: "#D97706" };
   if (days <= 15) return { bg: "#ECFDF5", color: "#059669" };
@@ -128,6 +133,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onOpenBudgetModal,
   onNavigateTab,
   onSelectCategory,
+  vencimientos = [],
+  onMarkVencimientoPaid,
+  onDeleteVencimiento,
+  onAddVencimiento,
 }) => {
   // Current user display name
   const isUser1 = profile?.currentUser === 'user1';
@@ -152,9 +161,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     });
   };
 
-  // Helper ARS currency format
-  const ars = (n: number) =>
-    "$ " + Math.round(Math.abs(n)).toLocaleString("es-AR", { maximumFractionDigits: 0 });
+  // Helper ARS currency format (supports negative values)
+  const ars = (n: number) => {
+    const isNegative = n < 0;
+    const formatted = Math.round(Math.abs(n)).toLocaleString("es-AR", { maximumFractionDigits: 0 });
+    return isNegative ? `-$ ${formatted}` : `$ ${formatted}`;
+  };
 
   // Score History & Daily Score Logic
   const todayStr = useMemo(() => getTodayDateString(), []);
@@ -170,8 +182,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   // Calculate live daily score
   const dailyScore = useMemo(() => {
-    return computeDailyFinancialScore(transactions, budgets, scoreHistory, todayStr);
-  }, [transactions, budgets, scoreHistory, todayStr]);
+    return computeDailyFinancialScore(transactions, budgets, scoreHistory, todayStr, vencimientos);
+  }, [transactions, budgets, scoreHistory, todayStr, vencimientos]);
 
   const isScoreUnlockedToday = useMemo(() => {
     return Boolean(scoreHistory[todayStr]?.unlockedAt);
@@ -417,9 +429,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   }, [monthExpensesList]);
 
   // 1. Saldo disponible adaptado al modo activo (Personal vs Compartido)
+  // Permite que el saldo pueda mostrarse en negativo si los gastos superan los ingresos
   const availableBalance = totalIncome > 0 
     ? (totalIncome - totalExpenses) 
-    : (activeMode === 'individual' ? Math.max(0, 185000 - totalExpenses) : Math.max(0, 520000 - totalExpenses));
+    : (activeMode === 'individual' ? (185000 - totalExpenses) : (520000 - totalExpenses));
 
   // 2. Presupuesto General del Mes & % Usado
   const generalBudget = useMemo(() => {
@@ -725,60 +738,35 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     return budgetAlertsList.filter(item => item.severity === 'critical').length;
   }, [budgetAlertsList]);
 
-  // Upcoming bills / vencimientos
+  // Vencimientos próximos — calculados dinámicamente desde props reales
   const upcomingBills = useMemo(() => {
-    try {
-      const savedV4 = localStorage.getItem('gastoar_vencimientos_alerts_v4') || localStorage.getItem('gastoar_vencimientos_alerts_v3');
-      if (savedV4) {
-        const parsed = JSON.parse(savedV4);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const todayDate = new Date();
-          const curDay = todayDate.getDate();
-          const iconMap: Record<string, string> = {
-            servicio: '⚡',
-            tarjeta: '💳',
-            impuesto: '🏛️',
-            alquiler: '🏠',
-            otro: '📄',
-          };
-          const unpaid = parsed
-            .filter((item: any) => !item.paidThisMonth && item.name)
-            .map((item: any) => {
-              const dueDay = item.dueDay || 1;
-              const daysLeft = dueDay - curDay;
-              const dueMonth = String(todayDate.getMonth() + 1).padStart(2, '0');
-              const dueDayStr = String(dueDay).padStart(2, '0');
-              return {
-                id: item.id || String(Math.random()),
-                icon: iconMap[item.category] || '📄',
-                title: item.name,
-                cat: item.provider || item.category || 'Servicio',
-                due: `${dueDayStr}/${dueMonth}`,
-                amount: item.estimatedAmount || 0,
-                daysLeft: daysLeft < 0 ? 0 : daysLeft,
-              };
-            })
-            .sort((a: any, b: any) => a.daysLeft - b.daysLeft)
-            .slice(0, 4);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-          if (unpaid.length > 0) {
-            return unpaid;
-          }
-        }
-      }
-    } catch {}
+    return vencimientos
+      .filter(v => !v.isPaid) // Solo no pagados
+      .map(v => {
+        const due = new Date(v.dueDate + 'T00:00:00');
+        const diffMs = due.getTime() - today.getTime();
+        const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-    if (isDemoMode) {
-      return [
-        { id: "1", icon: "💧", title: "Aysa",    cat: "Agua",          due: "28/09", amount: 4850,  daysLeft: 2  },
-        { id: "2", icon: "⚡", title: "Edenor",  cat: "Electricidad",  due: "01/10", amount: 6120,  daysLeft: 6  },
-        { id: "3", icon: "🏛️", title: "ABL",     cat: "Imp. Municipal",due: "10/10", amount: 5300,  daysLeft: 15 },
-        { id: "4", icon: "🚗", title: "Patente", cat: "Impuesto",      due: "15/10", amount: 8900,  daysLeft: 20 },
-      ];
-    }
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        const dueFormatted = `${pad(due.getDate())}/${pad(due.getMonth() + 1)}`;
 
-    return [];
-  }, [isDemoMode]);
+        return {
+          id: v.id,
+          icon: v.icon,
+          title: v.title,
+          cat: v.cat,
+          amount: v.amount,
+          due: dueFormatted,
+          daysLeft,
+          isOverdue: daysLeft < 0,
+        };
+      })
+      .sort((a, b) => a.daysLeft - b.daysLeft) // Más urgentes primero
+      .slice(0, 5); // Máximo 5 en el dashboard
+  }, [vencimientos]);
 
   // Circular progress math (ampliado para mayor visibilidad y presencia visual)
   const r = 40, cx = 50, cy = 50;
@@ -943,9 +931,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       <div className="bg-gradient-to-br from-[#2E0854] via-[#45108A] to-[#6F2EC5] text-white rounded-3xl p-5 shadow-lg shadow-purple-950/20 border border-purple-400/20">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold mb-2 text-purple-200">Saldo disponible</p>
             <div className="flex items-center gap-2 mb-2">
-              <p className="text-3xl font-bold font-outfit text-white tracking-tight leading-none">
+              <p className="text-sm font-semibold text-purple-200">Saldo disponible</p>
+              {availableBalance < 0 && (
+                <span className="text-[10px] font-bold bg-rose-500/30 text-rose-200 border border-rose-400/30 px-2 py-0.5 rounded-full">
+                  Déficit
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 mb-2">
+              <p className={`text-3xl font-bold font-outfit tracking-tight leading-none ${availableBalance < 0 ? 'text-rose-200' : 'text-white'}`}>
                 {isBalanceHidden ? "$ ••••••" : ars(availableBalance)}
               </p>
               <button 
@@ -960,8 +955,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <div
                 className="h-full rounded-full transition-all duration-700"
                 style={{ 
-                  width: `${Math.min(100, Math.max(5, (availableBalance / generalBudget) * 100))}%`, 
-                  background: 'linear-gradient(90deg, #F95420, #FF8C42)' 
+                  width: `${availableBalance < 0 ? 100 : Math.min(100, Math.max(0, (availableBalance / generalBudget) * 100))}%`, 
+                  background: availableBalance < 0 ? '#F43F5E' : 'linear-gradient(90deg, #F95420, #FF8C42)' 
                 }}
               />
             </div>
@@ -1351,20 +1346,20 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       </div>
 
       {/* 7. Upcoming Bills / Vencimientos próximos */}
-      {upcomingBills && upcomingBills.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-gray-900">Vencimientos próximos</h3>
-            {onNavigateTab && (
-              <button 
-                className="text-xs font-semibold cursor-pointer hover:underline" 
-                style={{ color: P }}
-                onClick={() => onNavigateTab('card_alerts')}
-              >
-                Ver todos
-              </button>
-            )}
-          </div>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-gray-900">Vencimientos próximos</h3>
+          {onNavigateTab && (
+            <button 
+              className="text-xs font-semibold cursor-pointer hover:underline" 
+              style={{ color: P }}
+              onClick={() => onNavigateTab('card_alerts')}
+            >
+              Ver todos
+            </button>
+          )}
+        </div>
+        {upcomingBills && upcomingBills.length > 0 ? (
           <div className="bg-white rounded-3xl shadow-sm border border-white overflow-hidden divide-y divide-gray-50">
             {upcomingBills.map((bill) => {
               const badge = billBadge(bill.daysLeft);
@@ -1384,15 +1379,50 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                       className="text-[10px] font-semibold px-2 py-1 rounded-full whitespace-nowrap"
                       style={{ backgroundColor: badge.bg, color: badge.color }}
                     >
-                      En {bill.daysLeft} días
+                      {bill.daysLeft < 0 ? `Venció hace ${Math.abs(bill.daysLeft)}d` : bill.daysLeft === 0 ? 'Vence hoy' : `En ${bill.daysLeft} días`}
                     </span>
                   </div>
+
+                  {/* Botón pagar */}
+                  {onMarkVencimientoPaid && (
+                    <button
+                      type="button"
+                      onClick={() => onMarkVencimientoPaid(bill.id)}
+                      title="Marcar como pagado"
+                      className="ml-2 flex-shrink-0 w-7 h-7 rounded-full bg-emerald-100 hover:bg-emerald-200 
+                                 text-emerald-700 flex items-center justify-center transition-colors cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               );
             })}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="bg-white rounded-3xl shadow-sm border border-white p-6 text-center text-slate-400">
+            <p className="text-2xl mb-1">✅</p>
+            <p className="text-xs font-medium">No tenés vencimientos próximos</p>
+            {onNavigateTab ? (
+              <button
+                type="button"
+                onClick={() => onNavigateTab('card_alerts')}
+                className="mt-2 text-xs text-purple-600 hover:underline font-semibold cursor-pointer"
+              >
+                + Gestionar vencimientos
+              </button>
+            ) : onAddVencimiento ? (
+              <button
+                type="button"
+                onClick={() => onNavigateTab ? onNavigateTab('card_alerts') : null}
+                className="mt-2 text-xs text-purple-600 hover:underline font-semibold cursor-pointer"
+              >
+                + Agregar vencimiento
+              </button>
+            ) : null}
+          </div>
+        )}
+      </div>
 
       {/* 7. Mobile CTA */}
       <button
@@ -1408,10 +1438,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       <DailyScoreModal
         isOpen={isScoreModalOpen}
         onClose={() => setIsScoreModalOpen(false)}
-        dailyScore={dailyScore}
-        isUnlocked={isScoreUnlockedToday}
-        onFinalizeDay={handleFinalizeDay}
-        scoreHistory={scoreHistory}
+        score={dailyScore}
+        history={scoreHistory}
+        onFinalize={handleFinalizeDay}
+        isFinalized={isScoreUnlockedToday}
       />
 
     </div>

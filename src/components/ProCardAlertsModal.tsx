@@ -198,29 +198,28 @@ export const ProCardAlertsModal: React.FC<ProCardAlertsModalProps> = ({
 }) => {
   const [items, setItems] = useState<DueAlertItem[]>(() => {
     try {
-      const savedV4 = localStorage.getItem('gastoar_vencimientos_alerts_v4');
-      if (savedV4 !== null) return JSON.parse(savedV4);
+      const savedV5 = localStorage.getItem('gastoar_vencimientos_alerts_v5');
+      if (savedV5 !== null) {
+        const parsed = JSON.parse(savedV5);
+        if (Array.isArray(parsed)) {
+          if (!isDemoMode) {
+            const demoIds = ['c1', 'c2', 'a1', 'e1', 's1', 's2', 's3', 's4', 'i1'];
+            return parsed.filter((it: any) => it && it.id && !demoIds.includes(it.id));
+          }
+          return parsed;
+        }
+      }
 
-      const savedV3 = localStorage.getItem('gastoar_vencimientos_alerts_v3');
-      if (savedV3 !== null) return JSON.parse(savedV3);
-      
-      const savedV2 = localStorage.getItem('gastoar_card_alerts_v2');
-      if (savedV2) {
-        const oldCards = JSON.parse(savedV2);
-        const converted: DueAlertItem[] = oldCards.map((c: any) => ({
-          id: c.id || 'c-' + Math.random(),
-          category: 'tarjeta' as AlertItemCategory,
-          name: c.cardName || 'Tarjeta de Crédito',
-          provider: c.bankName || 'Banco',
-          dueDay: c.dueDay || 5,
-          closeDay: c.closeDay || 20,
-          lastDigits: c.lastDigits,
-          color: c.color,
-          reminderDaysBeforeClose: c.reminderDaysBeforeClose || 1,
-          reminderDaysBeforeDue: c.reminderDaysBeforeDue || 2,
-          lastSyncedAt: c.lastSyncedAt
-        }));
-        return [...converted, ...DEFAULT_ALERT_ITEMS.filter(d => d.category !== 'tarjeta')];
+      const savedV4 = localStorage.getItem('gastoar_vencimientos_alerts_v4');
+      if (savedV4 !== null) {
+        const parsed = JSON.parse(savedV4);
+        if (Array.isArray(parsed)) {
+          if (!isDemoMode) {
+            const demoIds = ['c1', 'c2', 'a1', 'e1', 's1', 's2', 's3', 's4', 'i1'];
+            return parsed.filter((it: any) => it && it.id && !demoIds.includes(it.id));
+          }
+          return parsed;
+        }
       }
     } catch (e) {
       console.error(e);
@@ -253,7 +252,7 @@ export const ProCardAlertsModal: React.FC<ProCardAlertsModalProps> = ({
   const saveItemsToStorage = (updated: DueAlertItem[]) => {
     setItems(updated);
     try {
-      localStorage.setItem('gastoar_vencimientos_alerts_v3', JSON.stringify(updated));
+      localStorage.setItem('gastoar_vencimientos_alerts_v5', JSON.stringify(updated));
     } catch (e) {
       console.error(e);
     }

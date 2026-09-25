@@ -18,7 +18,8 @@ import {
   Clock,
   ChevronDown,
   Coins,
-  Trash2
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { CategoryMap, CoupleProfile, PaymentMethod, SplitType, Transaction } from '../types';
 import { BankCardSelect } from './BankCardSelect';
@@ -94,6 +95,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [showSchedulePreview, setShowSchedulePreview] = useState<boolean>(false);
   const [calcMode, setCalcMode] = useState<'total' | 'por_cuota'>('total');
   const [montoPorCuotaInput, setMontoPorCuotaInput] = useState<string>('');
+
+  // Estado de errores de validación
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (editingTransaction) {
@@ -174,6 +179,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setPrimerMesCuota(defaultFirstPay.substring(0, 7));
       setMontoPorCuotaInput('');
     }
+    setFormErrors({});
+    setIsSubmitting(false);
   }, [editingTransaction, isOpen, categoryMap, profile, initialIsCuotas, initialTransactionType]);
 
   const handleCategoryChange = (newCat: string) => {
@@ -259,65 +266,99 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // ── Validación con feedback ──────────────────────────────────────────────
+    const errors: Record<string, string> = {};
     const numMonto = parseFloat(monto);
-    if (!concepto.trim() || isNaN(numMonto) || numMonto <= 0) {
-      return;
+
+    if (!concepto.trim()) {
+      errors.concepto = 'Ingresá el concepto o comercio';
+    }
+    if (isNaN(numMonto) || numMonto <= 0) {
+      errors.monto = 'Ingresá un monto mayor a $0';
+    }
+    if (!tipoTransaccion || (tipoTransaccion === 'gasto' && !categoria)) {
+      errors.categoria = 'Seleccioná una categoría';
+    }
+    if (!fecha) {
+      errors.fecha = 'Seleccioná la fecha';
+    }
+    if (esCuotas && cuotasTotal < 2) {
+      errors.cuotas = 'Las cuotas deben ser 2 o más';
     }
 
-    if (tipoTransaccion === 'ingreso') {
-      onSave({
-        id: editingTransaction ? editingTransaction.id : undefined,
-        concepto: concepto.trim(),
-        descripcion: descripcion.trim() || undefined,
-        monto: numMonto,
-        moneda: profile.currency || 'ARS',
-        categoria: 'Ingresos',
-        subcategoria: subcategoria || concepto.trim(),
-        fecha: fecha || new Date().toISOString().split('T')[0],
-        tipo,
-        tipoTransaccion: 'ingreso',
-        pagadoPor, // Quién cobró o recibió el dinero
-        metodoPago: metodoPago || 'Transferencia',
-        inputMethod: editingTransaction?.inputMethod || 'manual',
-        audioTranscription: editingTransaction?.audioTranscription,
-        confidence: editingTransaction?.confidence,
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      // Scroll al primer error
+      const firstErrorKey = Object.keys(errors)[0];
+      document.getElementById(`field-${firstErrorKey}`)?.scrollIntoView({
+        behavior: 'smooth', block: 'center'
       });
       return;
     }
 
-    // Expense submit
-    const isInstallmentActive = esCuotas && (cuotasTotal > 1 || metodoPago === 'Crédito');
-    const finalMontoCuota = isInstallmentActive 
-      ? (parseFloat(montoPorCuotaInput) || numMonto / (cuotasTotal || 1))
-      : undefined;
+    setFormErrors({});
+    setIsSubmitting(true);
 
-    onSave({
-      id: editingTransaction ? editingTransaction.id : undefined,
-      concepto: concepto.trim(),
-      descripcion: descripcion.trim(),
-      monto: numMonto,
-      moneda: profile.currency || 'ARS',
-      categoria: categoria || Object.keys(categoryMap)[0] || 'Alimentación',
-      subcategoria: subcategoria || categoryMap[categoria]?.[0] || 'General',
-      fecha: fecha || new Date().toISOString().split('T')[0],
-      tipo,
-      tipoTransaccion: 'gasto',
-      pagadoPor,
-      splitType: tipo === 'pareja' ? splitType : undefined,
-      user1Percent: tipo === 'pareja' && splitType === 'custom_percent' ? user1Percent : undefined,
-      user2Percent: tipo === 'pareja' && splitType === 'custom_percent' ? user2Percent : undefined,
-      metodoPago: isInstallmentActive ? 'Crédito' : metodoPago,
-      esCuotas: isInstallmentActive,
-      cuotasTotal: isInstallmentActive ? cuotasTotal : undefined,
-      cuotaActual: isInstallmentActive ? cuotaActual : undefined,
-      montoCuota: finalMontoCuota,
-      tarjetaNombre: isInstallmentActive ? tarjetaNombre.trim() : undefined,
-      primerMesCuota: isInstallmentActive ? (fechaPrimerPago ? fechaPrimerPago.substring(0, 7) : primerMesCuota) : undefined,
-      fechaPrimerPago: isInstallmentActive ? fechaPrimerPago : undefined,
-      inputMethod: editingTransaction?.inputMethod || 'manual',
-      audioTranscription: editingTransaction?.audioTranscription,
-      confidence: editingTransaction?.confidence,
-    });
+    try {
+      // ── INGRESO ─────────────────────────────────────────────────────────────
+      if (tipoTransaccion === 'ingreso') {
+        onSave({
+          id: editingTransaction ? editingTransaction.id : undefined,
+          concepto: concepto.trim(),
+          descripcion: descripcion.trim() || undefined,
+          monto: numMonto,
+          moneda: profile.currency || 'ARS',
+          categoria: 'Ingresos',
+          subcategoria: subcategoria || concepto.trim(),
+          fecha: fecha || new Date().toISOString().split('T')[0],
+          tipo,
+          tipoTransaccion: 'ingreso',
+          pagadoPor, // Quién cobró o recibió el dinero
+          metodoPago: metodoPago || 'Transferencia',
+          inputMethod: editingTransaction?.inputMethod || 'manual',
+          audioTranscription: editingTransaction?.audioTranscription,
+          confidence: editingTransaction?.confidence,
+        });
+        return;
+      }
+
+      // ── GASTO ────────────────────────────────────────────────────────────────
+      const isInstallmentActive = esCuotas && (cuotasTotal > 1 || metodoPago === 'Crédito');
+      const finalMontoCuota = isInstallmentActive 
+        ? (parseFloat(montoPorCuotaInput) || numMonto / (cuotasTotal || 1))
+        : undefined;
+
+      onSave({
+        id: editingTransaction ? editingTransaction.id : undefined,
+        concepto: concepto.trim(),
+        descripcion: descripcion.trim(),
+        monto: numMonto,
+        moneda: profile.currency || 'ARS',
+        categoria: categoria || Object.keys(categoryMap)[0] || 'Alimentación',
+        subcategoria: subcategoria || categoryMap[categoria]?.[0] || 'General',
+        fecha: fecha || new Date().toISOString().split('T')[0],
+        tipo,
+        tipoTransaccion: 'gasto',
+        pagadoPor,
+        splitType: tipo === 'pareja' ? splitType : undefined,
+        user1Percent: tipo === 'pareja' && splitType === 'custom_percent' ? user1Percent : undefined,
+        user2Percent: tipo === 'pareja' && splitType === 'custom_percent' ? user2Percent : undefined,
+        metodoPago: isInstallmentActive ? 'Crédito' : metodoPago,
+        esCuotas: isInstallmentActive,
+        cuotasTotal: isInstallmentActive ? cuotasTotal : undefined,
+        cuotaActual: isInstallmentActive ? cuotaActual : undefined,
+        montoCuota: finalMontoCuota,
+        tarjetaNombre: isInstallmentActive ? tarjetaNombre.trim() : undefined,
+        primerMesCuota: isInstallmentActive ? (fechaPrimerPago ? fechaPrimerPago.substring(0, 7) : primerMesCuota) : undefined,
+        fechaPrimerPago: isInstallmentActive ? fechaPrimerPago : undefined,
+        inputMethod: editingTransaction?.inputMethod || 'manual',
+        audioTranscription: editingTransaction?.audioTranscription,
+        confidence: editingTransaction?.confidence,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -459,13 +500,25 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     Concepto / Empresa / Pagador *
                   </label>
                   <input
+                    id="field-concepto"
                     type="text"
-                    required
                     value={concepto}
-                    onChange={(e) => setConcepto(e.target.value)}
+                    onChange={(e) => {
+                      setConcepto(e.target.value);
+                      if (formErrors.concepto) setFormErrors(p => ({ ...p, concepto: '' }));
+                    }}
                     placeholder="Ej: Sueldo Empresa, Cliente Freelance, Venta..."
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none transition-all"
+                    className={`w-full px-3 py-2.5 bg-slate-50 rounded-xl text-sm focus:ring-2 focus:bg-white focus:outline-none transition-all border ${
+                      formErrors.concepto
+                        ? 'border-red-400 ring-1 ring-red-300 bg-red-50/30'
+                        : 'border-slate-300 focus:ring-emerald-500'
+                    }`}
                   />
+                  {formErrors.concepto && (
+                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                      <span>⚠</span> {formErrors.concepto}
+                    </p>
+                  )}
                 </div>
 
                 <div className="sm:col-span-5">
@@ -474,19 +527,31 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                   </label>
                   <div className="relative">
                     <input
+                      id="field-monto"
                       type="number"
                       step="0.01"
                       min="0.01"
-                      required
                       value={monto}
-                      onChange={(e) => setMonto(e.target.value)}
+                      onChange={(e) => {
+                        setMonto(e.target.value);
+                        if (formErrors.monto) setFormErrors(p => ({ ...p, monto: '' }));
+                      }}
                       placeholder="0.00"
-                      className="w-full pl-3 pr-9 py-2.5 bg-emerald-50/50 border border-emerald-300 rounded-xl text-sm font-bold text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none transition-all"
+                      className={`w-full pl-3 pr-9 py-2.5 rounded-xl text-sm font-bold focus:ring-2 focus:bg-white focus:outline-none transition-all border ${
+                        formErrors.monto
+                          ? 'border-red-400 ring-1 ring-red-300 bg-red-50/30 text-red-900'
+                          : 'border-emerald-300 bg-emerald-50/50 text-emerald-950 focus:ring-emerald-500'
+                      }`}
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-600">
                       {profile.currency || '$'}
                     </span>
                   </div>
+                  {formErrors.monto && (
+                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                      <span>⚠</span> {formErrors.monto}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -651,13 +716,25 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                     Concepto / Comercio *
                   </label>
                   <input
+                    id="field-concepto"
                     type="text"
-                    required
                     value={concepto}
-                    onChange={(e) => setConcepto(e.target.value)}
+                    onChange={(e) => {
+                      setConcepto(e.target.value);
+                      if (formErrors.concepto) setFormErrors(p => ({ ...p, concepto: '' }));
+                    }}
                     placeholder="Ej: Smart TV, Supermercado, Zapatillas..."
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none transition-all"
+                    className={`w-full px-3 py-2.5 bg-slate-50 rounded-xl text-sm focus:ring-2 focus:bg-white focus:outline-none transition-all border ${
+                      formErrors.concepto
+                        ? 'border-red-400 ring-1 ring-red-300 bg-red-50/30'
+                        : 'border-slate-300 focus:ring-indigo-500'
+                    }`}
                   />
+                  {formErrors.concepto && (
+                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                      <span>⚠</span> {formErrors.concepto}
+                    </p>
+                  )}
                 </div>
 
                 <div className="sm:col-span-5">
@@ -666,19 +743,31 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                   </label>
                   <div className="relative">
                     <input
+                      id="field-monto"
                       type="number"
                       step="0.01"
                       min="0.01"
-                      required
                       value={monto}
-                      onChange={(e) => handleTotalMontoChange(e.target.value)}
+                      onChange={(e) => {
+                        handleTotalMontoChange(e.target.value);
+                        if (formErrors.monto) setFormErrors(p => ({ ...p, monto: '' }));
+                      }}
                       placeholder="0.00"
-                      className="w-full pl-3 pr-9 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none transition-all"
+                      className={`w-full pl-3 pr-9 py-2.5 bg-slate-50 rounded-xl text-sm font-bold focus:ring-2 focus:bg-white focus:outline-none transition-all border ${
+                        formErrors.monto
+                          ? 'border-red-400 ring-1 ring-red-300 bg-red-50/30 text-red-900'
+                          : 'border-slate-300 text-slate-900 focus:ring-indigo-500'
+                      }`}
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
                       {profile.currency || '$'}
                     </span>
                   </div>
+                  {formErrors.monto && (
+                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                      <span>⚠</span> {formErrors.monto}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1069,18 +1158,30 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               </button>
               <button
                 type="submit"
+                disabled={isSubmitting}
                 className={`px-5 py-2.5 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-1.5 ${
+                  isSubmitting ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                } ${
                   isIncome 
                     ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/25' 
                     : 'bg-[#0070f3] hover:bg-[#0060df] shadow-blue-500/25'
                 }`}
               >
-                <Check className="w-4 h-4 stroke-[3]" />
-                <span>
-                  {editingTransaction 
-                    ? 'Guardar Cambios' 
-                    : (isIncome ? 'Registrar Ingreso' : (esCuotas ? 'Registrar Compra en Cuotas' : 'Registrar Gasto'))}
-                </span>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Guardando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 stroke-[3]" />
+                    <span>
+                      {editingTransaction 
+                        ? 'Guardar Cambios' 
+                        : (isIncome ? 'Registrar Ingreso' : (esCuotas ? 'Registrar Compra en Cuotas' : 'Registrar Gasto'))}
+                    </span>
+                  </>
+                )}
               </button>
             </div>
           </div>

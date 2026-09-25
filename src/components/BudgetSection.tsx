@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   AlertTriangle, BarChart3, BellRing, Calendar, Check, CheckCircle2, ChevronRight,
   Edit3, Lightbulb, Plus, Settings2, ShieldCheck, Target, TrendingDown, TrendingUp,
-  WalletCards, X, Sparkles
+  WalletCards, X, Sparkles, HelpCircle
 } from 'lucide-react';
 import { Budgets, CategoryColors, CategoryMap, Transaction } from '../types';
 import { formatCurrency } from '../utils/formatters';
@@ -185,6 +185,14 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
               <div className="grid grid-cols-5 gap-2 mt-3">{[70,75,80,85,90].map(p => <button key={p} onClick={() => onUpdateBudgets?.({ ...budgets, alertThresholdPercent: p })} className={`py-2 rounded-xl text-xs font-black border ${threshold === p ? 'bg-[#7928CA] border-[#7928CA] text-white' : 'bg-white dark:bg-[#190731] border-slate-200 dark:border-purple-900/50 text-slate-600 dark:text-slate-300'}`}>{p}%</button>)}</div>
               <input type="range" min="50" max="95" step="5" value={threshold} onChange={e => onUpdateBudgets?.({ ...budgets, alertThresholdPercent: Number(e.target.value) })} className="w-full mt-5 accent-purple-600" />
               <div className="flex justify-between text-[10px] text-slate-400 font-bold"><span>Temprana</span><span>Moderada</span><span>Tardía</span></div>
+
+              {/* Compact explanation card for mobile & desktop */}
+              <div className="mt-4 text-[10px] sm:text-[11px] leading-tight sm:leading-normal text-slate-600 bg-white/85 py-1.5 px-2.5 sm:p-3 rounded-lg sm:rounded-xl border border-slate-200/70 flex items-start gap-1.5 sm:gap-2 shadow-2xs">
+                <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-600 shrink-0 mt-0.5" />
+                <span className="leading-snug sm:leading-normal">
+                  <strong className="text-slate-800 font-bold">¿Cómo funciona el sistema de alertas?</strong> Se mostrará 🟢 <strong>Verde</strong> si llevás gastado menos del {threshold}%, 🟡 <strong>Amarillo</strong> al alcanzar entre el {threshold}% y el 99%, y 🔴 <strong>Rojo</strong> si superás el 100% de tu presupuesto.
+                </span>
+              </div>
             </div>
             <div className="grid sm:grid-cols-3 gap-3">
               <StatusBox title="Bajo control" count={summary.safe} tone="green" icon={CheckCircle2} />
@@ -216,17 +224,17 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
   );
 };
 
-function Metric({ label, value, helper, icon: Icon, tone }: { label:string; value:string; helper:string; icon:React.ElementType; tone:'purple'|'orange'|'green'|'blue' }) {
+const Metric: React.FC<{ label:string; value:string; helper:string; icon:React.ElementType; tone:'purple'|'orange'|'green'|'blue' }> = ({ label, value, helper, icon: Icon, tone }) => {
   const tones = { purple:'bg-purple-50 text-[#7928CA] dark:bg-purple-950/30', orange:'bg-orange-50 text-orange-600 dark:bg-orange-950/20', green:'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20', blue:'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/20' };
   return <div className="rounded-2xl border border-slate-200 dark:border-purple-900/40 p-4 bg-white dark:bg-[#16072b]"><div className="flex items-center justify-between gap-2"><span className="text-[10px] uppercase tracking-wider font-black text-slate-400">{label}</span><span className={`w-8 h-8 rounded-xl flex items-center justify-center ${tones[tone]}`}><Icon className="w-4 h-4" /></span></div><p className="text-lg sm:text-xl font-black text-slate-900 dark:text-white mt-3 truncate">{value}</p><p className="text-[10px] text-slate-500 mt-1">{helper}</p></div>;
-}
+};
 
-function StatusBox({ title, count, tone, icon: Icon }: { title:string; count:number; tone:'green'|'orange'|'slate'; icon:React.ElementType }) {
+const StatusBox: React.FC<{ title:string; count:number; tone:'green'|'orange'|'slate'; icon:React.ElementType }> = ({ title, count, tone, icon: Icon }) => {
   const cls = tone === 'green' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : tone === 'orange' ? 'bg-orange-50 border-orange-100 text-orange-700' : 'bg-slate-50 border-slate-200 text-slate-700';
   return <div className={`rounded-2xl border p-4 ${cls}`}><div className="flex items-center justify-between"><Icon className="w-5 h-5" /><span className="text-2xl font-black">{count}</span></div><p className="text-xs font-black mt-3">{title}</p></div>;
-}
+};
 
-function CategoryCard({ row, currency, threshold, onEdit, onView }: { row:any; currency:string; threshold:number; onEdit:()=>void; onView:()=>void }) {
+const CategoryCard: React.FC<{ row:any; currency:string; threshold:number; onEdit:()=>void; onView:()=>void }> = ({ row, currency, threshold, onEdit, onView }) => {
   const statusClass = row.status === 'exceeded' ? 'bg-rose-100 text-rose-700' : row.status === 'warning' ? 'bg-amber-100 text-amber-700' : row.status === 'none' ? 'bg-slate-100 text-slate-600' : 'bg-emerald-100 text-emerald-700';
   return <div className="rounded-2xl border border-slate-200 dark:border-purple-900/40 p-4 bg-white dark:bg-[#16072b] hover:shadow-md transition-shadow relative overflow-hidden"><div className="absolute top-0 left-0 right-0 h-1" style={{backgroundColor:row.status==='exceeded'?'#f43f5e':row.status==='warning'?'#f59e0b':row.color}} /><div className="flex items-start justify-between gap-2"><div className="min-w-0"><div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full shrink-0" style={{backgroundColor:row.color}} /><h4 className="text-sm font-black truncate">{row.category}</h4></div><p className="text-[10px] text-slate-400 mt-1">{row.limit > 0 ? `${formatCurrency(row.spent,currency)} de ${formatCurrency(row.limit,currency)}` : 'Sin límite asignado'}</p></div><span className={`px-2 py-1 rounded-full text-[9px] font-black ${statusClass}`}>{row.limit <= 0 ? 'Sin límite' : `${row.pct}%`}</span></div>{row.limit > 0 && <div className="mt-3 h-2.5 rounded-full bg-slate-100 dark:bg-purple-950/60 overflow-hidden"><div className={`h-full rounded-full ${row.status==='exceeded'?'bg-rose-500':row.status==='warning'?'bg-amber-500':'bg-[#7928CA]'}`} style={{width:`${Math.min(100,row.pct)}%`}} /></div>}<div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-purple-900/30"><button onClick={onView} className="text-[10px] font-black text-slate-500 hover:text-[#7928CA]">Ver gastos</button><button onClick={onEdit} className="px-2.5 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/30 text-[#7928CA] text-[10px] font-black flex items-center gap-1"><Edit3 className="w-3 h-3" />{row.limit>0?'Editar':'Asignar'}</button></div></div>;
 }

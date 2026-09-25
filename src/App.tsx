@@ -99,6 +99,19 @@ import {
   TrialExpiredBlockedScreen 
 } from './components/TrialExpiredBlockedScreen';
 import { 
+  MobileScreensViewerModal,
+  ScreenId
+} from './components/mobileScreens/MobileScreensViewerModal';
+import { 
+  ProfileScreen 
+} from './components/mobileScreens/ProfileScreen';
+import { 
+  SettingsScreen 
+} from './components/mobileScreens/SettingsScreen';
+import { 
+  MobileSubscriptionScreen 
+} from './components/mobileScreens/MobileSubscriptionScreen';
+import { 
   FirebaseCloudSyncModal 
 } from './components/FirebaseCloudSyncModal';
 import { 
@@ -117,7 +130,9 @@ import {
   registerWithEmailFirebase,
   loginWithEmailFirebase,
   getAppStateFromFirestore,
-  syncAppStateToFirestore
+  syncAppStateToFirestore,
+  listenToAppState,
+  listenToMonthMovements
 } from './lib/firebase';
 import { 
   BillingCycle,
@@ -134,7 +149,8 @@ import {
   SubscriptionPlanId,
   Transaction,
   UserAccount,
-  UserSubscription
+  UserSubscription,
+  Vencimiento
 } from './types';
 import { 
   DEFAULT_BUDGETS, 
@@ -163,7 +179,9 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('control_gastos_is_authenticated') === 'true';
   });
-  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(() => {
+    return !localStorage.getItem('control_gastos_is_authenticated');
+  });
 
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
     return localStorage.getItem('control_gastos_is_admin') === 'true';
@@ -403,8 +421,78 @@ export default function App() {
     return isDemo ? DEFAULT_GOALS : [];
   });
 
+  // ─── Vencimientos ─────────────────────────────────────────────────────────────
+  const [vencimientos, setVencimientos] = useState<Vencimiento[]>(() => {
+    const saved = localStorage.getItem('gastoar_vencimientos_v1');
+    if (saved) {
+      try { return JSON.parse(saved); } catch {}
+    }
+    // Datos iniciales de ejemplo (se pueden borrar luego)
+    const today = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const addDays = (d: Date, days: number) => {
+      const r = new Date(d);
+      r.setDate(r.getDate() + days);
+      return `${r.getFullYear()}-${pad(r.getMonth() + 1)}-${pad(r.getDate())}`;
+    };
+    return [
+      {
+        id: 'v1',
+        icon: '💳',
+        title: 'Tarjeta Visa',
+        cat: 'Tarjeta de crédito',
+        amount: 85000,
+        dueDate: addDays(today, 3),
+        isRecurring: true,
+      },
+      {
+        id: 'v2',
+        icon: '🏢',
+        title: 'Expensas',
+        cat: 'Hogar',
+        amount: 135000,
+        dueDate: addDays(today, 5),
+        isRecurring: true,
+      },
+      {
+        id: 'v3',
+        icon: '💧',
+        title: 'AySA',
+        cat: 'Servicios',
+        amount: 28500,
+        dueDate: addDays(today, 8),
+        isRecurring: true,
+      },
+      {
+        id: 'v4',
+        icon: '🌐',
+        title: 'Internet',
+        cat: 'Servicios',
+        amount: 12000,
+        dueDate: addDays(today, 11),
+        isRecurring: true,
+      },
+      {
+        id: 'v5',
+        icon: '🏠',
+        title: 'Alquiler',
+        cat: 'Vivienda',
+        amount: 650000,
+        dueDate: addDays(today, 14),
+        isRecurring: true,
+      },
+    ];
+  });
+
+  // Persistir vencimientos
+  useEffect(() => {
+    localStorage.setItem('gastoar_vencimientos_v1', JSON.stringify(vencimientos));
+  }, [vencimientos]);
+
   // UI States
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'installments' | 'card_alerts' | 'couple_balance' | 'budgets' | 'categories' | 'ai' | 'settlement' | 'goals' | 'subscriptions' | 'admin_subscriptions'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'installments' | 'card_alerts' | 'couple_balance' | 'budgets' | 'categories' | 'ai' | 'settlement' | 'goals' | 'subscriptions' | 'admin_subscriptions' | 'charts' | 'profile' | 'settings' | 'mobile_screens'>('dashboard');
+  const [isMobileScreensModalOpen, setIsMobileScreensModalOpen] = useState<boolean>(false);
+  const [mobileScreensInitialScreen, setMobileScreensInitialScreen] = useState<ScreenId>('home');
 
   // Sync route path with activeTab if user accesses specific route
   useEffect(() => {
@@ -419,6 +507,9 @@ export default function App() {
     else if (raw === 'subscriptions' || raw === 'suscripciones') setActiveTab('subscriptions');
     else if (raw === 'admin_subscriptions' || raw === 'admin') setActiveTab('admin_subscriptions');
     else if (raw === 'transactions' || raw === 'gastos') setActiveTab('transactions');
+    else if (raw === 'profile' || raw === 'perfil') setActiveTab('profile');
+    else if (raw === 'settings' || raw === 'configuracion' || raw === 'ajustes') setActiveTab('settings');
+    else if (raw === 'mobile_screens' || raw === 'pantallas') setIsMobileScreensModalOpen(true);
     else if (raw === 'dashboard') setActiveTab('dashboard');
   }, [location.pathname]);
   const [activeMode, setActiveMode] = useState<ExpenseMode>(() => {
@@ -520,10 +611,11 @@ export default function App() {
 
   // Active user ID for Firebase Firestore partitioning
   const activeUserId = useMemo(() => {
+    if (auth.currentUser?.uid) return auth.currentUser.uid;
     if (currentUserAccount?.id) return currentUserAccount.id.replace(/[^a-zA-Z0-9_-]/g, '_');
     if (currentUserAccount?.email) return currentUserAccount.email.replace(/[^a-zA-Z0-9_-]/g, '_');
     return 'usuario_principal';
-  }, [currentUserAccount]);
+  }, [currentUserAccount, auth.currentUser?.uid]);
 
   const handleMergeTransactions = (newTxs: Transaction[]) => {
     setTransactions(prev => {
@@ -536,90 +628,96 @@ export default function App() {
 
   // Cloud Sync State (for multi-device real-time consistency)
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('synced');
-  const isInitialCloudLoadDone = React.useRef<boolean>(false);
+  const isRemoteUpdate = useRef<boolean>(false);
+  const isInitialCloudLoadDone = useRef<boolean>(true);
 
-  // Load from Cloud on App start / session restore
-  // OPTIMIZACIÓN DE LECTURAS: Solo se descarga el mes actual (ej: septiembre)
+  // Sincronización en tiempo real con Firebase Firestore (onSnapshot)
+  // Cross-device: PC <-> Celular
+  // Elimina la secuencia bloqueante (mes actual + presupuesto + estado completo) del arranque.
   useEffect(() => {
-    if (!isAuthenticated || !currentUserAccount?.email || isDemoMode) return;
+    if (!isAuthenticated || !currentUserAccount?.email || isDemoMode || !activeUserId) return;
 
-    const loadCloudData = async () => {
-      try {
-        setCloudSyncStatus('syncing');
+    setCloudSyncStatus('syncing');
 
-        // 1. Firebase Firestore: Descarga optimizada únicamente del mes actual
-        if (activeUserId) {
-          try {
-            const currentMonthKey = getMesKeyFromDate('');
-            const firestoreMonthTxs = await getMonthMovementsFromFirestore(activeUserId, currentMonthKey);
-            if (firestoreMonthTxs && firestoreMonthTxs.length > 0) {
-              setTransactions(prev => {
-                const map = new Map<string, Transaction>();
-                prev.forEach(t => map.set(t.id, t));
-                firestoreMonthTxs.forEach(t => map.set(t.id, t));
-                return Array.from(map.values());
-              });
-            }
+    // 1. Listener en tiempo real de Movimientos del mes actual (PC <-> Celular)
+    const currentMonthKey = getMesKeyFromDate('');
+    const unsubscribeMovements = listenToMonthMovements(
+      activeUserId,
+      currentMonthKey,
+      (remoteMonthTxs) => {
+        isRemoteUpdate.current = true;
+        setTransactions(prev => {
+          const map = new Map<string, Transaction>();
+          // Conservar movimientos de otros meses ya cargados en memoria
+          prev.forEach(t => map.set(t.id, t));
+          // Sincronizar reactivamente los movimientos del mes actual
+          remoteMonthTxs.forEach(t => map.set(t.id, t));
+          const merged = Array.from(map.values());
+          merged.sort((a, b) => {
+            const dateDiff = (b.fecha || '').localeCompare(a.fecha || '');
+            if (dateDiff !== 0) return dateDiff;
+            return (b.createdAt || 0) - (a.createdAt || 0);
+          });
+          return merged;
+        });
+        setCloudSyncStatus('synced');
+      },
+      () => setCloudSyncStatus('offline')
+    );
 
-            const firestoreBudgets = await getBudgetsFromFirestore(activeUserId);
-            if (firestoreBudgets) {
-              setBudgets(firestoreBudgets);
-            }
-          } catch (fbErr) {
-            console.warn('Firebase initial month load check:', fbErr);
-          }
+    // 2. Listener en tiempo real del Estado General de la aplicación (PC <-> Celular)
+    const unsubscribeAppState = listenToAppState(
+      activeUserId,
+      (data) => {
+        isRemoteUpdate.current = true;
+        if (Array.isArray(data.transactions) && data.transactions.length > 0) {
+          setTransactions(prev => {
+            const map = new Map<string, Transaction>();
+            (data.transactions as Transaction[]).forEach(t => map.set(t.id, t));
+            prev.forEach(t => map.set(t.id, t));
+            return Array.from(map.values());
+          });
         }
-
-        const data: any = await getAppStateFromFirestore(activeUserId);
-        if (data) {
-            if (Array.isArray(data.transactions) && data.transactions.length > 0) {
-              setTransactions(prev => {
-                const map = new Map<string, Transaction>();
-                (data.transactions as Transaction[]).forEach(t => map.set(t.id, t));
-                prev.forEach(t => map.set(t.id, t));
-                return Array.from(map.values());
-              });
-            }
-            if (data.categoryMap && Object.keys(data.categoryMap).length > 0) {
-              setCategoryMap(data.categoryMap);
-            }
-            if (data.categoryColors) {
-              setCategoryColors(data.categoryColors);
-            }
-            if (data.budgets) {
-              setBudgets(data.budgets);
-            }
-            if (data.profile) {
-              setProfile(data.profile);
-            }
-            if (Array.isArray(data.settlementHistory)) {
-              setSettlementHistory(data.settlementHistory);
-            }
-            if (Array.isArray(data.goals)) {
-              setGoals(data.goals);
-            }
-            if (Array.isArray(data.subscriptions) && data.subscriptions.length > 0) {
-              setSubscriptions(data.subscriptions);
-            }
-            setCloudSyncStatus('synced');
-        } else {
-          setCloudSyncStatus('synced');
+        if (data.categoryMap && Object.keys(data.categoryMap as object).length > 0) {
+          setCategoryMap(data.categoryMap as Record<string, string[]>);
         }
-      } catch (err) {
-        console.warn('Could not sync cloud data on load:', err);
-        setCloudSyncStatus('offline');
-      } finally {
-        isInitialCloudLoadDone.current = true;
-      }
+        if (data.categoryColors) {
+          setCategoryColors(data.categoryColors as Record<string, string>);
+        }
+        if (data.budgets) {
+          setBudgets(data.budgets as Budgets);
+        }
+        if (data.profile) {
+          setProfile(data.profile as CoupleProfile);
+        }
+        if (Array.isArray(data.settlementHistory)) {
+          setSettlementHistory(data.settlementHistory as SettlementRecord[]);
+        }
+        if (Array.isArray(data.goals)) {
+          setGoals(data.goals as Goal[]);
+        }
+        if (Array.isArray(data.subscriptions) && (data.subscriptions as unknown[]).length > 0) {
+          setSubscriptions(data.subscriptions as UserSubscription[]);
+        }
+        setCloudSyncStatus('synced');
+      },
+      () => setCloudSyncStatus('offline')
+    );
+
+    return () => {
+      unsubscribeMovements();
+      unsubscribeAppState();
     };
+  }, [isAuthenticated, currentUserAccount?.email, activeUserId, isDemoMode]);
 
-    loadCloudData();
-  }, [isAuthenticated, currentUserAccount?.email]);
-
-  // Debounced auto-sync to Cloud whenever state changes
+  // Auto-sincronización con Firestore cuando el usuario modifica datos localmente (evita loops por updates remotos)
   useEffect(() => {
-    if (!isAuthenticated || !currentUserAccount?.email || isDemoMode) return;
-    if (!isInitialCloudLoadDone.current) return;
+    if (!isAuthenticated || !currentUserAccount?.email || isDemoMode || !activeUserId) return;
+
+    if (isRemoteUpdate.current) {
+      isRemoteUpdate.current = false;
+      return;
+    }
 
     const timer = setTimeout(async () => {
       try {
@@ -646,8 +744,7 @@ export default function App() {
     subscriptions,
     isAuthenticated,
     currentUserAccount?.email,
-    currentUserAccount?.accountCode,
-    profile.accountCode,
+    activeUserId,
     isDemoMode,
   ]);
 
@@ -855,6 +952,20 @@ export default function App() {
       saveMovementToFirestore(activeUserId, savedTx).catch(err => {
         console.warn('Could not sync movement to Firebase Firestore:', err);
       });
+      // Sincronización inmediata de estado para reflejo instantáneo en otros dispositivos (PC <-> Celular)
+      const updatedTxs = [savedTx, ...transactions.filter(t => t.id !== savedTx.id)];
+      syncAppStateToFirestore(activeUserId, {
+        transactions: updatedTxs,
+        categoryMap,
+        categoryColors,
+        budgets,
+        profile,
+        settlementHistory,
+        goals,
+        subscriptions,
+      }).catch(err => {
+        console.warn('Could not sync app state on save:', err);
+      });
     }
 
     setIsTxModalOpen(false);
@@ -874,6 +985,19 @@ export default function App() {
     if (toDelete && activeUserId && !isDemoMode) {
       deleteMovementFromFirestore(activeUserId, id, toDelete.fecha).catch(err => {
         console.warn('Could not delete movement from Firebase Firestore:', err);
+      });
+      const remainingTxs = transactions.filter(t => t.id !== id);
+      syncAppStateToFirestore(activeUserId, {
+        transactions: remainingTxs,
+        categoryMap,
+        categoryColors,
+        budgets,
+        profile,
+        settlementHistory,
+        goals,
+        subscriptions,
+      }).catch(err => {
+        console.warn('Could not sync app state on delete:', err);
       });
     }
     setTransactions(prev => prev.filter(t => t.id !== id));
@@ -991,6 +1115,50 @@ export default function App() {
   const handleDeleteGoal = (id: string) => {
     setGoals(prev => prev.filter(g => g.id !== id));
     showToast('Caja de meta eliminada', 'info');
+  };
+
+  // ─── Handlers de Vencimientos ─────────────────────────────────────────────────
+
+  const handleAddVencimiento = (v: Omit<Vencimiento, 'id'>) => {
+    const newV: Vencimiento = { ...v, id: 'venc-' + Date.now() };
+    setVencimientos(prev => [...prev, newV].sort((a, b) => a.dueDate.localeCompare(b.dueDate)));
+    showToast(`Vencimiento "${v.title}" agregado`, 'success');
+  };
+
+  const handleMarkVencimientoPaid = (id: string) => {
+    setVencimientos(prev => prev.map(v => {
+      if (v.id !== id) return v;
+      // Si es recurrente, avanzar al próximo mes en lugar de eliminar
+      if (v.isRecurring) {
+        const next = new Date(v.dueDate);
+        next.setMonth(next.getMonth() + 1);
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        const nextDate = `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}`;
+        return { ...v, dueDate: nextDate, isPaid: false };
+      }
+      return { ...v, isPaid: true };
+    }));
+    showToast('Vencimiento marcado como pagado ✓', 'success');
+  };
+
+  const handleDeleteVencimiento = (id: string) => {
+    setVencimientos(prev => prev.filter(v => v.id !== id));
+    showToast('Vencimiento eliminado', 'info');
+  };
+
+  const handleExportData = () => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(transactions, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `gastoar_export_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('Datos exportados exitosamente en formato JSON', 'success');
+    } catch {
+      showToast('Error al exportar datos', 'error');
+    }
   };
 
   const handleAddContribution = (goalId: string, contribution: Omit<GoalContribution, 'id'>) => {
@@ -1405,6 +1573,7 @@ export default function App() {
       localStorage.setItem('control_gastos_budgets_v5', JSON.stringify({ categories: {}, subcategories: {} }));
       localStorage.setItem('control_gastos_goals_v1', JSON.stringify([]));
       localStorage.setItem('control_gastos_settlements_v3', JSON.stringify([]));
+      localStorage.setItem('gastoar_vencimientos_alerts_v5', JSON.stringify([]));
       localStorage.setItem('gastoar_vencimientos_alerts_v4', JSON.stringify([]));
       localStorage.setItem('gastoar_vencimientos_alerts_v3', JSON.stringify([]));
       localStorage.setItem('gastoar_card_alerts_v2', JSON.stringify([]));
@@ -1494,6 +1663,7 @@ export default function App() {
       localStorage.setItem('control_gastos_budgets_v5', JSON.stringify({ categories: {}, subcategories: {} }));
       localStorage.setItem('control_gastos_goals_v1', JSON.stringify([]));
       localStorage.setItem('control_gastos_settlements_v3', JSON.stringify([]));
+      localStorage.setItem('gastoar_vencimientos_alerts_v5', JSON.stringify([]));
       localStorage.setItem('gastoar_vencimientos_alerts_v4', JSON.stringify([]));
       localStorage.setItem('gastoar_vencimientos_alerts_v3', JSON.stringify([]));
       localStorage.setItem('gastoar_card_alerts_v2', JSON.stringify([]));
@@ -1609,37 +1779,92 @@ export default function App() {
             isAuthenticated ? (
               <Navigate to={(location.state as any)?.from?.pathname || '/'} replace />
             ) : (
-              <AuthLandingPage
-                onLogin={async (email, pass) => {
-                  const res = await handleLogin(email, pass);
-                  if (res.success) {
-                    navigate((location.state as any)?.from?.pathname || '/', { replace: true });
-                  }
-                  return res;
-                }}
-                onRegister={async (data) => {
-                  const res = await handleRegister(data);
-                  if (res.success) {
-                    navigate((location.state as any)?.from?.pathname || '/', { replace: true });
-                  }
-                  return res;
-                }}
-                onGoogleLogin={async () => {
-                  const res = await handleGoogleLogin();
-                  if (res.success) {
-                    navigate((location.state as any)?.from?.pathname || '/', { replace: true });
-                  }
-                  return res;
-                }}
-                onGuestDemo={() => {
-                  handleGuestDemo();
-                  navigate('/', { replace: true });
-                }}
-                onOpenAdminPanel={() => {
-                  handleOpenAdminPanel();
-                  navigate('/admin', { replace: true });
-                }}
-              />
+              <>
+                <AuthLandingPage
+                  onLogin={async (email, pass) => {
+                    const res = await handleLogin(email, pass);
+                    if (res.success) {
+                      navigate((location.state as any)?.from?.pathname || '/', { replace: true });
+                    }
+                    return res;
+                  }}
+                  onRegister={async (data) => {
+                    const res = await handleRegister(data);
+                    if (res.success) {
+                      navigate((location.state as any)?.from?.pathname || '/', { replace: true });
+                    }
+                    return res;
+                  }}
+                  onGoogleLogin={async () => {
+                    const res = await handleGoogleLogin();
+                    if (res.success) {
+                      navigate((location.state as any)?.from?.pathname || '/', { replace: true });
+                    }
+                    return res;
+                  }}
+                  onGuestDemo={() => {
+                    handleGuestDemo();
+                    navigate('/', { replace: true });
+                  }}
+                  onOpenAdminPanel={() => {
+                    handleOpenAdminPanel();
+                    navigate('/admin', { replace: true });
+                  }}
+                  onOpenMobileScreens={() => setIsMobileScreensModalOpen(true)}
+                />
+                {/* Also allow opening Mobile Screens viewer on public landing */}
+                <MobileScreensViewerModal
+                  isOpen={isMobileScreensModalOpen}
+                  onClose={() => setIsMobileScreensModalOpen(false)}
+                  initialScreen={mobileScreensInitialScreen}
+                  userAccount={currentUserAccount}
+                  profile={profile}
+                  transactions={transactions}
+                  subscription={activeUserSub}
+                  isDarkMode={isDarkMode}
+                  onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+                  onNavigateToTab={(tab) => {
+                    setIsMobileScreensModalOpen(false);
+                    if (tab === 'login' || tab === 'register') {
+                      // stays on auth landing page
+                    } else {
+                      // demo mode or authenticated
+                      handleGuestDemo();
+                      navigate('/', { replace: true });
+                      setActiveTab(tab as any);
+                    }
+                  }}
+                  onOpenNewExpense={() => {
+                    setIsMobileScreensModalOpen(false);
+                    handleGuestDemo();
+                    navigate('/', { replace: true });
+                    setEditingTransaction(null);
+                    setInitialIsCuotas(false);
+                    setTxModalInitialType('gasto');
+                    setIsTxModalOpen(true);
+                  }}
+                  onOpenNewIncome={() => {
+                    setIsMobileScreensModalOpen(false);
+                    handleGuestDemo();
+                    navigate('/', { replace: true });
+                    setIsIncomeModalOpen(true);
+                  }}
+                  onOpenVoiceExpense={() => {
+                    setIsMobileScreensModalOpen(false);
+                    handleGuestDemo();
+                    navigate('/', { replace: true });
+                    setIsAiModalOpen(true);
+                  }}
+                  onOpenCloudSync={() => {
+                    setIsMobileScreensModalOpen(false);
+                    handleGuestDemo();
+                    navigate('/', { replace: true });
+                    setIsCloudSyncModalOpen(true);
+                  }}
+                  onLogout={handleLogout}
+                  onShowToast={showToast}
+                />
+              </>
             )
           }
         />
@@ -1682,6 +1907,7 @@ export default function App() {
         onOpenLogoDownload={() => setIsLogoModalOpen(true)}
         debtInfo={debtInfo}
         onLogout={handleLogout}
+        onOpenMobileScreens={() => setIsMobileScreensModalOpen(true)}
         isAdmin={isAdmin}
         isDemoMode={isDemoMode}
         onExitDemo={handleExitDemo}
@@ -1707,6 +1933,7 @@ export default function App() {
           onOpenAiModal={() => setIsAiModalOpen(true)}
           onNavigateHome={() => setActiveTab('dashboard')}
           onToggleSidebar={() => setIsSidebarOpenMobile(prev => !prev)}
+          onOpenMobileScreens={() => setIsMobileScreensModalOpen(true)}
           isSidebarPinned={isSidebarPinned}
           isDemoMode={isDemoMode}
           onExitDemo={handleExitDemo}
@@ -1891,6 +2118,10 @@ export default function App() {
                   }));
                   setActiveTab('transactions');
                 }}
+                vencimientos={vencimientos}
+                onMarkVencimientoPaid={handleMarkVencimientoPaid}
+                onDeleteVencimiento={handleDeleteVencimiento}
+                onAddVencimiento={handleAddVencimiento}
               />
             </div>
           )}
@@ -1923,6 +2154,43 @@ export default function App() {
             />
           )}
 
+          {/* TAB 10: MI PERFIL (Pantalla 6) */}
+          {activeTab === 'profile' && (
+            <div className="max-w-md mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-purple-100">
+              <ProfileScreen
+                userAccount={currentUserAccount}
+                profile={profile}
+                subscription={activeUserSub}
+                onUpdateProfile={(data) => {
+                  setProfile(prev => ({ ...prev, ...data }));
+                  showToast('Perfil actualizado con éxito', 'success');
+                }}
+                onNavigateToTab={(tab) => setActiveTab(tab as any)}
+                onOpenCloudSync={() => setIsCloudSyncModalOpen(true)}
+                onLogout={handleLogout}
+                onShowToast={showToast}
+              />
+            </div>
+          )}
+
+          {/* TAB 11: CONFIGURACIÓN (Pantalla 7) */}
+          {activeTab === 'settings' && (
+            <div className="max-w-md mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-purple-100">
+              <SettingsScreen
+                userAccount={currentUserAccount}
+                profile={profile}
+                isDarkMode={isDarkMode}
+                onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+                onUpdateProfile={(data) => {
+                  setProfile(prev => ({ ...prev, ...data }));
+                }}
+                onExportData={handleExportData}
+                onLogout={handleLogout}
+                onShowToast={showToast}
+              />
+            </div>
+          )}
+
         </main>
       </div>
 
@@ -1936,6 +2204,7 @@ export default function App() {
         }}
         onOpenVoiceExpense={() => setIsAiModalOpen(true)}
         onToggleSidebar={() => setIsSidebarOpenMobile(prev => !prev)}
+        onOpenMobileScreens={() => setIsMobileScreensModalOpen(true)}
         hasDebt={debtInfo.debtAmount > 0}
       />
 
@@ -2114,6 +2383,44 @@ export default function App() {
         profile={profile}
         budgets={budgets}
         onUpgradePlan={() => { setIsDiagnosisModalOpen(false); setActiveTab('subscriptions'); }}
+      />
+
+      {/* 8 Essential Mobile Screens Viewer Modal */}
+      <MobileScreensViewerModal
+        isOpen={isMobileScreensModalOpen}
+        onClose={() => setIsMobileScreensModalOpen(false)}
+        initialScreen={mobileScreensInitialScreen}
+        userAccount={currentUserAccount}
+        profile={profile}
+        transactions={transactions}
+        subscription={activeUserSub}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+        onNavigateToTab={(tab) => {
+          setIsMobileScreensModalOpen(false);
+          setActiveTab(tab as any);
+        }}
+        onOpenNewExpense={() => {
+          setIsMobileScreensModalOpen(false);
+          setEditingTransaction(null);
+          setInitialIsCuotas(false);
+          setTxModalInitialType('gasto');
+          setIsTxModalOpen(true);
+        }}
+        onOpenNewIncome={() => {
+          setIsMobileScreensModalOpen(false);
+          setIsIncomeModalOpen(true);
+        }}
+        onOpenVoiceExpense={() => {
+          setIsMobileScreensModalOpen(false);
+          setIsAiModalOpen(true);
+        }}
+        onOpenCloudSync={() => {
+          setIsMobileScreensModalOpen(false);
+          setIsCloudSyncModalOpen(true);
+        }}
+        onLogout={handleLogout}
+        onShowToast={showToast}
       />
                 </div>
               )}

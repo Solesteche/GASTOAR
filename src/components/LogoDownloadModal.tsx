@@ -131,7 +131,7 @@ export const LogoDownloadModal: React.FC<LogoDownloadModalProps> = ({
         </g>
         <!-- Text -->
         <text x="220" y="125" font-family="Plus Jakarta Sans, sans-serif" font-weight="900" font-size="70" fill="#FFFFFF">Gasto<tspan fill="#D946EF">AR</tspan></text>
-        <text x="222" y="165" font-family="Plus Jakarta Sans, sans-serif" font-weight="700" font-size="22" fill="#E9D5FF">Registrá. Controlá. Ahorrá.</text>
+        <text x="222" y="165" font-family="Plus Jakarta Sans, sans-serif" font-weight="700" font-size="22" fill="#E9D5FF">Registra, Controla, Ahorra</text>
         <rect x="222" y="178" width="160" height="6" rx="3" fill="url(#barGrad)"/>
       </svg>`;
 
@@ -167,7 +167,7 @@ export const LogoDownloadModal: React.FC<LogoDownloadModalProps> = ({
         </g>
         <!-- Text -->
         <text x="220" y="125" font-family="Plus Jakarta Sans, sans-serif" font-weight="900" font-size="70" fill="#2E0854">Gasto<tspan fill="#7E22CE">AR</tspan></text>
-        <text x="222" y="165" font-family="Plus Jakarta Sans, sans-serif" font-weight="700" font-size="22" fill="#334155">Registrá. Controlá. Ahorrá.</text>
+        <text x="222" y="165" font-family="Plus Jakarta Sans, sans-serif" font-weight="700" font-size="22" fill="#334155">Registra, Controla, Ahorra</text>
         <rect x="222" y="178" width="160" height="6" rx="3" fill="url(#barGrad2)"/>
       </svg>`;
 
