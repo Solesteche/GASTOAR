@@ -1100,120 +1100,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
-      {/* 5. CategorySection (Donut + Legend) */}
-      <div className="bg-white rounded-3xl p-5 shadow-sm border border-white">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-gray-900">Por categorías</h3>
-          {(onNavigateTab || onSelectCategory) && (
-            <button 
-              onClick={() => {
-                if (onSelectCategory) {
-                  onSelectCategory('ALL');
-                } else if (onNavigateTab) {
-                  onNavigateTab('transactions');
-                }
-              }} 
-              className="text-xs font-semibold cursor-pointer hover:underline active:opacity-75 transition-opacity" 
-              style={{ color: P }}
-              title="Ver movimientos"
-            >
-              Ver más
-            </button>
-          )}
-        </div>
-        {categoryPieData.length === 0 ? (
-          <div className="py-6 px-4 text-center flex flex-col items-center justify-center space-y-2">
-            <div className="w-10 h-10 rounded-2xl bg-purple-50 text-[#6F2EC5] flex items-center justify-center text-lg">
-              📊
-            </div>
-            <p className="text-xs sm:text-sm font-bold text-gray-800">Sin gastos este mes</p>
-            <p className="text-xs text-gray-400 max-w-xs">
-              La distribución por categorías aparecerá aquí en cuanto registres tus primeros movimientos.
-            </p>
-            {onOpenTransactionModal && (
-              <button
-                type="button"
-                onClick={onOpenTransactionModal}
-                className="mt-1 px-3 py-1.5 bg-[#F95420] hover:bg-[#EA580C] text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
-              >
-                + Registrar primer gasto
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-4">
-            {/* Donut Chart */}
-            <div className="relative flex-shrink-0" style={{ width: 130, height: 130 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie 
-                    data={categoryPieData} 
-                    cx="50%" 
-                    cy="50%" 
-                    innerRadius={38} 
-                    outerRadius={58}
-                    paddingAngle={2} 
-                    dataKey="value" 
-                    startAngle={90} 
-                    endAngle={-270}
-                    onClick={(entry) => {
-                      if (entry && entry.name) {
-                        if (onSelectCategory && entry.name !== 'Otros') {
-                          onSelectCategory(entry.name);
-                        } else if (onNavigateTab) {
-                          onNavigateTab('transactions');
-                        }
-                      }
-                    }}
-                    cursor="pointer"
-                  >
-                    {categoryPieData.map((d, i) => <Cell key={i} fill={d.color} />)}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <p className="text-xs font-bold text-gray-900 font-outfit leading-tight">
-                  {isBalanceHidden ? '$ •••••' : ars(totalPieGastado)}
-                </p>
-                <p className="text-[9px] text-gray-400 text-center leading-tight">Total<br/>gastado</p>
-              </div>
-            </div>
-
-            {/* List */}
-            <div className="flex-1 w-full space-y-1.5">
-              {categoryPieData.slice(0, 5).map(d => (
-                <div 
-                  key={d.name} 
-                  onClick={() => {
-                    if (onSelectCategory && d.name !== 'Otros') {
-                      onSelectCategory(d.name);
-                    } else if (onNavigateTab) {
-                      onNavigateTab('transactions');
-                    }
-                  }}
-                  className="flex items-center justify-between p-1.5 -mx-1.5 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors group"
-                  title={`Ver gastos de ${d.name}`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
-                    <span className="text-xs text-gray-700 truncate group-hover:text-purple-700 group-hover:font-medium transition-colors">
-                      {d.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-xs font-bold text-gray-900 font-outfit">
-                      {isBalanceHidden ? '$ •••••' : ars(d.value)}
-                    </span>
-                    <span className="text-[10px] text-gray-400 w-7 text-right">{d.pct}%</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 6. Alertas Límites de Presupuesto */}
+      {/* 5. Alertas Límites de Presupuesto — prioridad después del Score */}
       <div className="bg-[#F8F7FC] rounded-3xl p-4 sm:p-6 border border-purple-100/50 shadow-xs space-y-3.5">
         {/* Header */}
         <div className="flex items-start sm:items-center justify-between gap-3">
@@ -1345,7 +1232,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         )}
       </div>
 
-      {/* 7. Upcoming Bills / Vencimientos próximos */}
+      {/* 6. Vencimientos próximos — después de las alertas */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-gray-900">Vencimientos próximos</h3>
@@ -1420,6 +1307,119 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 + Agregar vencimiento
               </button>
             ) : null}
+          </div>
+        )}
+      </div>
+
+      {/* 7. Distribución por categorías */}
+      <div className="bg-white rounded-3xl p-5 shadow-sm border border-white">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-bold text-gray-900">Por categorías</h3>
+          {(onNavigateTab || onSelectCategory) && (
+            <button 
+              onClick={() => {
+                if (onSelectCategory) {
+                  onSelectCategory('ALL');
+                } else if (onNavigateTab) {
+                  onNavigateTab('transactions');
+                }
+              }} 
+              className="text-xs font-semibold cursor-pointer hover:underline active:opacity-75 transition-opacity" 
+              style={{ color: P }}
+              title="Ver movimientos"
+            >
+              Ver más
+            </button>
+          )}
+        </div>
+        {categoryPieData.length === 0 ? (
+          <div className="py-6 px-4 text-center flex flex-col items-center justify-center space-y-2">
+            <div className="w-10 h-10 rounded-2xl bg-purple-50 text-[#6F2EC5] flex items-center justify-center text-lg">
+              📊
+            </div>
+            <p className="text-xs sm:text-sm font-bold text-gray-800">Sin gastos este mes</p>
+            <p className="text-xs text-gray-400 max-w-xs">
+              La distribución por categorías aparecerá aquí en cuanto registres tus primeros movimientos.
+            </p>
+            {onOpenTransactionModal && (
+              <button
+                type="button"
+                onClick={onOpenTransactionModal}
+                className="mt-1 px-3 py-1.5 bg-[#F95420] hover:bg-[#EA580C] text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+              >
+                + Registrar primer gasto
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-4">
+            {/* Donut Chart */}
+            <div className="relative flex-shrink-0" style={{ width: 130, height: 130 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie 
+                    data={categoryPieData} 
+                    cx="50%" 
+                    cy="50%" 
+                    innerRadius={38} 
+                    outerRadius={58}
+                    paddingAngle={2} 
+                    dataKey="value" 
+                    startAngle={90} 
+                    endAngle={-270}
+                    onClick={(entry) => {
+                      if (entry && entry.name) {
+                        if (onSelectCategory && entry.name !== 'Otros') {
+                          onSelectCategory(entry.name);
+                        } else if (onNavigateTab) {
+                          onNavigateTab('transactions');
+                        }
+                      }
+                    }}
+                    cursor="pointer"
+                  >
+                    {categoryPieData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <p className="text-xs font-bold text-gray-900 font-outfit leading-tight">
+                  {isBalanceHidden ? '$ •••••' : ars(totalPieGastado)}
+                </p>
+                <p className="text-[9px] text-gray-400 text-center leading-tight">Total<br/>gastado</p>
+              </div>
+            </div>
+
+            {/* List */}
+            <div className="flex-1 w-full space-y-1.5">
+              {categoryPieData.slice(0, 5).map(d => (
+                <div 
+                  key={d.name} 
+                  onClick={() => {
+                    if (onSelectCategory && d.name !== 'Otros') {
+                      onSelectCategory(d.name);
+                    } else if (onNavigateTab) {
+                      onNavigateTab('transactions');
+                    }
+                  }}
+                  className="flex items-center justify-between p-1.5 -mx-1.5 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors group"
+                  title={`Ver gastos de ${d.name}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                    <span className="text-xs text-gray-700 truncate group-hover:text-purple-700 group-hover:font-medium transition-colors">
+                      {d.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs font-bold text-gray-900 font-outfit">
+                      {isBalanceHidden ? '$ •••••' : ars(d.value)}
+                    </span>
+                    <span className="text-[10px] text-gray-400 w-7 text-right">{d.pct}%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
