@@ -3,10 +3,18 @@ import {
   Bell, BellRing, Building2, Calendar, CalendarClock, Check,
   CheckCircle2, ChevronLeft, ChevronRight, Clock, Copy,
   CreditCard, Droplets, Edit3, FileText, Flame, HeartPulse, Home, Landmark,
-  MoreHorizontal, Plus, Search, Trash2, Tv, Wifi, X, Zap
+  MoreHorizontal, Plus, Search, Trash2, Tv, Wifi, X, Zap, Volume2, AlertTriangle
 } from 'lucide-react';
 import { CoupleProfile, Transaction } from '../types';
 import { formatCurrency } from '../utils/formatters';
+import {
+  checkAndNotifyVencimientos,
+  requestNotificationPermission,
+  sendTestNotification,
+  playNotificationSound,
+  convertDueDayToDateStr,
+  calculateHoursUntilDue,
+} from '../services/localNotificationService';
 
 export type AlertItemCategory = 'tarjeta' | 'alquiler' | 'expensas' | 'servicio' | 'impuesto' | 'suscripcion' | 'salud' | 'otro';
 
@@ -34,9 +42,11 @@ interface AlertsSectionProps {
   profile: CoupleProfile;
   transactions?: Transaction[];
   isDemoMode?: boolean;
+  isPro?: boolean;
   onShowToast: (msg: string, type: 'success' | 'error' | 'info') => void;
   onOpenTransactionModal?: () => void;
   onOpenCalendarModal?: () => void;
+  onOpenCashFlow?: () => void;
 }
 
 const DEMO_ITEM_IDS = ['e1', 's1', 's3', 'a1', 's4', 's2', 'c1', 'c2'];
@@ -67,9 +77,11 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   profile,
   transactions,
   isDemoMode = false,
+  isPro = false,
   onShowToast,
   onOpenTransactionModal,
-  onOpenCalendarModal
+  onOpenCalendarModal,
+  onOpenCashFlow,
 }) => {
   const [items, setItems] = useState<DueAlertItem[]>(() => {
     try {
@@ -250,48 +262,45 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   };
 
   const toggleNotifications = async () => {
-    if (!('Notification' in window)) {
-      onShowToast('Tu navegador no soporta notificaciones web.', 'info');
-      return;
+    const res = await requestNotificationPermission();
+    if (res === 'granted') {
+      setNotificationsEnabled(true);
+      playNotificationSound();
+      onShowToast('¡Servicio de notificaciones a menos de 48 hs activado!', 'success');
+      // Trigger evaluation immediately
+      checkAndNotifyVencimientos([], items, {
+        force: true,
+        onInAppAlert: (alert) => {
+          onShowToast(`⏰ Alerta: "${alert.title}" vence en menos de 48 hs (${alert.urgencyMessage})`, 'info');
+        }
+      });
+    } else if (res === 'denied') {
+      onShowToast('Permiso de notificaciones rechazado en el navegador.', 'info');
+    } else {
+      onShowToast('Tu navegador no soporta notificaciones de escritorio.', 'info');
     }
-    if (Notification.permission !== 'granted') {
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') {
-        onShowToast('Permiso de notificaciones rechazado.', 'info');
-        return;
-      }
-    }
-    setNotificationsEnabled(true);
-    localStorage.setItem('gastoar_vencimientos_notif_v1', 'true');
-    onShowToast('Notificaciones activadas en este dispositivo.', 'success');
   };
 
-  // Verificación diaria de recordatorios en base a la anticipación configurada
-  useEffect(() => {
-    if (!notificationsEnabled || !('Notification' in window) || Notification.permission !== 'granted') return;
-    const notifKey = `gastoar_notif_sent_${currentYear}_${currentMonth}_${currentDay}`;
-    if (localStorage.getItem(notifKey)) return;
-
-    const dueToRemind = items.filter(item => {
-      if (item.paidThisMonth) return false;
-      const rem = item.reminderDaysBeforeDue !== undefined ? item.reminderDaysBeforeDue : 3;
-      const daysUntilDue = item.dueDay - currentDay;
-      return daysUntilDue >= 0 && daysUntilDue <= rem;
-    });
-
-    if (dueToRemind.length > 0) {
-      localStorage.setItem(notifKey, 'true');
-      const listNames = dueToRemind.map(i => `${i.name} (vence día ${i.dueDay})`).join(', ');
-      try {
-        new Notification('GastoAR • Recordatorio de Pago', {
-          body: `Tenés ${dueToRemind.length} vencimiento(s) para abonar: ${listNames}.`,
-          icon: '/favicon.ico'
-        });
-      } catch (e) {
-        console.warn('Error al disparar notificación:', e);
-      }
+  const handleTestNotification = async () => {
+    playNotificationSound();
+    const ok = await sendTestNotification();
+    if (ok) {
+      onShowToast('Notificación de prueba enviada con éxito ✓', 'success');
+    } else {
+      onShowToast('Sonido reproducido. Activa permisos para recibir notificaciones del sistema.', 'info');
     }
-  }, [notificationsEnabled, items, currentDay, currentMonth, currentYear]);
+  };
+
+  // Verificación periódica y a menos de 48 horas de la fecha de pago
+  useEffect(() => {
+    if (!notificationsEnabled) return;
+    checkAndNotifyVencimientos([], items, {
+      force: false,
+      onInAppAlert: (alert) => {
+        onShowToast(`⏰ Vencimiento en menos de 48 hs: "${alert.title}" (${alert.urgencyMessage})`, 'info');
+      }
+    });
+  }, [notificationsEnabled, items]);
 
   const stats = useMemo(() => {
     const pending = items.filter(i => !i.paidThisMonth);
@@ -381,11 +390,19 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   const renderCard = (item: DueAlertItem) => {
     const { Icon, bg, text } = getItemIconConfig(item);
     const expanded = expandedItemId === item.id;
+    const dateStr = convertDueDayToDateStr(item.dueDay);
+    const hoursCalc = calculateHoursUntilDue(dateStr);
+    const isUnder48h = !item.paidThisMonth && hoursCalc.isUnder48Hours;
+
     return (
       <article
         key={item.id}
         className={`bg-white border rounded-2xl p-3.5 sm:p-4 transition-all shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:border-purple-200 ${
-          item.paidThisMonth ? 'border-slate-100 opacity-80' : 'border-slate-100'
+          isUnder48h 
+            ? 'border-amber-300 ring-2 ring-amber-400/20 bg-amber-50/10'
+            : item.paidThisMonth 
+            ? 'border-slate-100 opacity-80' 
+            : 'border-slate-100'
         }`}
       >
         <div
@@ -404,6 +421,11 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
                 </h3>
                 {item.lastDigits && (
                   <span className="text-[10px] font-mono font-bold text-slate-500">••{item.lastDigits}</span>
+                )}
+                {isUnder48h && (
+                  <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-rose-700 bg-rose-100 border border-rose-200 px-1.5 py-0.2 rounded-md animate-pulse">
+                    ⚡ &lt;48 hs
+                  </span>
                 )}
               </div>
               <p className="text-xs text-slate-400 font-normal truncate mt-0.5">
@@ -694,20 +716,32 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
           </div>
         </div>
 
-        {/* Second row: Avisos & Calendario pills */}
-        <div className="relative z-10 grid grid-cols-2 gap-2.5">
-          <button
-            type="button"
-            onClick={toggleNotifications}
-            className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 ${
-              notificationsEnabled 
-                ? 'border-white/30 bg-white/20 text-white shadow-xs' 
-                : 'border-white/15 bg-white/10 text-white hover:bg-white/15'
-            }`}
-          >
-            {notificationsEnabled ? <BellRing className="w-4 h-4 text-[#FFA785]" /> : <Bell className="w-4 h-4 text-purple-200" />}
-            <span>{notificationsEnabled ? 'Avisos activos' : 'Avisos'}</span>
-          </button>
+        {/* Second row: Avisos, Calendario & Flujo Pro pills */}
+        <div className={`relative z-10 grid ${onOpenCashFlow ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={toggleNotifications}
+              className={`flex-1 py-2.5 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
+                notificationsEnabled 
+                  ? 'border-white/30 bg-white/20 text-white shadow-xs' 
+                  : 'border-white/15 bg-white/10 text-white hover:bg-white/15'
+              }`}
+            >
+              {notificationsEnabled ? <BellRing className="w-4 h-4 text-[#FFA785]" /> : <Bell className="w-4 h-4 text-purple-200" />}
+              <span className="truncate">{notificationsEnabled ? 'Avisos (<48h)' : 'Avisos'}</span>
+            </button>
+            {notificationsEnabled && (
+              <button
+                type="button"
+                onClick={handleTestNotification}
+                className="py-2.5 px-2 rounded-xl border border-white/20 bg-white/10 text-white hover:bg-white/20 text-xs font-bold flex items-center justify-center shrink-0 cursor-pointer active:scale-95"
+                title="Probar sonido y notificación local de 48 hs"
+              >
+                <Volume2 className="w-4 h-4 text-amber-200" />
+              </button>
+            )}
+          </div>
 
           <button
             type="button"
@@ -719,8 +753,20 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
             }`}
           >
             <Calendar className="w-4 h-4 text-white" />
-            <span>Calendario</span>
+            <span className="truncate">Calendario</span>
           </button>
+
+          {onOpenCashFlow && (
+            <button
+              type="button"
+              onClick={onOpenCashFlow}
+              className="py-2.5 px-2 rounded-xl border border-purple-300/40 bg-gradient-to-r from-purple-500/30 to-pink-500/30 hover:bg-white/25 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95"
+              title="Proyección de Flujo de Caja Pro"
+            >
+              <span className="text-amber-300">🔮</span>
+              <span className="truncate">Flujo Pro</span>
+            </button>
+          )}
         </div>
 
         {/* Third row: Full-width vibrant orange button */}

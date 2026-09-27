@@ -7,8 +7,7 @@ import {
   ArrowUpRight, 
   LogOut,
   HelpCircle,
-  Mic,
-  Smartphone
+  Mic
 } from 'lucide-react';
 import { CoupleProfile, ExpenseMode } from '../types';
 import { GastoArBrand } from './GastoArLogo';
@@ -28,7 +27,6 @@ interface HeaderProps {
   onExitDemo?: () => void;
   cloudSyncStatus?: 'synced' | 'syncing' | 'offline' | 'error';
   onOpenCloudSync?: () => void;
-  onOpenMobileScreens?: () => void;
   isDarkMode?: boolean;
 }
 
@@ -46,7 +44,6 @@ export const Header: React.FC<HeaderProps> = ({
   onExitDemo,
   cloudSyncStatus = 'synced',
   onOpenCloudSync,
-  onOpenMobileScreens,
   isDarkMode = false,
 }) => {
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -92,7 +89,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="bg-white/95 backdrop-blur-xl text-slate-800 sticky top-0 z-30 border-b border-purple-100 shadow-xs">
+    <header className="bg-white/95 dark:bg-[#0d041a]/95 backdrop-blur-xl text-slate-800 dark:text-white sticky top-0 z-30 border-b border-purple-100 dark:border-purple-900/40 shadow-xs">
       <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
         
         {/* Left Side: Clickable Brand Logo (Opens menu on mobile, navigates home on desktop) */}
@@ -191,17 +188,6 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Quick Action Buttons for Gasto & Ingreso */}
           <div className="hidden md:flex items-center gap-2">
-            {onOpenMobileScreens && (
-              <button
-                type="button"
-                onClick={onOpenMobileScreens}
-                className="px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#7928CA] border border-purple-200/90 font-bold text-xs transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
-                title="Ver las 8 pantallas móviles"
-              >
-                <Smartphone className="w-3.5 h-3.5 text-[#7928CA]" />
-                <span>8 Pantallas</span>
-              </button>
-            )}
             <button
               type="button"
               onClick={handleOpenGasto}

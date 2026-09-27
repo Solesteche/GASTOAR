@@ -16,6 +16,7 @@ import {
   Coins,
   CreditCard,
   TrendingUp,
+  Activity,
   LogOut,
   Target,
   ShieldCheck,
@@ -35,7 +36,7 @@ interface SidebarProps {
   isPinned: boolean;
   onTogglePin: () => void;
   onCloseMobile: () => void;
-  activeTab: 'dashboard' | 'transactions' | 'couple_balance' | 'installments' | 'budgets' | 'categories' | 'ai' | 'settlement' | 'goals' | 'subscriptions' | 'admin_subscriptions';
+  activeTab: string;
   onSelectTab: (tab: any) => void;
   activeMode: ExpenseMode;
   onModeChange: (mode: ExpenseMode) => void;
@@ -54,6 +55,7 @@ interface SidebarProps {
   isAdmin?: boolean;
   isDemoMode?: boolean;
   onExitDemo?: () => void;
+  isDarkMode?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -80,6 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isAdmin = false,
   isDemoMode = false,
   onExitDemo,
+  isDarkMode = false,
 }) => {
   const isUser1 = profile.currentUser === 'user1';
   const currentUserName = isUser1 ? profile.user1Name : profile.user2Name;
@@ -87,18 +90,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const baseNavItems = [
     { id: 'dashboard', label: 'Resumen', icon: LayoutDashboard, badge: null },
     { id: 'transactions', label: 'Movimientos', icon: Receipt, badge: null },
-    { id: 'installments', label: 'Gastos en Cuotas', icon: CreditCard, badge: 'Tarjetas' },
+    { id: 'installments', label: 'Gastos en Cuotas', icon: CreditCard, badge: null },
     { id: 'card_alerts', label: 'Vencimientos', icon: CalendarClock, badge: null },
     { 
       id: 'couple_balance', 
-      label: 'Balance de Pareja', 
+      label: 'Cuenta Compartida', 
       icon: Scale, 
-      badge: debtInfo.debtAmount > 0 ? (debtInfo.whoOwesWhom === (isUser1 ? 'user1_owes_user2' : 'user2_owes_user1') ? 'Debes' : 'Te deben') : 'Al día' 
+      badge: null 
     },
-    { id: 'budgets', label: 'Presupuestos & Límites', icon: Sliders, badge: null },
-    { id: 'goals', label: 'Metas & Cajas', icon: Target, badge: 'Ahorro' },
-    { id: 'categories', label: 'Categorías & Subcat', icon: FolderPlus, badge: null },
+    { id: 'budgets', label: 'Presupuestos', icon: Sliders, badge: null },
+    { id: 'cashflow', label: 'Flujo de Caja', icon: Activity, badge: 'PRO' },
+    { id: 'currency', label: 'Dólar & Divisas', icon: Coins, badge: 'AR' },
+    { id: 'goals', label: 'Metas & Cajas', icon: Target, badge: null },
+    { id: 'categories', label: 'Categorías y Subcategorías', icon: FolderPlus, badge: null },
     { id: 'ai', label: 'Gasto por Voz', icon: Mic, badge: 'IA', isModal: true },
+    { id: 'profile', label: 'Mi Perfil', icon: User, badge: null },
+    { id: 'settings', label: 'Configuración', icon: Settings, badge: null },
+    { id: 'subscriptions', label: 'Suscripción PRO', icon: BadgePercent, badge: 'PRO' },
   ];
 
   const adminItem = { id: 'admin_subscriptions', label: 'Panel Admin Clientes', icon: ShieldCheck, badge: 'Admin' };
@@ -125,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex flex-col h-full min-h-full max-h-full overflow-hidden justify-between w-full">
           
           {/* Header with Clickable Logo to Home/Dashboard (Req 13) */}
-          <div className="h-16 px-4 flex items-center justify-between border-b border-purple-50 shrink-0 bg-white">
+          <div className="h-16 px-4 flex items-center justify-between border-b border-purple-50 dark:border-purple-900/30 shrink-0 bg-white dark:bg-[#130924]">
             {/* When expanded */}
             <button
               type="button"
@@ -138,7 +146,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <GastoArBrand 
                 size="sm" 
-                variant="light" 
+                variant={isDarkMode ? 'dark' : 'light'} 
                 showTagline={true} 
                 showAccentBar={true} 
               />
@@ -151,7 +159,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className={`hidden cursor-pointer focus:outline-none ${!isPinned ? 'md:flex md:items-center md:justify-center md:w-full' : ''}`}
               title="Ir al Resumen / Inicio"
             >
-              <GastoArIcon size={30} />
+              <GastoArIcon size={30} variant={isDarkMode ? 'dark' : 'light'} />
             </button>
 
             {/* Pin Toggle on Desktop */}

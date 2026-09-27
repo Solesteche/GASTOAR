@@ -20,7 +20,7 @@ import {
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-interface InflationModeSectionProps {
+export interface InflationModeSectionProps {
   budgets: Budgets;
   onApplyAdjustment: (newBudgets: Budgets, selectedCategories: string[]) => void;
   onUpdateSettings: (settings: InflationSettings) => void;

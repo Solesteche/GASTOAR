@@ -225,7 +225,7 @@ export const LogoDownloadModal: React.FC<LogoDownloadModalProps> = ({
                 }`}
               >
                 <div className="h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center mb-1.5 p-1 shadow-2xs">
-                  <GastoArBrand size="sm" showTagline={false} />
+                  <GastoArBrand size="sm" variant="light" showTagline={false} />
                 </div>
                 <span className="text-xs font-bold text-slate-800 block">Fondo Claro</span>
               </button>
@@ -306,7 +306,7 @@ export const LogoDownloadModal: React.FC<LogoDownloadModalProps> = ({
                   <GastoArBrand size="md" variant="dark" />
                 </div>
               ) : (
-                <GastoArBrand size="md" />
+                <GastoArBrand size="md" variant="light" />
               )}
             </div>
             <p className="text-[11px] text-slate-400 font-medium">

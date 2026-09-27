@@ -1,12 +1,22 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   AlertTriangle, BarChart3, BellRing, Calendar, Check, CheckCircle2, ChevronRight,
   Edit3, Lightbulb, Plus, Settings2, ShieldCheck, Target, TrendingDown, TrendingUp,
-  WalletCards, X, Sparkles, HelpCircle
+  WalletCards, X, Sparkles, HelpCircle, Flame, Crown, RotateCcw, CheckSquare, Square,
+  Info, ArrowUpRight, Zap
 } from 'lucide-react';
 import { Budgets, CategoryColors, CategoryMap, Transaction } from '../types';
 import { formatCurrency } from '../utils/formatters';
 import { BudgetComparisonView } from './BudgetComparisonView';
+import { InflationModeSection } from './InflationModeSection';
+import {
+  InflationModeEngine,
+  InflationSettings,
+  IPC_CATEGORY_RATES,
+  IPC_GENERAL_RATE,
+  InflationReport,
+  BudgetProjection
+} from '../InflationModeEngine';
 
 interface BudgetSectionProps {
   budgets: Budgets;
@@ -14,10 +24,12 @@ interface BudgetSectionProps {
   categoryColors: CategoryColors;
   transactions: Transaction[];
   currency: string;
+  isPro?: boolean;
   onOpenBudgetModal: () => void;
   onCreateBudget?: () => void;
   onUpdateBudgets?: (newBudgets: Budgets) => void;
   onSelectCategory?: (category: string) => void;
+  onUpgradeToPro?: () => void;
 }
 
 const DEFAULT_BUDGETS: Budgets = { categories: {}, subcategories: {} };
@@ -29,10 +41,12 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
   categoryColors = {},
   transactions = [],
   currency = 'ARS',
+  isPro = false,
   onOpenBudgetModal,
   onCreateBudget,
   onUpdateBudgets,
   onSelectCategory,
+  onUpgradeToPro,
 }) => {
   const [view, setView] = useState<BudgetView>('budget');
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
@@ -40,6 +54,14 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
   const [projectionPercent, setProjectionPercent] = useState(budgets?.projectionGrowthPercent || 15);
   const [projectionSource, setProjectionSource] = useState<'current_budget' | 'real_expenses'>('current_budget');
   const [search, setSearch] = useState('');
+
+  // ─── Estado Modo Inflación IPC (Plan Pro) ──────────────────────────────────
+  const [projectionSubTab, setProjectionSubTab] = useState<'ipc_pro' | 'standard'>('ipc_pro');
+  const [ipcSettings, setIpcSettings] = useState<InflationSettings>(() => InflationModeEngine.defaultSettings());
+  const [ipcMonthsAhead, setIpcMonthsAhead] = useState<number>(1);
+  const [selectedIpcCategories, setSelectedIpcCategories] = useState<string[]>([]);
+  const [previousBudgetsBackup, setPreviousBudgetsBackup] = useState<Budgets | null>(null);
+  const [ipcNotice, setIpcNotice] = useState<string | null>(null);
 
   const now = new Date();
   const year = now.getFullYear();
@@ -110,10 +132,58 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
 
   const openQuick = (category: string, value: number) => { setEditingCategory(category); setQuickValue(value ? String(value) : ''); };
 
+  // ─── Proyecciones IPC Pro con InflationModeEngine ─────────────────────────
+  const ipcReport: InflationReport = useMemo(() => {
+    return InflationModeEngine.calculateProjections(budgets, ipcSettings, ipcMonthsAhead);
+  }, [budgets, ipcSettings, ipcMonthsAhead]);
+
+  useEffect(() => {
+    if (ipcReport.projections.length > 0 && selectedIpcCategories.length === 0) {
+      setSelectedIpcCategories(ipcReport.projections.map(p => p.category));
+    }
+  }, [ipcReport.projections]);
+
+  const toggleSelectIpcCategory = (cat: string) => {
+    setSelectedIpcCategories(prev =>
+      prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
+    );
+  };
+
+  const toggleSelectAllIpcCategories = () => {
+    if (selectedIpcCategories.length === ipcReport.projections.length) {
+      setSelectedIpcCategories([]);
+    } else {
+      setSelectedIpcCategories(ipcReport.projections.map(p => p.category));
+    }
+  };
+
+  const handleApplyIpcAdjustment = () => {
+    if (!onUpdateBudgets) return;
+    setPreviousBudgetsBackup(JSON.parse(JSON.stringify(budgets)));
+    const updated = InflationModeEngine.applyAdjustment(
+      budgets,
+      ipcReport,
+      selectedIpcCategories.length > 0 ? selectedIpcCategories : undefined
+    );
+    onUpdateBudgets(updated);
+    const affectedCount = selectedIpcCategories.length || ipcReport.projections.length;
+    setIpcNotice(`¡Ajuste por inflación IPC aplicado con éxito a ${affectedCount} categoría${affectedCount === 1 ? '' : 's'}!`);
+    setTimeout(() => setIpcNotice(null), 6000);
+  };
+
+  const handleUndoIpcAdjustment = () => {
+    if (previousBudgetsBackup && onUpdateBudgets) {
+      onUpdateBudgets(previousBudgetsBackup);
+      setPreviousBudgetsBackup(null);
+      setIpcNotice('Se restablecieron los presupuestos anteriores.');
+      setTimeout(() => setIpcNotice(null), 4000);
+    }
+  };
+
   const tabs: Array<[BudgetView, string, React.ElementType]> = [
     ['budget', 'Presupuesto', WalletCards],
     ['alerts', 'Alertas y Límites', BellRing],
-    ['projection', 'Proyección', TrendingUp],
+    ['projection', 'Proyección & IPC', TrendingUp],
     ['comparison', 'Comparativa', BarChart3],
   ];
 
@@ -205,14 +275,218 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
 
         {view === 'projection' && (
           <div className="p-4 sm:p-6 space-y-5">
-            <div className="rounded-3xl border border-purple-100 bg-gradient-to-br from-purple-50 to-indigo-50/50 dark:from-purple-950/20 dark:to-indigo-950/20 dark:border-purple-900/50 p-5">
-              <div className="flex items-start gap-3"><div className="w-10 h-10 rounded-2xl bg-[#7928CA] text-white flex items-center justify-center"><TrendingUp className="w-5 h-5" /></div><div><h3 className="font-black text-[#2E0854] dark:text-white">Proyección automática para próximos meses</h3><p className="text-xs text-slate-600 dark:text-slate-300 mt-1">Ajustá tus presupuestos según la inflación esperada tomando como base tus límites actuales o tus gastos reales.</p></div></div>
-              <div className="mt-5 grid sm:grid-cols-2 gap-3"><button onClick={() => setProjectionSource('current_budget')} className={`text-left p-4 rounded-2xl border ${projectionSource === 'current_budget' ? 'bg-white dark:bg-[#190731] border-purple-500 ring-2 ring-purple-500/10' : 'bg-white/50 dark:bg-[#16072b] border-slate-200 dark:border-purple-900/50'}`}><p className="text-xs font-black">Opción A · Límites actuales</p><p className="text-[10px] text-slate-500 mt-1">Aplica la inflación sobre los presupuestos definidos hoy.</p></button><button onClick={() => setProjectionSource('real_expenses')} className={`text-left p-4 rounded-2xl border ${projectionSource === 'real_expenses' ? 'bg-white dark:bg-[#190731] border-purple-500 ring-2 ring-purple-500/10' : 'bg-white/50 dark:bg-[#16072b] border-slate-200 dark:border-purple-900/50'}`}><p className="text-xs font-black">Opción B · Gastos reales</p><p className="text-[10px] text-slate-500 mt-1">Usa tu consumo registrado como punto de partida.</p></button></div>
-              <div className="mt-5"><div className="flex items-center justify-between"><span className="text-xs font-black">Inflación / ajuste esperado</span><span className="text-lg font-black text-[#7928CA]">+{projectionPercent}%</span></div><input type="range" min="0" max="50" step="1" value={projectionPercent} onChange={e => setProjectionPercent(Number(e.target.value))} className="w-full mt-3 accent-purple-600" /><div className="flex gap-2 flex-wrap mt-3">{[5,10,15,20,25,30].map(p => <button key={p} onClick={() => setProjectionPercent(p)} className={`px-3 py-1.5 rounded-xl text-[11px] font-black border ${projectionPercent === p ? 'bg-[#2E0854] text-white border-[#2E0854]' : 'bg-white dark:bg-[#190731] border-slate-200 dark:border-purple-900/50 text-slate-600 dark:text-slate-300'}`}>+{p}%</button>)}</div></div>
+            {/* SUB-TABS: IPC PRO vs SIMULADOR SIMPLE */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-purple-900/40">
+              <div className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-[#16072b] rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => setProjectionSubTab('ipc_pro')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
+                    projectionSubTab === 'ipc_pro'
+                      ? 'bg-gradient-to-r from-[#2E0854] to-[#7928CA] text-white shadow-md'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                  }`}
+                >
+                  <Flame className="w-4 h-4 text-amber-300" />
+                  <span>Modo Inflación IPC</span>
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-amber-400 text-purple-950 uppercase tracking-wider">
+                    PRO
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProjectionSubTab('standard')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+                    projectionSubTab === 'standard'
+                      ? 'bg-white dark:bg-[#20083c] text-purple-700 dark:text-purple-300 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900 dark:text-slate-400'
+                  }`}
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  <span>Simulador Estándar</span>
+                </button>
+              </div>
+
+              {/* Pro status badge or CTA */}
+              <div className="flex items-center gap-2">
+                {isPro ? (
+                  <span className="px-3 py-1.5 rounded-xl bg-purple-100 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-purple-800 dark:text-purple-300 text-[11px] font-black flex items-center gap-1.5">
+                    <Crown className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Plan Pro Activo · Motor IPC Habilitado</span>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onUpgradeToPro}
+                    className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-[11px] font-black flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    <Crown className="w-3.5 h-3.5" />
+                    <span>Desbloquear Plan Pro</span>
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3"><Metric label="Base actual" value={formatCurrency(projection.reduce((s,r)=>s+r.base,0), currency)} icon={Target} tone="purple" helper="Base seleccionada" /><Metric label="Proyectado" value={formatCurrency(projectedTotal, currency)} icon={TrendingUp} tone="green" helper={`+${projectionPercent}%`} /><Metric label="Diferencia" value={formatCurrency(projectedTotal - projection.reduce((s,r)=>s+r.base,0), currency)} icon={TrendingUp} tone="orange" helper="Ajuste estimado" /><Metric label="Categorías" value={String(projection.length)} icon={WalletCards} tone="blue" helper="Con base disponible" /></div>
-            <div className="rounded-2xl border border-slate-200 dark:border-purple-900/50 overflow-hidden"><div className="grid grid-cols-[1.5fr_1fr_1fr_0.7fr] gap-2 px-4 py-3 bg-slate-50 dark:bg-[#190731] text-[10px] uppercase font-black text-slate-400"><span>Categoría</span><span>Base</span><span>Proyección</span><span>Δ</span></div>{projection.map(r => <div key={r.category} className="grid grid-cols-[1.5fr_1fr_1fr_0.7fr] gap-2 px-4 py-3 border-t border-slate-100 dark:border-purple-900/30 text-xs"><span className="font-bold truncate">{r.category}</span><span>{formatCurrency(r.base,currency)}</span><strong className="text-[#7928CA]">{formatCurrency(r.projected,currency)}</strong><span className="text-emerald-600 font-bold">+{Math.round(r.projected-r.base).toLocaleString('es-AR')}</span></div>)}</div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 p-4"><div><p className="text-xs font-black text-emerald-900 dark:text-emerald-200">La proyección no cambia nada hasta que la confirmes.</p><p className="text-[10px] text-emerald-800/70 dark:text-emerald-300/70 mt-1">Podés revisar los valores y aplicar el ajuste cuando estés conforme.</p></div><button onClick={applyProjection} className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#2E0854] to-[#7928CA] text-white text-xs font-black flex items-center justify-center gap-1.5"><Check className="w-4 h-4" />Aplicar proyección</button></div>
+
+            {/* NOTICE BANNER */}
+            {ipcNotice && (
+              <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 text-xs sm:text-sm font-bold flex items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <span>{ipcNotice}</span>
+                </div>
+                {previousBudgetsBackup && (
+                  <button
+                    type="button"
+                    onClick={handleUndoIpcAdjustment}
+                    className="px-3 py-1 bg-white dark:bg-[#1a0833] border border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 rounded-xl text-xs font-black hover:bg-emerald-100 dark:hover:bg-purple-900/40 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Deshacer</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* ═══════════════════════════════════════════════════════════════════ */}
+            {/* SUB-VIEW 1: MODO INFLACIÓN IPC PRO                                  */}
+            {/* ═══════════════════════════════════════════════════════════════════ */}
+            {projectionSubTab === 'ipc_pro' && (
+              <InflationModeSection
+                budgets={budgets}
+                onApplyAdjustment={(newBudgets, selectedCategories) => {
+                  setPreviousBudgetsBackup(budgets);
+                  onUpdateBudgets?.(newBudgets);
+                  setIpcNotice(`Ajuste de inflación aplicado con éxito a ${selectedCategories.length} categorías.`);
+                }}
+                onUpdateSettings={(newSettings) => {
+                  setIpcSettings(newSettings);
+                }}
+                inflationSettings={ipcSettings}
+                isPro={isPro}
+                onUpgradePro={onUpgradeToPro}
+              />
+            )}
+
+            {/* ═══════════════════════════════════════════════════════════════════ */}
+            {/* SUB-VIEW 2: SIMULADOR ESTÁNDAR (Porcentaje plano)                  */}
+            {/* ═══════════════════════════════════════════════════════════════════ */}
+            {projectionSubTab === 'standard' && (
+              <div className="space-y-5">
+                <div className="rounded-3xl border border-purple-100 bg-gradient-to-br from-purple-50 to-indigo-50/50 dark:from-purple-950/20 dark:to-indigo-950/20 dark:border-purple-900/50 p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-[#7928CA] text-white flex items-center justify-center">
+                      <TrendingUp className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-[#2E0854] dark:text-white">
+                        Simulador Estándar de Ajuste Porcentual
+                      </h3>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                        Aplica un porcentaje plano a todas las categorías tomando como base tus límites actuales o tus gastos reales.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setProjectionSource('current_budget')}
+                      className={`text-left p-4 rounded-2xl border transition-all cursor-pointer ${
+                        projectionSource === 'current_budget'
+                          ? 'bg-white dark:bg-[#190731] border-purple-500 ring-2 ring-purple-500/10'
+                          : 'bg-white/50 dark:bg-[#16072b] border-slate-200 dark:border-purple-900/50'
+                      }`}
+                    >
+                      <p className="text-xs font-black">Opción A · Límites actuales</p>
+                      <p className="text-[10px] text-slate-500 mt-1">Aplica el porcentaje sobre los presupuestos definidos hoy.</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setProjectionSource('real_expenses')}
+                      className={`text-left p-4 rounded-2xl border transition-all cursor-pointer ${
+                        projectionSource === 'real_expenses'
+                          ? 'bg-white dark:bg-[#190731] border-purple-500 ring-2 ring-purple-500/10'
+                          : 'bg-white/50 dark:bg-[#16072b] border-slate-200 dark:border-purple-900/50'
+                      }`}
+                    >
+                      <p className="text-xs font-black">Opción B · Gastos reales</p>
+                      <p className="text-[10px] text-slate-500 mt-1">Usa tu consumo registrado histórico como punto de partida.</p>
+                    </button>
+                  </div>
+
+                  <div className="mt-5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black">Inflación / ajuste esperado</span>
+                      <span className="text-lg font-black text-[#7928CA]">+{projectionPercent}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="50"
+                      step="1"
+                      value={projectionPercent}
+                      onChange={e => setProjectionPercent(Number(e.target.value))}
+                      className="w-full mt-3 accent-purple-600"
+                    />
+                    <div className="flex gap-2 flex-wrap mt-3">
+                      {[5, 10, 15, 20, 25, 30].map(p => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setProjectionPercent(p)}
+                          className={`px-3 py-1.5 rounded-xl text-[11px] font-black border transition-all cursor-pointer ${
+                            projectionPercent === p
+                              ? 'bg-[#2E0854] text-white border-[#2E0854]'
+                              : 'bg-white dark:bg-[#190731] border-slate-200 dark:border-purple-900/50 text-slate-600 dark:text-slate-300'
+                          }`}
+                        >
+                          +{p}%
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <Metric label="Base actual" value={formatCurrency(projection.reduce((s, r) => s + r.base, 0), currency)} icon={Target} tone="purple" helper="Base seleccionada" />
+                  <Metric label="Proyectado" value={formatCurrency(projectedTotal, currency)} icon={TrendingUp} tone="green" helper={`+${projectionPercent}%`} />
+                  <Metric label="Diferencia" value={formatCurrency(projectedTotal - projection.reduce((s, r) => s + r.base, 0), currency)} icon={TrendingUp} tone="orange" helper="Ajuste estimado" />
+                  <Metric label="Categorías" value={String(projection.length)} icon={WalletCards} tone="blue" helper="Con base disponible" />
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 dark:border-purple-900/50 overflow-hidden">
+                  <div className="grid grid-cols-[1.5fr_1fr_1fr_0.7fr] gap-2 px-4 py-3 bg-slate-50 dark:bg-[#190731] text-[10px] uppercase font-black text-slate-400">
+                    <span>Categoría</span>
+                    <span>Base</span>
+                    <span>Proyección</span>
+                    <span>Δ</span>
+                  </div>
+                  {projection.map(r => (
+                    <div key={r.category} className="grid grid-cols-[1.5fr_1fr_1fr_0.7fr] gap-2 px-4 py-3 border-t border-slate-100 dark:border-purple-900/30 text-xs">
+                      <span className="font-bold truncate">{r.category}</span>
+                      <span>{formatCurrency(r.base, currency)}</span>
+                      <strong className="text-[#7928CA]">{formatCurrency(r.projected, currency)}</strong>
+                      <span className="text-emerald-600 font-bold">+{Math.round(r.projected - r.base).toLocaleString('es-AR')}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 p-4">
+                  <div>
+                    <p className="text-xs font-black text-emerald-900 dark:text-emerald-200">La proyección no cambia nada hasta que la confirmes.</p>
+                    <p className="text-[10px] text-emerald-800/70 dark:text-emerald-300/70 mt-1">Podés revisar los valores y aplicar el ajuste cuando estés conforme.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={applyProjection}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#2E0854] to-[#7928CA] text-white text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Aplicar proyección</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

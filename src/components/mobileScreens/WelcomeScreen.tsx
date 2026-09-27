@@ -17,7 +17,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
       {/* Top indicator tag */}
       <div className="pt-2 flex justify-between items-center z-10">
         <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-100">
-          Pantalla 2 · Bienvenida
+          GastoAR Móvil
         </span>
         {onExploreDemo && (
           <button

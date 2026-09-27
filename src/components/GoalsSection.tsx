@@ -35,6 +35,7 @@ interface GoalsSectionProps {
   onUpdateGoal: (id: string, updated: Partial<Goal>) => void;
   onDeleteGoal: (id: string) => void;
   onAddContribution: (goalId: string, contribution: Omit<GoalContribution, 'id'>) => void;
+  profile?: any;
 }
 
 const CATEGORY_CONFIG: Record<GoalCategory, { label: string; emoji: string; color: string; bg: string }> = {
@@ -463,27 +464,89 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
                 />
 
                 <div>
-                  {/* Card Header: Emoji/Icon + Category Badge + Menu */}
+                  {/* Card Header: Emoji/Icon with Circular Progress Visualizer + Category Badge + Menu */}
                   <div className="flex items-start justify-between gap-3 mb-4">
                     <div className="flex items-center gap-3">
+                      {/* Small Circular Progress Visualizer around Avatar */}
                       <div 
-                        className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-xs border border-black/5"
-                        style={{ backgroundColor: `${goal.color || '#7928CA'}15` }}
+                        className="relative w-13 h-13 sm:w-14 sm:h-14 shrink-0 flex items-center justify-center cursor-default"
+                        title={`Progreso: ${pct}% de la meta`}
                       >
-                        {goal.emoji || categoryConfig.emoji}
-                      </div>
-                      <div>
-                        <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${categoryConfig.bg}`}>
-                          {categoryConfig.label}
+                        <svg className="w-full h-full -rotate-90" viewBox="0 0 52 52">
+                          {/* Background Track */}
+                          <circle
+                            cx="26"
+                            cy="26"
+                            r="22"
+                            fill="none"
+                            stroke="rgba(121, 40, 202, 0.12)"
+                            strokeWidth="3.5"
+                          />
+                          {/* Radial Progress Ring */}
+                          <circle
+                            cx="26"
+                            cy="26"
+                            r="22"
+                            fill="none"
+                            stroke={isCompleted ? '#10b981' : (goal.color || '#7928CA')}
+                            strokeWidth="3.5"
+                            strokeDasharray={2 * Math.PI * 22}
+                            strokeDashoffset={(2 * Math.PI * 22) * (1 - Math.min(100, Math.max(0, pct)) / 100)}
+                            strokeLinecap="round"
+                            className="transition-all duration-700 ease-out"
+                          />
+                        </svg>
+
+                        {/* Centered Emoji Icon */}
+                        <div 
+                          className="absolute inset-1.5 rounded-full flex items-center justify-center text-xl sm:text-2xl shadow-2xs transition-transform group-hover:scale-105"
+                          style={{ backgroundColor: `${goal.color || '#7928CA'}15` }}
+                        >
+                          {goal.emoji || categoryConfig.emoji}
+                        </div>
+
+                        {/* Mini Progress Status Indicator on Avatar */}
+                        <span 
+                          className="absolute -bottom-1 -right-1 text-[9px] font-black px-1.5 py-0.5 rounded-full border shadow-2xs flex items-center gap-0.5 leading-none"
+                          style={{
+                            backgroundColor: isCompleted ? '#10b981' : (goal.color || '#7928CA'),
+                            color: '#ffffff',
+                            borderColor: '#ffffff'
+                          }}
+                          title={`${pct}% completado`}
+                        >
+                          {isCompleted ? '✓' : `${pct}%`}
                         </span>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${categoryConfig.bg}`}>
+                            {categoryConfig.label}
+                          </span>
+                        </div>
                         <h3 className="text-base sm:text-lg font-black text-[#2E0854] tracking-tight leading-tight mt-1 line-clamp-1">
                           {goal.nombre}
                         </h3>
                       </div>
                     </div>
 
-                    {/* Actions Menu */}
-                    <div className="flex items-center gap-1">
+                    {/* Actions Menu & Header Progress Pill */}
+                    <div className="flex items-center gap-1.5">
+                      {/* Small Quick Progress Pill */}
+                      <div 
+                        className="px-2 py-0.5 rounded-full text-[11px] font-black border shadow-2xs flex items-center gap-1 leading-none shrink-0"
+                        style={{
+                          backgroundColor: `${isCompleted ? '#10b981' : (goal.color || '#7928CA')}15`,
+                          borderColor: `${isCompleted ? '#10b981' : (goal.color || '#7928CA')}35`,
+                          color: isCompleted ? '#059669' : (goal.color || '#7928CA')
+                        }}
+                        title={`Progreso acumulado: ${pct}%`}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isCompleted ? '#10b981' : (goal.color || '#7928CA') }} />
+                        <span>{pct}%</span>
+                      </div>
+
                       <button
                         onClick={() => handleOpenEdit(goal)}
                         className="p-1.5 text-slate-400 hover:text-[#7928CA] hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
@@ -508,47 +571,75 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
                     </p>
                   )}
 
-                  {/* Progress Numbers */}
+                  {/* Progress Numbers & Enhanced Milestone Visualizer */}
                   <div className="space-y-2 mb-4 bg-purple-50/20 p-3.5 rounded-2xl border border-purple-100/60">
                     <div className="flex items-baseline justify-between">
                       <span className="text-xs font-semibold text-slate-500">
                         {goal.categoria === 'deuda' ? 'Saldado a la fecha' : 'Ahorrado a la fecha'}
                       </span>
-                      <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ backgroundColor: `${goal.color}20`, color: goal.color }}>
-                        {pct}%
+                      <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ backgroundColor: `${goal.color || '#7928CA'}20`, color: goal.color || '#7928CA' }}>
+                        {pct}% de la meta
                       </span>
                     </div>
 
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-xl sm:text-2xl font-black text-[#2E0854]">
-                        ${formatNumber(goal.montoActual)}
-                      </span>
-                      <span className="text-xs font-bold text-slate-400">
-                        / ${formatNumber(goal.montoObjetivo)}
+                    <div className="flex items-baseline justify-between gap-1.5">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-xl sm:text-2xl font-black text-[#2E0854]">
+                          ${formatNumber(goal.montoActual)}
+                        </span>
+                        <span className="text-xs font-bold text-slate-400">
+                          / ${formatNumber(goal.montoObjetivo)}
+                        </span>
+                      </div>
+
+                      <span className="text-[11px] font-bold text-slate-500">
+                        {isCompleted ? (
+                          <span className="text-emerald-600 font-extrabold flex items-center gap-0.5">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Logrado
+                          </span>
+                        ) : (
+                          <span>Resta ${formatNumber(remaining)}</span>
+                        )}
                       </span>
                     </div>
 
-                    {/* Progress Bar */}
-                    <div className="w-full bg-purple-100/60 h-2.5 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${Math.max(pct, 3)}%`,
-                          backgroundColor: goal.color || '#7928CA'
-                        }}
-                      />
+                    {/* Progress Bar with Milestone Markers Visualizer */}
+                    <div className="pt-1 pb-0.5">
+                      <div className="w-full bg-purple-100/60 h-2.5 rounded-full overflow-hidden relative shadow-inner">
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{
+                            width: `${Math.max(pct, 3)}%`,
+                            backgroundColor: isCompleted ? '#10b981' : (goal.color || '#7928CA')
+                          }}
+                        />
+                      </div>
+
+                      {/* Milestone Ticks: 25%, 50%, 75%, 100% */}
+                      <div className="flex justify-between items-center px-0.5 mt-1 text-[9px] font-bold text-slate-400">
+                        <span className={pct >= 25 ? 'text-[#7928CA] font-extrabold' : ''}>25%</span>
+                        <span className={pct >= 50 ? 'text-[#7928CA] font-extrabold' : ''}>50%</span>
+                        <span className={pct >= 75 ? 'text-[#7928CA] font-extrabold' : ''}>75%</span>
+                        <span className={isCompleted ? 'text-emerald-600 font-extrabold' : ''}>100%</span>
+                      </div>
                     </div>
 
                     {/* Remaining or Completed message */}
-                    <div className="flex items-center justify-between text-[11px] font-semibold pt-0.5">
+                    <div className="flex items-center justify-between text-[11px] font-semibold pt-1 border-t border-purple-50">
                       {isCompleted ? (
                         <span className="text-emerald-600 flex items-center gap-1 font-bold">
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           ¡Meta alcanzada! 🎉
                         </span>
                       ) : (
-                        <span className="text-slate-600">
-                          Faltan ${formatNumber(remaining)}
+                        <span className="text-slate-600 font-medium">
+                          {pct >= 75 ? (
+                            <span className="text-[#F95420] font-bold">🔥 ¡Muy cerca del objetivo!</span>
+                          ) : pct >= 50 ? (
+                            <span className="text-purple-700 font-bold">🚀 ¡Superaste la mitad!</span>
+                          ) : (
+                            <span>Faltan ${formatNumber(remaining)}</span>
+                          )}
                         </span>
                       )}
 

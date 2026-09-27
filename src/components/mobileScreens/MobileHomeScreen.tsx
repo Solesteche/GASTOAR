@@ -44,20 +44,20 @@ export const MobileHomeScreen: React.FC<MobileHomeScreenProps> = ({
   const now = new Date();
   const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   
-  const currentMonthTx = transactions.filter(t => t.date && t.date.startsWith(currentMonthStr));
+  const currentMonthTx = transactions.filter(t => (t.fecha || '').startsWith(currentMonthStr));
   const totalExpense = currentMonthTx
-    .filter(t => t.type !== 'ingreso')
-    .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+    .filter(t => t.tipoTransaccion !== 'ingreso')
+    .reduce((acc, t) => acc + (Number(t.monto) || 0), 0);
   
   const totalIncome = currentMonthTx
-    .filter(t => t.type === 'ingreso')
-    .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+    .filter(t => t.tipoTransaccion === 'ingreso')
+    .reduce((acc, t) => acc + (Number(t.monto) || 0), 0);
 
   const balance = totalIncome - totalExpense;
-  const budgetRatio = totalIncome > 0 ? Math.min(100, Math.round((totalExpense / totalIncome) * 100)) : 68;
+  const budgetRatio = totalIncome > 0 ? Math.min(100, Math.round((totalExpense / totalIncome) * 100)) : (totalExpense > 0 ? 100 : 0);
 
   const recentTransactions = [...transactions]
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .sort((a, b) => new Date(b.fecha || 0).getTime() - new Date(a.fecha || 0).getTime())
     .slice(0, 4);
 
   return (
@@ -70,8 +70,8 @@ export const MobileHomeScreen: React.FC<MobileHomeScreenProps> = ({
               {userName.charAt(0).toUpperCase()}
             </div>
             <div>
-              <h2 className="text-base font-black text-slate-900 tracking-tight leading-tight flex items-center gap-1">
-                {greeting}, {userName} <span className="text-sm">👋</span>
+              <h2 className="text-base font-black text-slate-900 tracking-tight leading-tight">
+                {greeting}, {userName}
               </h2>
               <p className="text-[11px] text-slate-500 font-medium">
                 Panel Financiero Personal
@@ -215,7 +215,7 @@ export const MobileHomeScreen: React.FC<MobileHomeScreenProps> = ({
           <div className="space-y-2">
             {recentTransactions.length > 0 ? (
               recentTransactions.map((tx) => {
-                const isIncome = tx.type === 'ingreso';
+                const isIncome = tx.tipoTransaccion === 'ingreso';
                 return (
                   <div
                     key={tx.id}
@@ -227,14 +227,14 @@ export const MobileHomeScreen: React.FC<MobileHomeScreenProps> = ({
                         className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
                           isIncome
                             ? 'bg-emerald-50 text-emerald-600'
-                            : tx.isCuotas
+                            : tx.esCuotas
                             ? 'bg-orange-50 text-orange-600'
                             : 'bg-purple-50 text-purple-600'
                         }`}
                       >
                         {isIncome ? (
                           <ArrowDownRight className="w-4 h-4" />
-                        ) : tx.isCuotas ? (
+                        ) : tx.esCuotas ? (
                           <CreditCard className="w-4 h-4" />
                         ) : (
                           <Receipt className="w-4 h-4" />
@@ -242,10 +242,10 @@ export const MobileHomeScreen: React.FC<MobileHomeScreenProps> = ({
                       </div>
                       <div className="truncate">
                         <p className="text-xs font-bold text-slate-900 truncate">
-                          {tx.description || tx.categoria}
+                          {tx.concepto || tx.descripcion || tx.categoria}
                         </p>
                         <p className="text-[10px] text-slate-400 font-medium">
-                          {tx.date} · {tx.categoria}
+                          {tx.fecha} · {tx.categoria}
                         </p>
                       </div>
                     </div>
@@ -256,11 +256,11 @@ export const MobileHomeScreen: React.FC<MobileHomeScreenProps> = ({
                           isIncome ? 'text-emerald-600' : 'text-slate-900'
                         }`}
                       >
-                        {isIncome ? '+' : '-'}{formatCurrency(tx.amount, profile?.currency || 'ARS')}
+                        {isIncome ? '+' : '-'}{formatCurrency(tx.monto, profile?.currency || 'ARS')}
                       </span>
-                      {tx.isCuotas && (
+                      {tx.esCuotas && (
                         <p className="text-[9px] font-bold text-orange-600">
-                          {tx.cuotaActual}/{tx.cuotasTotales} cuotas
+                          {tx.cuotaActual || 1}/{tx.cuotasTotal || 1} cuotas
                         </p>
                       )}
                     </div>
@@ -276,10 +276,10 @@ export const MobileHomeScreen: React.FC<MobileHomeScreenProps> = ({
         </div>
       </div>
 
-      {/* Screen 5 Tag Footer */}
-      <div className="pt-3 text-center">
+      {/* Clean Brand Footer */}
+      <div className="pt-2 text-center">
         <span className="text-[10px] font-bold text-slate-400">
-          Pantalla 5 · Inicio / Dashboard Hub
+          GastoAR Móvil · Registra, Controla, Ahorra
         </span>
       </div>
     </div>

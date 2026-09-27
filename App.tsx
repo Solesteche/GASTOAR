@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { 
   Header 
 } from './components/Header';
@@ -38,6 +41,9 @@ import {
 import { 
   BudgetModal 
 } from './components/BudgetModal';
+import { 
+  BudgetCreateModal 
+} from './components/BudgetCreateModal';
 import { 
   CoupleSettingsModal 
 } from './components/CoupleSettingsModal';
@@ -94,9 +100,36 @@ import {
   TrialExpiredBlockedScreen 
 } from './components/TrialExpiredBlockedScreen';
 import { 
+  CashFlowSection 
+} from './components/CashFlowSection';
+import { 
+  MultiCurrencyWidget 
+} from './components/MultiCurrencyWidget';
+import { 
+  ScheduledPayment 
+} from './CashFlowEngine';
+import { 
+  SplashScreen 
+} from './components/mobileScreens/SplashScreen';
+import { 
+  OnboardingScreen 
+} from './components/mobileScreens/OnboardingScreen';
+import { 
+  ProfileScreen 
+} from './components/mobileScreens/ProfileScreen';
+import { 
+  SettingsScreen 
+} from './components/mobileScreens/SettingsScreen';
+import { 
+  MobileSubscriptionScreen 
+} from './components/mobileScreens/MobileSubscriptionScreen';
+import { 
   FirebaseCloudSyncModal 
 } from './components/FirebaseCloudSyncModal';
 import { 
+  auth,
+  onAuthStateChanged,
+  logOutFirebase,
   getMesKeyFromDate,
   getMonthMovementsFromFirestore,
   getUserProfileFromFirestore,
@@ -109,7 +142,9 @@ import {
   registerWithEmailFirebase,
   loginWithEmailFirebase,
   getAppStateFromFirestore,
-  syncAppStateToFirestore
+  syncAppStateToFirestore,
+  listenToAppState,
+  listenToMonthMovements
 } from './lib/firebase';
 import { 
   BillingCycle,
@@ -126,7 +161,8 @@ import {
   SubscriptionPlanId,
   Transaction,
   UserAccount,
-  UserSubscription
+  UserSubscription,
+  Vencimiento
 } from './types';
 import { 
   DEFAULT_BUDGETS, 
@@ -145,11 +181,18 @@ import {
   exportTransactionsToCSV,
   isDateInRange 
 } from './utils/formatters';
+import { recordLearnedPreference } from './utils/learnedPreferences';
 
 export default function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('control_gastos_is_authenticated') === 'true';
+  });
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(() => {
+    return !localStorage.getItem('control_gastos_is_authenticated');
   });
 
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
@@ -163,10 +206,72 @@ export default function App() {
   const [currentUserAccount, setCurrentUserAccount] = useState<UserAccount | null>(() => {
     const saved = localStorage.getItem('control_gastos_account_v1');
     if (saved) {
-      try { return JSON.parse(saved); } catch {}
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed?.accountCode && (parsed.accountCode.startsWith('PAREJA-') || parsed.accountCode.startsWith('PAIR-'))) {
+          parsed.accountCode = parsed.accountCode.replace(/^(PAREJA|PAIR)-/, 'COMPARTIDA-');
+        }
+        return parsed;
+      } catch {}
     }
     return null;
   });
+
+  // Global Session Persistence via Firebase onAuthStateChanged
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setIsAuthenticated(true);
+        localStorage.setItem('control_gastos_is_authenticated', 'true');
+
+        try {
+          const profileFromDb = await getUserProfileFromFirestore(user.uid);
+          if (profileFromDb) {
+            if (profileFromDb.accountCode && (profileFromDb.accountCode.startsWith('PAREJA-') || profileFromDb.accountCode.startsWith('PAIR-'))) {
+              profileFromDb.accountCode = profileFromDb.accountCode.replace(/^(PAREJA|PAIR)-/, 'COMPARTIDA-');
+            }
+            setCurrentUserAccount(profileFromDb);
+            localStorage.setItem('control_gastos_account_v1', JSON.stringify(profileFromDb));
+          } else {
+            setCurrentUserAccount((prev) => {
+              const email = user.email || prev?.email || 'usuario@gastoar.com';
+              const name = user.displayName || prev?.name || email.split('@')[0];
+              const rawCode = prev?.accountCode;
+              const accountCode = rawCode 
+                ? rawCode.replace(/^(PAREJA|PAIR)-/, 'COMPARTIDA-')
+                : ('COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000));
+              const updated: UserAccount = {
+                id: user.uid,
+                email,
+                name,
+                accountType: prev?.accountType || 'pareja',
+                selectedPlanId: prev?.selectedPlanId || 'pareja',
+                accountCode,
+                currency: prev?.currency || 'ARS',
+                createdAt: prev?.createdAt || Date.now(),
+              };
+              localStorage.setItem('control_gastos_account_v1', JSON.stringify(updated));
+              return updated;
+            });
+          }
+        } catch (e) {
+          console.warn('Error synchronizing Firebase user profile:', e);
+        }
+      } else {
+        const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
+        const isAdminStorage = localStorage.getItem('control_gastos_is_admin') === 'true';
+        if (!isDemo && !isAdminStorage) {
+          setIsAuthenticated(false);
+          setCurrentUserAccount(null);
+          localStorage.removeItem('control_gastos_is_authenticated');
+          localStorage.removeItem('control_gastos_account_v1');
+        }
+      }
+      setIsAuthLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Dark Mode State
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -193,6 +298,7 @@ export default function App() {
 
   // Application State
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
     const saved = localStorage.getItem('control_gastos_tx_v5');
     if (saved) {
       try {
@@ -205,7 +311,7 @@ export default function App() {
         });
       } catch {}
     }
-    return DEFAULT_TRANSACTIONS;
+    return isDemo ? DEFAULT_TRANSACTIONS : [];
   });
 
   const [categoryMap, setCategoryMap] = useState<CategoryMap>(() => {
@@ -213,8 +319,17 @@ export default function App() {
     if (saved) {
       try {
         const parsed: CategoryMap = JSON.parse(saved);
-        if (!parsed['Suscripciones']) {
-          parsed['Suscripciones'] = DEFAULT_CATEGORY_MAP['Suscripciones'];
+        // Ensure "Suscripciones y Plataformas" is established for all users and plans
+        if (!parsed['Suscripciones y Plataformas']) {
+          parsed['Suscripciones y Plataformas'] = parsed['Suscripciones'] || DEFAULT_CATEGORY_MAP['Suscripciones y Plataformas'] || [
+            "Netflix", "Spotify", "YouTube Premium", "Disney+ / Star+", "Amazon Prime Video",
+            "Max (HBO Max)", "Apple TV+ / iCloud", "ChatGPT Plus / OpenAI", "Paramount+",
+            "Crunchyroll", "Mercado Libre (Meli+)", "PlayStation Plus / Xbox Game Pass",
+            "Google One / Drive", "Otras plataformas digitales"
+          ];
+        }
+        if (parsed['Suscripciones']) {
+          delete parsed['Suscripciones'];
         }
 
         // Add "Gimnasio, Club, Pádel & Deportes" to Salud & Cuidado Personal if missing
@@ -255,8 +370,11 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (!parsed['Suscripciones']) {
-          parsed['Suscripciones'] = DEFAULT_CATEGORY_COLORS['Suscripciones'];
+        if (!parsed['Suscripciones y Plataformas']) {
+          parsed['Suscripciones y Plataformas'] = parsed['Suscripciones'] || DEFAULT_CATEGORY_COLORS['Suscripciones y Plataformas'] || '#7928CA';
+        }
+        if (parsed['Suscripciones']) {
+          delete parsed['Suscripciones'];
         }
         return parsed;
       } catch {}
@@ -265,23 +383,35 @@ export default function App() {
   });
 
   const [budgets, setBudgets] = useState<Budgets>(() => {
+    const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
     const saved = localStorage.getItem('control_gastos_budgets_v5');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed.categories && !parsed.categories['Suscripciones']) {
-          parsed.categories['Suscripciones'] = 60000;
+        if (parsed.categories) {
+          if (!parsed.categories['Suscripciones y Plataformas']) {
+            parsed.categories['Suscripciones y Plataformas'] = parsed.categories['Suscripciones'] || 60000;
+          }
+          if (parsed.categories['Suscripciones']) {
+            delete parsed.categories['Suscripciones'];
+          }
         }
         return parsed;
       } catch {}
     }
-    return DEFAULT_BUDGETS;
+    return isDemo ? DEFAULT_BUDGETS : { categories: {}, subcategories: {} };
   });
 
   const [profile, setProfile] = useState<CoupleProfile>(() => {
     const saved = localStorage.getItem('control_gastos_profile_v3');
     if (saved) {
-      try { return JSON.parse(saved); } catch {}
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed?.accountCode && (parsed.accountCode.startsWith('PAREJA-') || parsed.accountCode.startsWith('PAIR-'))) {
+          parsed.accountCode = parsed.accountCode.replace(/^(PAREJA|PAIR)-/, 'COMPARTIDA-');
+        }
+        return parsed;
+      } catch {}
     }
     return DEFAULT_COUPLE_PROFILE;
   });
@@ -295,15 +425,104 @@ export default function App() {
   });
 
   const [goals, setGoals] = useState<Goal[]>(() => {
+    const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
     const saved = localStorage.getItem('control_gastos_goals_v1');
     if (saved) {
       try { return JSON.parse(saved); } catch {}
     }
-    return DEFAULT_GOALS;
+    return isDemo ? DEFAULT_GOALS : [];
   });
 
+  // ─── Vencimientos ─────────────────────────────────────────────────────────────
+  const [vencimientos, setVencimientos] = useState<Vencimiento[]>(() => {
+    const saved = localStorage.getItem('gastoar_vencimientos_v1');
+    if (saved) {
+      try { return JSON.parse(saved); } catch {}
+    }
+    // Datos iniciales de ejemplo (se pueden borrar luego)
+    const today = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const addDays = (d: Date, days: number) => {
+      const r = new Date(d);
+      r.setDate(r.getDate() + days);
+      return `${r.getFullYear()}-${pad(r.getMonth() + 1)}-${pad(r.getDate())}`;
+    };
+    return [
+      {
+        id: 'v1',
+        icon: '💳',
+        title: 'Tarjeta Visa',
+        cat: 'Tarjeta de crédito',
+        amount: 85000,
+        dueDate: addDays(today, 3),
+        isRecurring: true,
+      },
+      {
+        id: 'v2',
+        icon: '🏢',
+        title: 'Expensas',
+        cat: 'Hogar',
+        amount: 135000,
+        dueDate: addDays(today, 5),
+        isRecurring: true,
+      },
+      {
+        id: 'v3',
+        icon: '💧',
+        title: 'AySA',
+        cat: 'Servicios',
+        amount: 28500,
+        dueDate: addDays(today, 8),
+        isRecurring: true,
+      },
+      {
+        id: 'v4',
+        icon: '🌐',
+        title: 'Internet',
+        cat: 'Servicios',
+        amount: 12000,
+        dueDate: addDays(today, 11),
+        isRecurring: true,
+      },
+      {
+        id: 'v5',
+        icon: '🏠',
+        title: 'Alquiler',
+        cat: 'Vivienda',
+        amount: 650000,
+        dueDate: addDays(today, 14),
+        isRecurring: true,
+      },
+    ];
+  });
+
+  // Persistir vencimientos
+  useEffect(() => {
+    localStorage.setItem('gastoar_vencimientos_v1', JSON.stringify(vencimientos));
+  }, [vencimientos]);
+
   // UI States
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'installments' | 'couple_balance' | 'budgets' | 'categories' | 'ai' | 'settlement' | 'goals' | 'subscriptions' | 'admin_subscriptions'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'installments' | 'card_alerts' | 'couple_balance' | 'budgets' | 'categories' | 'ai' | 'settlement' | 'goals' | 'subscriptions' | 'admin_subscriptions' | 'charts' | 'profile' | 'settings' | 'cashflow' | 'currency'>('dashboard');
+
+  // Sync route path with activeTab if user accesses specific route
+  useEffect(() => {
+    const raw = location.pathname.replace(/^\/+/, '').toLowerCase();
+    if (!raw || raw === 'login') return;
+    if (raw === 'installments' || raw === 'cuotas') setActiveTab('installments');
+    else if (raw === 'card_alerts' || raw === 'vencimientos' || raw === 'alertas') setActiveTab('card_alerts');
+    else if (raw === 'couple_balance' || raw === 'balance') setActiveTab('couple_balance');
+    else if (raw === 'budgets' || raw === 'presupuestos') setActiveTab('budgets');
+    else if (raw === 'categories' || raw === 'categorias') setActiveTab('categories');
+    else if (raw === 'goals' || raw === 'metas') setActiveTab('goals');
+    else if (raw === 'subscriptions' || raw === 'suscripciones') setActiveTab('subscriptions');
+    else if (raw === 'admin_subscriptions' || raw === 'admin') setActiveTab('admin_subscriptions');
+    else if (raw === 'transactions' || raw === 'gastos') setActiveTab('transactions');
+    else if (raw === 'cashflow' || raw === 'flujocaja' || raw === 'flujo') setActiveTab('cashflow');
+    else if (raw === 'currency' || raw === 'dolar' || raw === 'divisas') setActiveTab('currency');
+    else if (raw === 'profile' || raw === 'perfil') setActiveTab('profile');
+    else if (raw === 'settings' || raw === 'configuracion' || raw === 'ajustes') setActiveTab('settings');
+    else if (raw === 'dashboard') setActiveTab('dashboard');
+  }, [location.pathname]);
   const [activeMode, setActiveMode] = useState<ExpenseMode>(() => {
     const saved = localStorage.getItem('gastoar_active_mode');
     if (saved === 'individual' || saved === 'pareja') return saved;
@@ -324,6 +543,7 @@ export default function App() {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
+  const [isBudgetCreateModalOpen, setIsBudgetCreateModalOpen] = useState(false);
   const [isCoupleModalOpen, setIsCoupleModalOpen] = useState(false);
   const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -331,6 +551,12 @@ export default function App() {
   const [isCardAlertsModalOpen, setIsCardAlertsModalOpen] = useState(false);
   const [isDiagnosisModalOpen, setIsDiagnosisModalOpen] = useState(false);
   const [isCloudSyncModalOpen, setIsCloudSyncModalOpen] = useState(false);
+
+  // Screen 1 & 4: Mobile startup splash and tutorial modal
+  const [showSplash, setShowSplash] = useState<boolean>(() => {
+    return !sessionStorage.getItem('gastoar_splash_seen');
+  });
+  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState<boolean>(false);
 
   // Filters State
   const [filters, setFilters] = useState<FilterState>(() => {
@@ -362,6 +588,30 @@ export default function App() {
   const dismissToast = (id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
+
+  const appScheduledPayments = useMemo<ScheduledPayment[]>(() => {
+    return (vencimientos || []).filter(v => !v.isPaid).map(v => ({
+      id: v.id,
+      label: v.title || (v as any).servicio || 'Vencimiento',
+      amount: Number(v.amount || 0),
+      dueDate: v.dueDate || new Date().toISOString().split('T')[0],
+      type: 'expense' as const,
+      category: v.cat || 'Servicios',
+      emoji: v.icon || '📅',
+    }));
+  }, [vencimientos]);
+
+  const appTotalIncome = useMemo(() => {
+    return transactions.filter(t => t.tipoTransaccion === 'ingreso').reduce((s, t) => s + Number(t.monto || 0), 0);
+  }, [transactions]);
+
+  const appTotalExpenses = useMemo(() => {
+    return transactions.filter(t => t.tipoTransaccion !== 'ingreso').reduce((s, t) => s + Number(t.monto || 0), 0);
+  }, [transactions]);
+
+  const appAvailableBalance = useMemo(() => {
+    return appTotalIncome - appTotalExpenses;
+  }, [appTotalIncome, appTotalExpenses]);
 
   // Sync state to LocalStorage
   useEffect(() => {
@@ -402,10 +652,11 @@ export default function App() {
 
   // Active user ID for Firebase Firestore partitioning
   const activeUserId = useMemo(() => {
+    if (auth.currentUser?.uid) return auth.currentUser.uid;
     if (currentUserAccount?.id) return currentUserAccount.id.replace(/[^a-zA-Z0-9_-]/g, '_');
     if (currentUserAccount?.email) return currentUserAccount.email.replace(/[^a-zA-Z0-9_-]/g, '_');
     return 'usuario_principal';
-  }, [currentUserAccount]);
+  }, [currentUserAccount, auth.currentUser?.uid]);
 
   const handleMergeTransactions = (newTxs: Transaction[]) => {
     setTransactions(prev => {
@@ -418,90 +669,96 @@ export default function App() {
 
   // Cloud Sync State (for multi-device real-time consistency)
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('synced');
-  const isInitialCloudLoadDone = React.useRef<boolean>(false);
+  const isRemoteUpdate = useRef<boolean>(false);
+  const isInitialCloudLoadDone = useRef<boolean>(true);
 
-  // Load from Cloud on App start / session restore
-  // OPTIMIZACIÓN DE LECTURAS: Solo se descarga el mes actual (ej: septiembre)
+  // Sincronización en tiempo real con Firebase Firestore (onSnapshot)
+  // Cross-device: PC <-> Celular
+  // Elimina la secuencia bloqueante (mes actual + presupuesto + estado completo) del arranque.
   useEffect(() => {
-    if (!isAuthenticated || !currentUserAccount?.email || isDemoMode) return;
+    if (!isAuthenticated || !currentUserAccount?.email || isDemoMode || !activeUserId) return;
 
-    const loadCloudData = async () => {
-      try {
-        setCloudSyncStatus('syncing');
+    setCloudSyncStatus('syncing');
 
-        // 1. Firebase Firestore: Descarga optimizada únicamente del mes actual
-        if (activeUserId) {
-          try {
-            const currentMonthKey = getMesKeyFromDate('');
-            const firestoreMonthTxs = await getMonthMovementsFromFirestore(activeUserId, currentMonthKey);
-            if (firestoreMonthTxs && firestoreMonthTxs.length > 0) {
-              setTransactions(prev => {
-                const map = new Map<string, Transaction>();
-                prev.forEach(t => map.set(t.id, t));
-                firestoreMonthTxs.forEach(t => map.set(t.id, t));
-                return Array.from(map.values());
-              });
-            }
+    // 1. Listener en tiempo real de Movimientos del mes actual (PC <-> Celular)
+    const currentMonthKey = getMesKeyFromDate('');
+    const unsubscribeMovements = listenToMonthMovements(
+      activeUserId,
+      currentMonthKey,
+      (remoteMonthTxs) => {
+        isRemoteUpdate.current = true;
+        setTransactions(prev => {
+          const map = new Map<string, Transaction>();
+          // Conservar movimientos de otros meses ya cargados en memoria
+          prev.forEach(t => map.set(t.id, t));
+          // Sincronizar reactivamente los movimientos del mes actual
+          remoteMonthTxs.forEach(t => map.set(t.id, t));
+          const merged = Array.from(map.values());
+          merged.sort((a, b) => {
+            const dateDiff = (b.fecha || '').localeCompare(a.fecha || '');
+            if (dateDiff !== 0) return dateDiff;
+            return (b.createdAt || 0) - (a.createdAt || 0);
+          });
+          return merged;
+        });
+        setCloudSyncStatus('synced');
+      },
+      () => setCloudSyncStatus('offline')
+    );
 
-            const firestoreBudgets = await getBudgetsFromFirestore(activeUserId);
-            if (firestoreBudgets) {
-              setBudgets(firestoreBudgets);
-            }
-          } catch (fbErr) {
-            console.warn('Firebase initial month load check:', fbErr);
-          }
+    // 2. Listener en tiempo real del Estado General de la aplicación (PC <-> Celular)
+    const unsubscribeAppState = listenToAppState(
+      activeUserId,
+      (data) => {
+        isRemoteUpdate.current = true;
+        if (Array.isArray(data.transactions) && data.transactions.length > 0) {
+          setTransactions(prev => {
+            const map = new Map<string, Transaction>();
+            (data.transactions as Transaction[]).forEach(t => map.set(t.id, t));
+            prev.forEach(t => map.set(t.id, t));
+            return Array.from(map.values());
+          });
         }
-
-        const data: any = await getAppStateFromFirestore(activeUserId);
-        if (data) {
-            if (Array.isArray(data.transactions) && data.transactions.length > 0) {
-              setTransactions(prev => {
-                const map = new Map<string, Transaction>();
-                (data.transactions as Transaction[]).forEach(t => map.set(t.id, t));
-                prev.forEach(t => map.set(t.id, t));
-                return Array.from(map.values());
-              });
-            }
-            if (data.categoryMap && Object.keys(data.categoryMap).length > 0) {
-              setCategoryMap(data.categoryMap);
-            }
-            if (data.categoryColors) {
-              setCategoryColors(data.categoryColors);
-            }
-            if (data.budgets) {
-              setBudgets(data.budgets);
-            }
-            if (data.profile) {
-              setProfile(data.profile);
-            }
-            if (Array.isArray(data.settlementHistory)) {
-              setSettlementHistory(data.settlementHistory);
-            }
-            if (Array.isArray(data.goals)) {
-              setGoals(data.goals);
-            }
-            if (Array.isArray(data.subscriptions) && data.subscriptions.length > 0) {
-              setSubscriptions(data.subscriptions);
-            }
-            setCloudSyncStatus('synced');
-        } else {
-          setCloudSyncStatus('synced');
+        if (data.categoryMap && Object.keys(data.categoryMap as object).length > 0) {
+          setCategoryMap(data.categoryMap as Record<string, string[]>);
         }
-      } catch (err) {
-        console.warn('Could not sync cloud data on load:', err);
-        setCloudSyncStatus('offline');
-      } finally {
-        isInitialCloudLoadDone.current = true;
-      }
+        if (data.categoryColors) {
+          setCategoryColors(data.categoryColors as Record<string, string>);
+        }
+        if (data.budgets) {
+          setBudgets(data.budgets as Budgets);
+        }
+        if (data.profile) {
+          setProfile(data.profile as CoupleProfile);
+        }
+        if (Array.isArray(data.settlementHistory)) {
+          setSettlementHistory(data.settlementHistory as SettlementRecord[]);
+        }
+        if (Array.isArray(data.goals)) {
+          setGoals(data.goals as Goal[]);
+        }
+        if (Array.isArray(data.subscriptions) && (data.subscriptions as unknown[]).length > 0) {
+          setSubscriptions(data.subscriptions as UserSubscription[]);
+        }
+        setCloudSyncStatus('synced');
+      },
+      () => setCloudSyncStatus('offline')
+    );
+
+    return () => {
+      unsubscribeMovements();
+      unsubscribeAppState();
     };
+  }, [isAuthenticated, currentUserAccount?.email, activeUserId, isDemoMode]);
 
-    loadCloudData();
-  }, [isAuthenticated, currentUserAccount?.email]);
-
-  // Debounced auto-sync to Cloud whenever state changes
+  // Auto-sincronización con Firestore cuando el usuario modifica datos localmente (evita loops por updates remotos)
   useEffect(() => {
-    if (!isAuthenticated || !currentUserAccount?.email || isDemoMode) return;
-    if (!isInitialCloudLoadDone.current) return;
+    if (!isAuthenticated || !currentUserAccount?.email || isDemoMode || !activeUserId) return;
+
+    if (isRemoteUpdate.current) {
+      isRemoteUpdate.current = false;
+      return;
+    }
 
     const timer = setTimeout(async () => {
       try {
@@ -528,8 +785,7 @@ export default function App() {
     subscriptions,
     isAuthenticated,
     currentUserAccount?.email,
-    currentUserAccount?.accountCode,
-    profile.accountCode,
+    activeUserId,
     isDemoMode,
   ]);
 
@@ -717,10 +973,39 @@ export default function App() {
       showToast(isIncome ? '¡Ingreso registrado con éxito!' : '¡Gasto registrado con éxito!', 'success');
     }
 
+    // Automatically update learned preferences whenever an expense is created or edited
+    if (savedTx.tipoTransaccion === 'gasto' && savedTx.concepto && savedTx.categoria && savedTx.concepto !== 'Gasto por voz') {
+      try {
+        recordLearnedPreference(
+          savedTx.concepto,
+          savedTx.categoria,
+          savedTx.subcategoria || 'General',
+          savedTx.metodoPago,
+          'auto_learned'
+        );
+      } catch (err) {
+        console.warn('Could not record learned preference:', err);
+      }
+    }
+
     // Persist to Firebase Firestore under users/{userId}/movimientos/{mesKey}/items/{txId}
     if (activeUserId && !isDemoMode) {
       saveMovementToFirestore(activeUserId, savedTx).catch(err => {
         console.warn('Could not sync movement to Firebase Firestore:', err);
+      });
+      // Sincronización inmediata de estado para reflejo instantáneo en otros dispositivos (PC <-> Celular)
+      const updatedTxs = [savedTx, ...transactions.filter(t => t.id !== savedTx.id)];
+      syncAppStateToFirestore(activeUserId, {
+        transactions: updatedTxs,
+        categoryMap,
+        categoryColors,
+        budgets,
+        profile,
+        settlementHistory,
+        goals,
+        subscriptions,
+      }).catch(err => {
+        console.warn('Could not sync app state on save:', err);
       });
     }
 
@@ -741,6 +1026,19 @@ export default function App() {
     if (toDelete && activeUserId && !isDemoMode) {
       deleteMovementFromFirestore(activeUserId, id, toDelete.fecha).catch(err => {
         console.warn('Could not delete movement from Firebase Firestore:', err);
+      });
+      const remainingTxs = transactions.filter(t => t.id !== id);
+      syncAppStateToFirestore(activeUserId, {
+        transactions: remainingTxs,
+        categoryMap,
+        categoryColors,
+        budgets,
+        profile,
+        settlementHistory,
+        goals,
+        subscriptions,
+      }).catch(err => {
+        console.warn('Could not sync app state on delete:', err);
       });
     }
     setTransactions(prev => prev.filter(t => t.id !== id));
@@ -839,7 +1137,7 @@ export default function App() {
   };
 
   // Goals Handlers
-  const handleAddGoal = (goalData: Omit<Goal, 'id' | 'createdAt'>) => {
+  const handleAddGoal = (goalData: Omit<Goal, 'id' | 'createdAt'>): Goal => {
     const newGoal: Goal = {
       ...goalData,
       id: 'goal-' + Date.now(),
@@ -847,6 +1145,7 @@ export default function App() {
     };
     setGoals(prev => [newGoal, ...prev]);
     showToast(`Caja de meta "${newGoal.nombre}" creada con éxito`, 'success');
+    return newGoal;
   };
 
   const handleUpdateGoal = (id: string, updated: Partial<Goal>) => {
@@ -857,6 +1156,50 @@ export default function App() {
   const handleDeleteGoal = (id: string) => {
     setGoals(prev => prev.filter(g => g.id !== id));
     showToast('Caja de meta eliminada', 'info');
+  };
+
+  // ─── Handlers de Vencimientos ─────────────────────────────────────────────────
+
+  const handleAddVencimiento = (v: Omit<Vencimiento, 'id'>) => {
+    const newV: Vencimiento = { ...v, id: 'venc-' + Date.now() };
+    setVencimientos(prev => [...prev, newV].sort((a, b) => a.dueDate.localeCompare(b.dueDate)));
+    showToast(`Vencimiento "${v.title}" agregado`, 'success');
+  };
+
+  const handleMarkVencimientoPaid = (id: string) => {
+    setVencimientos(prev => prev.map(v => {
+      if (v.id !== id) return v;
+      // Si es recurrente, avanzar al próximo mes en lugar de eliminar
+      if (v.isRecurring) {
+        const next = new Date(v.dueDate);
+        next.setMonth(next.getMonth() + 1);
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        const nextDate = `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}`;
+        return { ...v, dueDate: nextDate, isPaid: false };
+      }
+      return { ...v, isPaid: true };
+    }));
+    showToast('Vencimiento marcado como pagado ✓', 'success');
+  };
+
+  const handleDeleteVencimiento = (id: string) => {
+    setVencimientos(prev => prev.filter(v => v.id !== id));
+    showToast('Vencimiento eliminado', 'info');
+  };
+
+  const handleExportData = () => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(transactions, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `gastoar_export_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('Datos exportados exitosamente en formato JSON', 'success');
+    } catch {
+      showToast('Error al exportar datos', 'error');
+    }
   };
 
   const handleAddContribution = (goalId: string, contribution: Omit<GoalContribution, 'id'>) => {
@@ -891,7 +1234,7 @@ export default function App() {
   };
 
   const handleGenerateNewCode = () => {
-    const newCode = 'PAREJA-' + Math.floor(1000 + Math.random() * 9000);
+    const newCode = 'COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000);
     setProfile(prev => ({ ...prev, accountCode: newCode }));
     showToast(`Nuevo código asignado: ${newCode}`, 'success');
   };
@@ -986,7 +1329,7 @@ export default function App() {
           email: firebaseUser.email || cleanEmail,
           name: firebaseUser.displayName || cleanEmail.split('@')[0],
           accountType: 'individual',
-          accountCode: `PAIR-${Math.floor(1000 + Math.random() * 9000)}`,
+          accountCode: `COMPARTIDA-${Math.floor(1000 + Math.random() * 9000)}`,
           currency: 'ARS',
           createdAt: now,
         };
@@ -1161,7 +1504,7 @@ export default function App() {
         userEmail: cleanEmail,
         userName: `${data.name.trim()}${data.lastName ? ' ' + data.lastName.trim() : ''}`,
         partnerName: data.partnerName ? data.partnerName.trim() : undefined,
-        accountCode: data.accountCode || ('PAIR-' + Math.floor(1000 + Math.random() * 9000)),
+        accountCode: data.accountCode ? data.accountCode.replace(/^(PAREJA|PAIR)-/, 'COMPARTIDA-') : ('COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000)),
         planId: chosenPlan.id,
         planName: chosenPlan.name,
         status: 'trial',
@@ -1266,6 +1609,16 @@ export default function App() {
       setProfile(cleanProfile);
       setSubscriptions([initialSub]);
 
+      // Clear all demo/previous local storage keys for clean slate
+      localStorage.setItem('control_gastos_tx_v5', JSON.stringify([]));
+      localStorage.setItem('control_gastos_budgets_v5', JSON.stringify({ categories: {}, subcategories: {} }));
+      localStorage.setItem('control_gastos_goals_v1', JSON.stringify([]));
+      localStorage.setItem('control_gastos_settlements_v3', JSON.stringify([]));
+      localStorage.setItem('gastoar_vencimientos_alerts_v5', JSON.stringify([]));
+      localStorage.setItem('gastoar_vencimientos_alerts_v4', JSON.stringify([]));
+      localStorage.setItem('gastoar_vencimientos_alerts_v3', JSON.stringify([]));
+      localStorage.setItem('gastoar_card_alerts_v2', JSON.stringify([]));
+
       setIsAdmin(false);
       setIsDemoMode(false);
       localStorage.setItem('control_gastos_is_admin', 'false');
@@ -1300,7 +1653,7 @@ export default function App() {
 
       const email = user.email.toLowerCase();
       const name = user.displayName || email.split('@')[0];
-      const accountCode = 'PAIR-' + Math.floor(1000 + Math.random() * 9000);
+      const accountCode = 'COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000);
 
       const acc: UserAccount = {
         id: user.uid,
@@ -1341,6 +1694,20 @@ export default function App() {
       // Save locally
       setCurrentUserAccount(acc);
       localStorage.setItem('control_gastos_account_v1', JSON.stringify(acc));
+
+      // Reset state for new session
+      setTransactions([]);
+      setGoals([]);
+      setSettlementHistory([]);
+      setBudgets({ categories: {}, subcategories: {} });
+      localStorage.setItem('control_gastos_tx_v5', JSON.stringify([]));
+      localStorage.setItem('control_gastos_budgets_v5', JSON.stringify({ categories: {}, subcategories: {} }));
+      localStorage.setItem('control_gastos_goals_v1', JSON.stringify([]));
+      localStorage.setItem('control_gastos_settlements_v3', JSON.stringify([]));
+      localStorage.setItem('gastoar_vencimientos_alerts_v5', JSON.stringify([]));
+      localStorage.setItem('gastoar_vencimientos_alerts_v4', JSON.stringify([]));
+      localStorage.setItem('gastoar_vencimientos_alerts_v3', JSON.stringify([]));
+      localStorage.setItem('gastoar_card_alerts_v2', JSON.stringify([]));
 
       setIsAdmin(false);
       setIsDemoMode(false);
@@ -1404,7 +1771,12 @@ export default function App() {
     showToast('Modo Administrador activado. Gestión de suscripciones y clientes.', 'info');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await logOutFirebase();
+    } catch (e) {
+      console.warn('Error signing out of Firebase:', e);
+    }
     setIsAuthenticated(false);
     setIsAdmin(false);
     setIsDemoMode(false);
@@ -1414,12 +1786,13 @@ export default function App() {
     localStorage.removeItem('control_gastos_is_demo');
     localStorage.removeItem('control_gastos_account_v1');
     showToast('Has cerrado sesión correctamente. ¡Hasta pronto! 👋', 'info');
+    navigate('/login', { replace: true });
   };
 
   // Active User Subscription & Permissions
   const activeUserSub = subscriptions.find(s => s.userEmail.toLowerCase() === (currentUserAccount?.email || 'ejemplo@ejemplo.com').toLowerCase());
   const currentPlanId: SubscriptionPlanId = activeUserSub?.planId || currentUserAccount?.selectedPlanId || (currentUserAccount?.accountType === 'individual' ? 'individual' : 'pareja');
-  const canManageCategories = isAdmin || currentPlanId !== 'individual';
+  const canManageCategories = isAdmin || (currentPlanId !== 'individual' && currentPlanId !== 'free');
 
   // Check if Trial is Expired
   const isTrialExpired = useMemo(() => {
@@ -1434,42 +1807,71 @@ export default function App() {
     return false;
   }, [isAdmin, isDemoMode, activeUserSub]);
 
-  // Render Auth Landing Page if not logged in
-  if (!isAuthenticated) {
-    return (
-      <>
-        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-        <AuthLandingPage
-          onLogin={handleLogin}
-          onRegister={handleRegister}
-          onGoogleLogin={handleGoogleLogin}
-          onGuestDemo={handleGuestDemo}
-          onOpenAdminPanel={handleOpenAdminPanel}
-        />
-      </>
-    );
-  }
-
-  // Render Trial Expired Block Screen if trial has ended
-  if (isTrialExpired) {
-    return (
-      <>
-        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-        <TrialExpiredBlockedScreen
-          userAccount={currentUserAccount}
-          subscription={activeUserSub}
-          onSelectPlanPayment={handleSelectPlanPayment}
-          onLogout={handleLogout}
-          onOpenAdminPanel={handleOpenAdminPanel}
-        />
-      </>
-    );
-  }
-
   return (
-    <div className={`min-h-screen flex flex-col md:flex-row antialiased selection:bg-purple-100 selection:text-purple-900 transition-colors duration-300 ${isDarkMode ? 'dark bg-[#0a0314] text-purple-50' : 'bg-slate-50 text-slate-800'}`}>
+    <>
       {/* Toast Notification Layer */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
+      <Routes>
+        {/* Public Login Route */}
+        <Route
+          path="/login"
+          element={
+            isAuthenticated ? (
+              <Navigate to={(location.state as any)?.from?.pathname || '/'} replace />
+            ) : (
+              <>
+                <AuthLandingPage
+                  onLogin={async (email, pass) => {
+                    const res = await handleLogin(email, pass);
+                    if (res.success) {
+                      navigate((location.state as any)?.from?.pathname || '/', { replace: true });
+                    }
+                    return res;
+                  }}
+                  onRegister={async (data) => {
+                    const res = await handleRegister(data);
+                    if (res.success) {
+                      navigate((location.state as any)?.from?.pathname || '/', { replace: true });
+                    }
+                    return res;
+                  }}
+                  onGoogleLogin={async () => {
+                    const res = await handleGoogleLogin();
+                    if (res.success) {
+                      navigate((location.state as any)?.from?.pathname || '/', { replace: true });
+                    }
+                    return res;
+                  }}
+                  onGuestDemo={() => {
+                    handleGuestDemo();
+                    navigate('/', { replace: true });
+                  }}
+                  onOpenAdminPanel={() => {
+                    handleOpenAdminPanel();
+                    navigate('/admin', { replace: true });
+                  }}
+                />
+              </>
+            )
+          }
+        />
+
+        {/* Protected App Routes (Expenses Management, Balance, Alerts, Categories, Sync, Admin, etc.) */}
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated} isAuthLoading={isAuthLoading}>
+              {isTrialExpired ? (
+                <TrialExpiredBlockedScreen
+                  userAccount={currentUserAccount}
+                  subscription={activeUserSub}
+                  onSelectPlanPayment={handleSelectPlanPayment}
+                  onLogout={handleLogout}
+                  onOpenAdminPanel={handleOpenAdminPanel}
+                />
+              ) : (
+                <div className={`min-h-screen flex flex-col md:flex-row antialiased selection:bg-purple-100 selection:text-purple-900 transition-colors duration-300 ${isDarkMode ? 'dark bg-[#0a0314] text-purple-50' : 'bg-slate-50 text-slate-800'}`}>
 
       {/* Sidebar Navigation */}
       <Sidebar
@@ -1496,6 +1898,7 @@ export default function App() {
         isAdmin={isAdmin}
         isDemoMode={isDemoMode}
         onExitDemo={handleExitDemo}
+        isDarkMode={isDarkMode}
       />
 
       {/* Main Content Area */}
@@ -1522,6 +1925,7 @@ export default function App() {
           onExitDemo={handleExitDemo}
           cloudSyncStatus={cloudSyncStatus}
           onOpenCloudSync={() => setIsCloudSyncModalOpen(true)}
+          isDarkMode={isDarkMode}
         />
 
         {/* Dashboard Main Container */}
@@ -1551,6 +1955,7 @@ export default function App() {
             <AlertsSection
               profile={profile}
               transactions={transactions}
+              isDemoMode={isDemoMode}
               onShowToast={showToast}
               onOpenTransactionModal={() => {
                 setEditingTransaction(null);
@@ -1592,7 +1997,9 @@ export default function App() {
                 categoryColors={categoryColors}
                 transactions={transactions}
                 currency={profile.currency}
+                isPro={currentPlanId === 'pro_ai' || isAdmin || isDemoMode}
                 onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
+                onCreateBudget={() => setIsBudgetCreateModalOpen(true)}
                 onUpdateBudgets={(newBudgets) => {
                   setBudgets(newBudgets);
                   showToast('Límites de presupuesto actualizados con éxito', 'success');
@@ -1605,6 +2012,7 @@ export default function App() {
                   }));
                   setActiveTab('transactions');
                 }}
+                onUpgradeToPro={() => setActiveTab('subscriptions')}
               />
             </div>
           )}
@@ -1614,7 +2022,8 @@ export default function App() {
             <CategoriesSection
               categoryMap={categoryMap}
               categoryColors={categoryColors}
-              canManageCategories={true}
+              canManageCategories={canManageCategories}
+              onUpgradePlan={() => setActiveTab('subscriptions')}
               onAddCategory={handleAddCategory}
               onAddSubcategory={handleAddSubcategory}
               onDeleteCategory={handleDeleteCategory}
@@ -1677,6 +2086,7 @@ export default function App() {
                 categoryColors={categoryColors}
                 categoryMap={categoryMap}
                 budgets={budgets}
+                isDemoMode={isDemoMode}
                 activeMode={activeMode}
                 onModeChange={handleModeChange}
                 onOpenTransactionModal={() => { 
@@ -1696,6 +2106,13 @@ export default function App() {
                   }));
                   setActiveTab('transactions');
                 }}
+                vencimientos={vencimientos}
+                onMarkVencimientoPaid={handleMarkVencimientoPaid}
+                onDeleteVencimiento={handleDeleteVencimiento}
+                onAddVencimiento={handleAddVencimiento}
+                isPro={currentPlanId === 'pro_ai' || isAdmin || isDemoMode}
+                onUpgradeToPro={() => setActiveTab('subscriptions')}
+                onOpenCashFlowTab={() => setActiveTab('cashflow')}
               />
             </div>
           )}
@@ -1718,6 +2135,66 @@ export default function App() {
             </div>
           )}
 
+          {/* TAB: FLUJO DE CAJA (CASH FLOW PRO) */}
+          {activeTab === 'cashflow' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>🔮 Proyección de Flujo de Caja</span>
+                    <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 text-white text-[10px] font-black uppercase">
+                      Plan Pro
+                    </span>
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Proyección de saldo día a día a 30 días, días críticos y alerta de liquidez con pagos programados.
+                  </p>
+                </div>
+              </div>
+              <CashFlowSection
+                transactions={transactions}
+                currentBalance={appAvailableBalance}
+                scheduledPayments={appScheduledPayments}
+                isPro={currentPlanId === 'pro_ai' || isAdmin || isDemoMode}
+                onUpgradePro={() => setActiveTab('subscriptions')}
+                isDarkMode={isDarkMode}
+              />
+            </div>
+          )}
+
+          {/* TAB: COTIZACIONES MULTIMONEDA & CONVERSOR DÓLAR */}
+          {activeTab === 'currency' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>💵 Dólar & Cotizaciones Multimoneda</span>
+                    <span className="px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-600 dark:text-orange-300 text-[10px] font-black uppercase border border-orange-300">
+                      En Vivo
+                    </span>
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Cotizaciones en tiempo real del Dólar Blue, MEP, Tarjeta, Cripto y Euro con conversor inteligente.
+                  </p>
+                </div>
+              </div>
+              <MultiCurrencyWidget
+                variant="card"
+                currentBalance={appAvailableBalance}
+                monthlyExpenses={appTotalExpenses}
+                isPro={currentPlanId === 'pro_ai' || isAdmin || isDemoMode}
+                onUpgradePro={() => setActiveTab('subscriptions')}
+                isDarkMode={isDarkMode}
+                onApplyConversion={(arsAmount) => {
+                  setEditingTransaction(null);
+                  setInitialIsCuotas(false);
+                  setTxModalInitialType('gasto');
+                  setIsTxModalOpen(true);
+                }}
+              />
+            </div>
+          )}
+
           {/* TAB 9: ADMIN PANEL FOR CLIENT SUBSCRIPTIONS */}
           {activeTab === 'admin_subscriptions' && (
             <SubscriptionAdminPanel
@@ -1726,6 +2203,65 @@ export default function App() {
               onAddSubscription={handleAddSubscription}
               onDeleteSubscription={handleDeleteSubscription}
             />
+          )}
+
+          {/* TAB: SUSCRIPCIÓN PRO (Pantalla 8) */}
+          {activeTab === 'subscriptions' && (
+            <div className="max-w-md mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-purple-100">
+              <MobileSubscriptionScreen
+                onBack={() => setActiveTab('dashboard')}
+                onSelectPlanPayment={(plan, cycle) => {
+                  if (activeUserSub) {
+                    handleUpdateSubscription(activeUserSub.id, {
+                      planId: plan.id as any,
+                      billingCycle: cycle,
+                      status: 'active'
+                    });
+                  }
+                  showToast(`¡Plan ${plan.name} activado con éxito!`, 'success');
+                  setActiveTab('dashboard');
+                }}
+                onShowToast={showToast}
+              />
+            </div>
+          )}
+
+          {/* TAB 10: MI PERFIL (Pantalla 6) */}
+          {activeTab === 'profile' && (
+            <div className="max-w-md mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-purple-100">
+              <ProfileScreen
+                userAccount={currentUserAccount}
+                profile={profile}
+                subscription={activeUserSub}
+                onUpdateProfile={(data) => {
+                  setProfile(prev => ({ ...prev, ...data }));
+                  showToast('Perfil actualizado con éxito', 'success');
+                }}
+                onNavigateToTab={(tab) => setActiveTab(tab as any)}
+                onOpenCloudSync={() => setIsCloudSyncModalOpen(true)}
+                onLogout={handleLogout}
+                onShowToast={showToast}
+              />
+            </div>
+          )}
+
+          {/* TAB 11: CONFIGURACIÓN (Pantalla 7) */}
+          {activeTab === 'settings' && (
+            <div className="max-w-md mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-purple-100">
+              <SettingsScreen
+                userAccount={currentUserAccount}
+                profile={profile}
+                isDarkMode={isDarkMode}
+                onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+                onUpdateProfile={(data) => {
+                  setProfile(prev => ({ ...prev, ...data }));
+                }}
+                onExportData={handleExportData}
+                onLogout={handleLogout}
+                onShowToast={showToast}
+                onOpenOnboarding={() => setIsOnboardingModalOpen(true)}
+              />
+            </div>
           )}
 
         </main>
@@ -1749,6 +2285,7 @@ export default function App() {
         isOpen={isTxModalOpen}
         onClose={() => { setIsTxModalOpen(false); setEditingTransaction(null); setInitialIsCuotas(false); }}
         onSave={handleSaveTransaction}
+        onDelete={handleDeleteTransaction}
         editingTransaction={editingTransaction}
         categoryMap={categoryMap}
         profile={profile}
@@ -1778,6 +2315,9 @@ export default function App() {
         profile={profile}
         transactions={transactions}
         budgets={budgets}
+        goals={goals}
+        onAddGoal={handleAddGoal}
+        onAddGoalContribution={handleAddContribution}
         onAddTransaction={handleSaveTransaction}
         onShowToast={showToast}
       />
@@ -1793,6 +2333,20 @@ export default function App() {
         onAddSubcategory={handleAddSubcategory}
         onDeleteCategory={handleDeleteCategory}
         onDeleteSubcategory={handleDeleteSubcategory}
+      />
+
+      <BudgetCreateModal
+        isOpen={isBudgetCreateModalOpen}
+        onClose={() => setIsBudgetCreateModalOpen(false)}
+        budgets={budgets}
+        categoryMap={categoryMap}
+        categoryColors={categoryColors}
+        transactions={transactions}
+        currency={profile?.currency || 'ARS'}
+        onCreate={(newBudgets) => {
+          setBudgets(newBudgets);
+          showToast('Presupuesto creado con éxito', 'success');
+        }}
       />
 
       <BudgetModal
@@ -1887,6 +2441,7 @@ export default function App() {
         onClose={() => setIsCardAlertsModalOpen(false)}
         transactions={transactions}
         profile={profile}
+        isDemoMode={isDemoMode}
         onUpgradePlan={() => { setIsCardAlertsModalOpen(false); setActiveTab('subscriptions'); }}
         onShowToast={showToast}
         isProOrTrial={activeUserSub ? (activeUserSub.status === 'active' || activeUserSub.status === 'trial') : true}
@@ -1901,6 +2456,45 @@ export default function App() {
         budgets={budgets}
         onUpgradePlan={() => { setIsDiagnosisModalOpen(false); setActiveTab('subscriptions'); }}
       />
-    </div>
+
+      {/* Pantalla 4: Onboarding Tutorial Modal */}
+      {isOnboardingModalOpen && (
+        <div className="fixed inset-0 z-[99998] flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in">
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-purple-100 max-h-[92vh] flex flex-col">
+            <OnboardingScreen
+              onFinish={() => {
+                localStorage.setItem('gastoar_onboarding_completed', 'true');
+                setIsOnboardingModalOpen(false);
+                showToast('¡Tutorial completado!', 'success');
+              }}
+              onSkip={() => {
+                localStorage.setItem('gastoar_onboarding_completed', 'true');
+                setIsOnboardingModalOpen(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Pantalla 1: Native Splash Screen on App Launch */}
+      {showSplash && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#0D041A]">
+          <div className="w-full max-w-md h-full min-h-[580px] bg-[#0D041A] flex flex-col">
+            <SplashScreen 
+              onFinish={() => {
+                sessionStorage.setItem('gastoar_splash_seen', 'true');
+                setShowSplash(false);
+              }} 
+            />
+          </div>
+        </div>
+      )}
+                </div>
+              )}
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </>
   );
 }

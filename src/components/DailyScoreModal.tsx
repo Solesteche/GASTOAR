@@ -454,7 +454,7 @@ export const DailyScoreModal: React.FC<DailyScoreModalProps> = ({
               className="w-full py-3.5 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.98] shadow-md shadow-purple-500/20 cursor-pointer"
               style={{ background: 'linear-gradient(135deg, #7C3AED, #9333EA)' }}
             >
-              Finalizar día y guardar score
+              Ver Score
             </button>
           )}
         </div>

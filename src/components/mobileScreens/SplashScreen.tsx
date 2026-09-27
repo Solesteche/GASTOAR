@@ -46,7 +46,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       <div className="pt-4 z-10">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] font-medium text-purple-200">
           <Sparkles className="w-3 h-3 text-orange-400" />
-          <span>Pantalla 1 · Intro / Splash</span>
+          <span>GastoAR · Control Inteligente</span>
         </div>
       </div>
 
@@ -55,7 +55,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         {/* Official Brand Icon with Ambient Glow */}
         <div className="relative group">
           <div className="absolute -inset-2 bg-gradient-to-r from-[#7928CA] via-[#D946EF] to-[#F95420] rounded-3xl blur-xl opacity-60 group-hover:opacity-90 transition duration-500" />
-          <GastoArIcon size={96} className="relative z-10 shadow-2xl" />
+          <GastoArIcon size={96} variant="dark" className="relative z-10 shadow-2xl" />
         </div>
 
         {/* Brand Name & Tagline */}

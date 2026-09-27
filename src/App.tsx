@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { 
   Header 
@@ -99,9 +100,22 @@ import {
   TrialExpiredBlockedScreen 
 } from './components/TrialExpiredBlockedScreen';
 import { 
-  MobileScreensViewerModal,
-  ScreenId
-} from './components/mobileScreens/MobileScreensViewerModal';
+  CashFlowSection 
+} from './components/CashFlowSection';
+import { 
+  MultiCurrencyWidget 
+} from './components/MultiCurrencyWidget';
+import { 
+  ScheduledPayment 
+} from './CashFlowEngine';
+import { useVencimientoNotifications } from './hooks/useVencimientoNotifications';
+import { VencimientoAlertBanner } from './components/VencimientoAlertBanner';
+import { 
+  SplashScreen 
+} from './components/mobileScreens/SplashScreen';
+import { 
+  OnboardingScreen 
+} from './components/mobileScreens/OnboardingScreen';
 import { 
   ProfileScreen 
 } from './components/mobileScreens/ProfileScreen';
@@ -490,9 +504,7 @@ export default function App() {
   }, [vencimientos]);
 
   // UI States
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'installments' | 'card_alerts' | 'couple_balance' | 'budgets' | 'categories' | 'ai' | 'settlement' | 'goals' | 'subscriptions' | 'admin_subscriptions' | 'charts' | 'profile' | 'settings' | 'mobile_screens'>('dashboard');
-  const [isMobileScreensModalOpen, setIsMobileScreensModalOpen] = useState<boolean>(false);
-  const [mobileScreensInitialScreen, setMobileScreensInitialScreen] = useState<ScreenId>('home');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'installments' | 'card_alerts' | 'couple_balance' | 'budgets' | 'categories' | 'ai' | 'settlement' | 'goals' | 'subscriptions' | 'admin_subscriptions' | 'charts' | 'profile' | 'settings' | 'cashflow' | 'currency'>('dashboard');
 
   // Sync route path with activeTab if user accesses specific route
   useEffect(() => {
@@ -507,9 +519,10 @@ export default function App() {
     else if (raw === 'subscriptions' || raw === 'suscripciones') setActiveTab('subscriptions');
     else if (raw === 'admin_subscriptions' || raw === 'admin') setActiveTab('admin_subscriptions');
     else if (raw === 'transactions' || raw === 'gastos') setActiveTab('transactions');
+    else if (raw === 'cashflow' || raw === 'flujocaja' || raw === 'flujo') setActiveTab('cashflow');
+    else if (raw === 'currency' || raw === 'dolar' || raw === 'divisas') setActiveTab('currency');
     else if (raw === 'profile' || raw === 'perfil') setActiveTab('profile');
     else if (raw === 'settings' || raw === 'configuracion' || raw === 'ajustes') setActiveTab('settings');
-    else if (raw === 'mobile_screens' || raw === 'pantallas') setIsMobileScreensModalOpen(true);
     else if (raw === 'dashboard') setActiveTab('dashboard');
   }, [location.pathname]);
   const [activeMode, setActiveMode] = useState<ExpenseMode>(() => {
@@ -541,6 +554,12 @@ export default function App() {
   const [isDiagnosisModalOpen, setIsDiagnosisModalOpen] = useState(false);
   const [isCloudSyncModalOpen, setIsCloudSyncModalOpen] = useState(false);
 
+  // Screen 1 & 4: Mobile startup splash and tutorial modal
+  const [showSplash, setShowSplash] = useState<boolean>(() => {
+    return !sessionStorage.getItem('gastoar_splash_seen');
+  });
+  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState<boolean>(false);
+
   // Filters State
   const [filters, setFilters] = useState<FilterState>(() => {
     const savedMode = localStorage.getItem('gastoar_active_mode');
@@ -571,6 +590,40 @@ export default function App() {
   const dismissToast = (id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
+
+  // ─── Servicio de Notificaciones Locales de Vencimientos (<48hs) ─────────────────
+  const {
+    urgentAlerts,
+    urgentCount,
+    checkNotifications: checkVencimientoNotifications,
+  } = useVencimientoNotifications({
+    vencimientos,
+    onShowToast: showToast,
+  });
+
+  const appScheduledPayments = useMemo<ScheduledPayment[]>(() => {
+    return (vencimientos || []).filter(v => !v.isPaid).map(v => ({
+      id: v.id,
+      label: v.title || (v as any).servicio || 'Vencimiento',
+      amount: Number(v.amount || 0),
+      dueDate: v.dueDate || new Date().toISOString().split('T')[0],
+      type: 'expense' as const,
+      category: v.cat || 'Servicios',
+      emoji: v.icon || '📅',
+    }));
+  }, [vencimientos]);
+
+  const appTotalIncome = useMemo(() => {
+    return transactions.filter(t => t.tipoTransaccion === 'ingreso').reduce((s, t) => s + Number(t.monto || 0), 0);
+  }, [transactions]);
+
+  const appTotalExpenses = useMemo(() => {
+    return transactions.filter(t => t.tipoTransaccion !== 'ingreso').reduce((s, t) => s + Number(t.monto || 0), 0);
+  }, [transactions]);
+
+  const appAvailableBalance = useMemo(() => {
+    return appTotalIncome - appTotalExpenses;
+  }, [appTotalIncome, appTotalExpenses]);
 
   // Sync state to LocalStorage
   useEffect(() => {
@@ -1744,7 +1797,7 @@ export default function App() {
     localStorage.removeItem('control_gastos_is_admin');
     localStorage.removeItem('control_gastos_is_demo');
     localStorage.removeItem('control_gastos_account_v1');
-    showToast('Has cerrado sesión correctamente. ¡Hasta pronto! 👋', 'info');
+    showToast('Has cerrado sesión correctamente. ¡Hasta pronto!', 'info');
     navigate('/login', { replace: true });
   };
 
@@ -1810,59 +1863,6 @@ export default function App() {
                     handleOpenAdminPanel();
                     navigate('/admin', { replace: true });
                   }}
-                  onOpenMobileScreens={() => setIsMobileScreensModalOpen(true)}
-                />
-                {/* Also allow opening Mobile Screens viewer on public landing */}
-                <MobileScreensViewerModal
-                  isOpen={isMobileScreensModalOpen}
-                  onClose={() => setIsMobileScreensModalOpen(false)}
-                  initialScreen={mobileScreensInitialScreen}
-                  userAccount={currentUserAccount}
-                  profile={profile}
-                  transactions={transactions}
-                  subscription={activeUserSub}
-                  isDarkMode={isDarkMode}
-                  onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
-                  onNavigateToTab={(tab) => {
-                    setIsMobileScreensModalOpen(false);
-                    if (tab === 'login' || tab === 'register') {
-                      // stays on auth landing page
-                    } else {
-                      // demo mode or authenticated
-                      handleGuestDemo();
-                      navigate('/', { replace: true });
-                      setActiveTab(tab as any);
-                    }
-                  }}
-                  onOpenNewExpense={() => {
-                    setIsMobileScreensModalOpen(false);
-                    handleGuestDemo();
-                    navigate('/', { replace: true });
-                    setEditingTransaction(null);
-                    setInitialIsCuotas(false);
-                    setTxModalInitialType('gasto');
-                    setIsTxModalOpen(true);
-                  }}
-                  onOpenNewIncome={() => {
-                    setIsMobileScreensModalOpen(false);
-                    handleGuestDemo();
-                    navigate('/', { replace: true });
-                    setIsIncomeModalOpen(true);
-                  }}
-                  onOpenVoiceExpense={() => {
-                    setIsMobileScreensModalOpen(false);
-                    handleGuestDemo();
-                    navigate('/', { replace: true });
-                    setIsAiModalOpen(true);
-                  }}
-                  onOpenCloudSync={() => {
-                    setIsMobileScreensModalOpen(false);
-                    handleGuestDemo();
-                    navigate('/', { replace: true });
-                    setIsCloudSyncModalOpen(true);
-                  }}
-                  onLogout={handleLogout}
-                  onShowToast={showToast}
                 />
               </>
             )
@@ -1907,11 +1907,11 @@ export default function App() {
         onOpenLogoDownload={() => setIsLogoModalOpen(true)}
         debtInfo={debtInfo}
         onLogout={handleLogout}
-        onOpenMobileScreens={() => setIsMobileScreensModalOpen(true)}
         isAdmin={isAdmin}
         isDemoMode={isDemoMode}
         onExitDemo={handleExitDemo}
         isDarkMode={isDarkMode}
+        urgentVencimientosCount={urgentCount}
       />
 
       {/* Main Content Area */}
@@ -1933,7 +1933,6 @@ export default function App() {
           onOpenAiModal={() => setIsAiModalOpen(true)}
           onNavigateHome={() => setActiveTab('dashboard')}
           onToggleSidebar={() => setIsSidebarOpenMobile(prev => !prev)}
-          onOpenMobileScreens={() => setIsMobileScreensModalOpen(true)}
           isSidebarPinned={isSidebarPinned}
           isDemoMode={isDemoMode}
           onExitDemo={handleExitDemo}
@@ -1944,6 +1943,29 @@ export default function App() {
 
         {/* Dashboard Main Container */}
         <main className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-6 flex-1 w-full space-y-6">
+          
+          {/* Banner de Alerta de Vencimientos Locales (<48hs) */}
+          <VencimientoAlertBanner
+            urgentAlerts={urgentAlerts}
+            onMarkPaid={(id, source) => {
+              if (source === 'vencimiento') {
+                handleMarkVencimientoPaid(id);
+              } else {
+                try {
+                  const saved = localStorage.getItem('gastoar_vencimientos_alerts_v5');
+                  if (saved) {
+                    const list = JSON.parse(saved);
+                    const updated = list.map((it: any) => it.id === id ? { ...it, paidThisMonth: true, paidAt: Date.now() } : it);
+                    localStorage.setItem('gastoar_vencimientos_alerts_v5', JSON.stringify(updated));
+                  }
+                } catch {}
+                showToast('Vencimiento marcado como pagado ✓', 'success');
+                checkVencimientoNotifications(true);
+              }
+            }}
+            onNavigateToVencimientos={() => setActiveTab('card_alerts')}
+            onShowToast={showToast}
+          />
           
           {/* TAB 1: DEDICATED INSTALLMENTS SECTION */}
           {activeTab === 'installments' && (
@@ -2011,6 +2033,7 @@ export default function App() {
                 categoryColors={categoryColors}
                 transactions={transactions}
                 currency={profile.currency}
+                isPro={currentPlanId === 'pro_ai' || isAdmin || isDemoMode}
                 onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
                 onCreateBudget={() => setIsBudgetCreateModalOpen(true)}
                 onUpdateBudgets={(newBudgets) => {
@@ -2025,6 +2048,7 @@ export default function App() {
                   }));
                   setActiveTab('transactions');
                 }}
+                onUpgradeToPro={() => setActiveTab('subscriptions')}
               />
             </div>
           )}
@@ -2122,6 +2146,10 @@ export default function App() {
                 onMarkVencimientoPaid={handleMarkVencimientoPaid}
                 onDeleteVencimiento={handleDeleteVencimiento}
                 onAddVencimiento={handleAddVencimiento}
+                isPro={currentPlanId === 'pro_ai' || isAdmin || isDemoMode}
+                onUpgradeToPro={() => setActiveTab('subscriptions')}
+                onOpenCashFlowTab={() => setActiveTab('cashflow')}
+                onOpenProfileModal={() => setIsProfileModalOpen(true)}
               />
             </div>
           )}
@@ -2144,6 +2172,66 @@ export default function App() {
             </div>
           )}
 
+          {/* TAB: FLUJO DE CAJA (CASH FLOW PRO) */}
+          {activeTab === 'cashflow' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>🔮 Proyección de Flujo de Caja</span>
+                    <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 text-white text-[10px] font-black uppercase">
+                      Plan Pro
+                    </span>
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Proyección de saldo día a día a 30 días, días críticos y alerta de liquidez con pagos programados.
+                  </p>
+                </div>
+              </div>
+              <CashFlowSection
+                transactions={transactions}
+                currentBalance={appAvailableBalance}
+                scheduledPayments={appScheduledPayments}
+                isPro={currentPlanId === 'pro_ai' || isAdmin || isDemoMode}
+                onUpgradePro={() => setActiveTab('subscriptions')}
+                isDarkMode={isDarkMode}
+              />
+            </div>
+          )}
+
+          {/* TAB: COTIZACIONES MULTIMONEDA & CONVERSOR DÓLAR */}
+          {activeTab === 'currency' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>💵 Dólar & Cotizaciones Multimoneda</span>
+                    <span className="px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-600 dark:text-orange-300 text-[10px] font-black uppercase border border-orange-300">
+                      En Vivo
+                    </span>
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Cotizaciones en tiempo real del Dólar Blue, MEP, Tarjeta, Cripto y Euro con conversor inteligente.
+                  </p>
+                </div>
+              </div>
+              <MultiCurrencyWidget
+                variant="card"
+                currentBalance={appAvailableBalance}
+                monthlyExpenses={appTotalExpenses}
+                isPro={currentPlanId === 'pro_ai' || isAdmin || isDemoMode}
+                onUpgradePro={() => setActiveTab('subscriptions')}
+                isDarkMode={isDarkMode}
+                onApplyConversion={(arsAmount) => {
+                  setEditingTransaction(null);
+                  setInitialIsCuotas(false);
+                  setTxModalInitialType('gasto');
+                  setIsTxModalOpen(true);
+                }}
+              />
+            </div>
+          )}
+
           {/* TAB 9: ADMIN PANEL FOR CLIENT SUBSCRIPTIONS */}
           {activeTab === 'admin_subscriptions' && (
             <SubscriptionAdminPanel
@@ -2152,6 +2240,27 @@ export default function App() {
               onAddSubscription={handleAddSubscription}
               onDeleteSubscription={handleDeleteSubscription}
             />
+          )}
+
+          {/* TAB: SUSCRIPCIÓN PRO (Pantalla 8) */}
+          {activeTab === 'subscriptions' && (
+            <div className="max-w-md mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-purple-100">
+              <MobileSubscriptionScreen
+                onBack={() => setActiveTab('dashboard')}
+                onSelectPlanPayment={(plan, cycle) => {
+                  if (activeUserSub) {
+                    handleUpdateSubscription(activeUserSub.id, {
+                      planId: plan.id as any,
+                      billingCycle: cycle,
+                      status: 'active'
+                    });
+                  }
+                  showToast(`¡Plan ${plan.name} activado con éxito!`, 'success');
+                  setActiveTab('dashboard');
+                }}
+                onShowToast={showToast}
+              />
+            </div>
           )}
 
           {/* TAB 10: MI PERFIL (Pantalla 6) */}
@@ -2188,6 +2297,7 @@ export default function App() {
                 onExportData={handleExportData}
                 onLogout={handleLogout}
                 onShowToast={showToast}
+                onOpenOnboarding={() => setIsOnboardingModalOpen(true)}
               />
             </div>
           )}
@@ -2205,8 +2315,8 @@ export default function App() {
         }}
         onOpenVoiceExpense={() => setIsAiModalOpen(true)}
         onToggleSidebar={() => setIsSidebarOpenMobile(prev => !prev)}
-        onOpenMobileScreens={() => setIsMobileScreensModalOpen(true)}
         hasDebt={debtInfo.debtAmount > 0}
+        urgentVencimientosCount={urgentCount}
       />
 
       {/* MODALS */}
@@ -2339,6 +2449,10 @@ export default function App() {
         onLogout={handleLogout}
         onSelectPlanPayment={handleSelectPlanPayment}
         onShowToast={showToast}
+        onNavigateToTab={(tab) => {
+          setIsProfileModalOpen(false);
+          setActiveTab(tab as any);
+        }}
         onOpenCloudSync={() => {
           setIsProfileModalOpen(false);
           setIsCloudSyncModalOpen(true);
@@ -2386,43 +2500,38 @@ export default function App() {
         onUpgradePlan={() => { setIsDiagnosisModalOpen(false); setActiveTab('subscriptions'); }}
       />
 
-      {/* 8 Essential Mobile Screens Viewer Modal */}
-      <MobileScreensViewerModal
-        isOpen={isMobileScreensModalOpen}
-        onClose={() => setIsMobileScreensModalOpen(false)}
-        initialScreen={mobileScreensInitialScreen}
-        userAccount={currentUserAccount}
-        profile={profile}
-        transactions={transactions}
-        subscription={activeUserSub}
-        isDarkMode={isDarkMode}
-        onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
-        onNavigateToTab={(tab) => {
-          setIsMobileScreensModalOpen(false);
-          setActiveTab(tab as any);
-        }}
-        onOpenNewExpense={() => {
-          setIsMobileScreensModalOpen(false);
-          setEditingTransaction(null);
-          setInitialIsCuotas(false);
-          setTxModalInitialType('gasto');
-          setIsTxModalOpen(true);
-        }}
-        onOpenNewIncome={() => {
-          setIsMobileScreensModalOpen(false);
-          setIsIncomeModalOpen(true);
-        }}
-        onOpenVoiceExpense={() => {
-          setIsMobileScreensModalOpen(false);
-          setIsAiModalOpen(true);
-        }}
-        onOpenCloudSync={() => {
-          setIsMobileScreensModalOpen(false);
-          setIsCloudSyncModalOpen(true);
-        }}
-        onLogout={handleLogout}
-        onShowToast={showToast}
-      />
+      {/* Pantalla 4: Onboarding Tutorial Modal */}
+      {isOnboardingModalOpen && (
+        <div className="fixed inset-0 z-[99998] flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in">
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-purple-100 max-h-[92vh] flex flex-col">
+            <OnboardingScreen
+              onFinish={() => {
+                localStorage.setItem('gastoar_onboarding_completed', 'true');
+                setIsOnboardingModalOpen(false);
+                showToast('¡Tutorial completado!', 'success');
+              }}
+              onSkip={() => {
+                localStorage.setItem('gastoar_onboarding_completed', 'true');
+                setIsOnboardingModalOpen(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Pantalla 1: Native Splash Screen on App Launch */}
+      {showSplash && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#0D041A]">
+          <div className="w-full max-w-md h-full min-h-[580px] bg-[#0D041A] flex flex-col">
+            <SplashScreen 
+              onFinish={() => {
+                sessionStorage.setItem('gastoar_splash_seen', 'true');
+                setShowSplash(false);
+              }} 
+            />
+          </div>
+        </div>
+      )}
                 </div>
               )}
             </ProtectedRoute>

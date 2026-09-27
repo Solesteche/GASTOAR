@@ -16,10 +16,11 @@ import {
   CalendarClock,
   X,
   Mic,
-  Smartphone,
   User,
   Settings,
-  BadgePercent
+  BadgePercent,
+  TrendingUp,
+  Coins
 } from 'lucide-react';
 
 interface MobileBottomNavProps {
@@ -27,8 +28,8 @@ interface MobileBottomNavProps {
   onSelectTab: (tab: any) => void;
   onOpenVoiceExpense: () => void;
   onToggleSidebar?: () => void;
-  onOpenMobileScreens?: () => void;
   hasDebt: boolean;
+  urgentVencimientosCount?: number;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
@@ -36,8 +37,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   onSelectTab,
   onOpenVoiceExpense,
   onToggleSidebar,
-  onOpenMobileScreens,
   hasDebt,
+  urgentVencimientosCount = 0,
 }) => {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -59,7 +60,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     onSelectTab(tab);
   };
 
-  const isMoreTabActive = ['installments', 'charts', 'couple_balance', 'goals', 'budgets', 'categories', 'ai'].includes(activeTab);
+  const isMoreTabActive = ['installments', 'charts', 'couple_balance', 'goals', 'budgets', 'categories', 'ai', 'cashflow', 'currency'].includes(activeTab);
 
   return (
     <>
@@ -145,6 +146,30 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               </button>
 
               <button
+                onClick={() => handleMoreItemClick('cashflow')}
+                className={`p-3 rounded-2xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                  activeTab === 'cashflow' ? 'bg-purple-50 border-purple-300 text-purple-700 font-bold' : 'bg-slate-50/70 border-slate-100 text-slate-700'
+                }`}
+              >
+                <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
+                  <TrendingUp className="w-4.5 h-4.5" />
+                </div>
+                <span>Flujo Caja</span>
+              </button>
+
+              <button
+                onClick={() => handleMoreItemClick('currency')}
+                className={`p-3 rounded-2xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                  activeTab === 'currency' ? 'bg-amber-50 border-amber-300 text-amber-700 font-bold' : 'bg-slate-50/70 border-slate-100 text-slate-700'
+                }`}
+              >
+                <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+                  <Coins className="w-4.5 h-4.5" />
+                </div>
+                <span>Dólar Hoy</span>
+              </button>
+
+              <button
                 onClick={() => handleMoreItemClick('categories')}
                 className={`p-3 rounded-2xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
                   activeTab === 'categories' ? 'bg-pink-50 border-pink-300 text-pink-700 font-bold' : 'bg-slate-50/70 border-slate-100 text-slate-700'
@@ -164,23 +189,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                   <Mic className="w-4.5 h-4.5" />
                 </div>
                 <span>Gasto por Voz</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setIsMoreOpen(false);
-                  if (onOpenMobileScreens) {
-                    onOpenMobileScreens();
-                  } else {
-                    onSelectTab('mobile_screens');
-                  }
-                }}
-                className="p-3 rounded-2xl border bg-gradient-to-tr from-purple-500 to-indigo-600 text-white flex flex-col items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-              >
-                <div className="w-9 h-9 rounded-xl bg-white/20 text-white flex items-center justify-center">
-                  <Smartphone className="w-4.5 h-4.5" />
-                </div>
-                <span className="font-black text-[11px]">8 Pantallas</span>
               </button>
 
               <button
@@ -256,12 +264,19 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           {/* 4. Vencimientos */}
           <button
             onClick={() => onSelectTab('card_alerts')}
-            className={`flex flex-col items-center justify-center p-1.5 rounded-2xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center p-1.5 rounded-2xl transition-all cursor-pointer relative ${
               activeTab === 'card_alerts' ? 'bg-[#F4EEFF] text-[#7C3AED] font-black px-3.5' : 'text-slate-400 hover:text-slate-700'
             }`}
             title="Vencimientos"
           >
-            <CalendarClock className="w-5 h-5" />
+            <div className="relative">
+              <CalendarClock className="w-5 h-5" />
+              {urgentVencimientosCount > 0 && (
+                <span className="absolute -top-1.5 -right-2 px-1 min-w-[15px] h-[15px] rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center animate-pulse border border-white">
+                  {urgentVencimientosCount > 9 ? '9+' : urgentVencimientosCount}
+                </span>
+              )}
+            </div>
             <span className="text-[10px] mt-0.5 font-bold">Vencimientos</span>
           </button>
 

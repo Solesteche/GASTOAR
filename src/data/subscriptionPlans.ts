@@ -69,6 +69,8 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       'Creación y personalización total de categorías y subcategorías',
       'Registro ultra-rápido de gastos por voz o audios de WhatsApp con IA',
       'Categorización inteligente automática (ej: "Gasté 50000 en Coto" → Alimentación Supermercado)',
+      '📈 Modo Inflación IPC: Ajuste inteligente de presupuestos por categoría según inflación real INDEC o por rubro',
+      '🔮 Proyección de Flujo de Caja (Cash Flow a 30 días): anticipa tu saldo día por día y detecta días críticos',
       'Gestión de Vencimientos (Tarjetas, Alquiler, Expensas, Servicios e Impuestos) + Google Calendar 📅',
       'Soporte prioritario directo por WhatsApp 24/7',
       'Acceso anticipado a nuevas funciones exclusivas'
