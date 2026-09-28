@@ -2151,6 +2151,7 @@ export default function App() {
                 onUpgradeToPro={() => setActiveTab('subscriptions')}
                 onOpenCashFlowTab={() => setActiveTab('cashflow')}
                 onOpenProfileModal={() => setIsProfileModalOpen(true)}
+                onOpenSettlementModal={() => setIsSettlementModalOpen(true)}
               />
             </div>
           )}

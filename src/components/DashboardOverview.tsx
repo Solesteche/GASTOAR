@@ -14,6 +14,10 @@ import {
   AlertTriangle,
   X,
   User,
+  CreditCard,
+  Target,
+  Heart,
+  ArrowLeftRight,
 } from 'lucide-react';
 import {
   PieChart,
@@ -77,6 +81,7 @@ interface DashboardOverviewProps {
   onToggleSidebar?: () => void;
   isDarkMode?: boolean;
   onOpenProfileModal?: () => void;
+  onOpenSettlementModal?: () => void;
 }
 
 const MONTH_NAMES = [
@@ -125,6 +130,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onToggleSidebar,
   isDarkMode = false,
   onOpenProfileModal,
+  onOpenSettlementModal,
 }) => {
   const isUser1 = profile?.currentUser === 'user1';
   const currentUserName = profile ? (isUser1 ? profile.user1Name : profile.user2Name) : 'Sol';
@@ -1254,62 +1260,169 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* 5. SCORE Y FLUJO DE CAJA (EN UNA CAJA UNO AL LADO DEL OTRO)         */}
+      {/* 4.5 BOTONES DE ACCIONES RÁPIDAS (SEGÚN DISEÑO)                      */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-5 border border-slate-100 dark:border-purple-900/40 shadow-xs transition-all">
+      <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-5 border border-purple-100/80 dark:border-purple-900/40 shadow-xs transition-all">
+        {/* Cabecera: ACCIONES RÁPIDAS con línea divisoria */}
+        <div className="flex items-center gap-2.5 mb-3 sm:mb-4">
+          <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-[#6D3FEA] dark:text-purple-400 select-none">
+            ACCIONES RÁPIDAS
+          </span>
+          <div className="flex-1 h-px bg-purple-100 dark:bg-purple-900/40" />
+        </div>
+
+        {/* 4 Botones de Acciones Rápidas */}
+        <div className="grid grid-cols-4 gap-2 sm:gap-4">
+          
+          {/* 1. Cuotas */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onNavigateTab) onNavigateTab('installments');
+              else setIsInstallmentsModalOpen(true);
+            }}
+            className="flex flex-col items-center gap-2 p-1 sm:p-2 rounded-2xl hover:bg-slate-50 dark:hover:bg-purple-950/30 transition-all cursor-pointer group active:scale-95 text-center select-none"
+            title="Ver compras y gastos en cuotas"
+          >
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl sm:rounded-3xl bg-[#F4EEFF] dark:bg-purple-950/60 border border-purple-200/70 dark:border-purple-800/60 flex items-center justify-center text-[#6D3FEA] dark:text-purple-300 shadow-2xs group-hover:scale-105 group-hover:shadow-md transition-all">
+              <CreditCard className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
+            </div>
+            <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 group-hover:text-[#6D3FEA] transition-colors leading-tight">
+              Cuotas
+            </span>
+          </button>
+
+          {/* 2. Metas */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onNavigateTab) onNavigateTab('goals');
+              else setIsGoalsModalOpen(true);
+            }}
+            className="flex flex-col items-center gap-2 p-1 sm:p-2 rounded-2xl hover:bg-slate-50 dark:hover:bg-purple-950/30 transition-all cursor-pointer group active:scale-95 text-center select-none"
+            title="Ver cajas y metas de ahorro"
+          >
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl sm:rounded-3xl bg-[#FEF9E7] dark:bg-amber-950/50 border border-amber-200/70 dark:border-amber-800/60 flex items-center justify-center text-[#D97706] dark:text-amber-400 shadow-2xs group-hover:scale-105 group-hover:shadow-md transition-all">
+              <Target className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
+            </div>
+            <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 group-hover:text-amber-600 transition-colors leading-tight">
+              Metas
+            </span>
+          </button>
+
+          {/* 3. Balance pareja */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onNavigateTab) onNavigateTab('couple_balance');
+            }}
+            className="flex flex-col items-center gap-2 p-1 sm:p-2 rounded-2xl hover:bg-slate-50 dark:hover:bg-purple-950/30 transition-all cursor-pointer group active:scale-95 text-center select-none"
+            title="Ver balance y quién le debe a quién en pareja (Dúo)"
+          >
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl sm:rounded-3xl bg-[#FDF2F4] dark:bg-pink-950/50 border border-pink-200/70 dark:border-pink-800/60 flex items-center justify-center text-[#EC4899] dark:text-pink-400 shadow-2xs group-hover:scale-105 group-hover:shadow-md transition-all">
+              <Heart className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
+            </div>
+            <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 group-hover:text-pink-600 transition-colors leading-tight">
+              Balance pareja
+            </span>
+          </button>
+
+          {/* 4. Liquidar */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenSettlementModal) onOpenSettlementModal();
+            }}
+            className="flex flex-col items-center gap-2 p-1 sm:p-2 rounded-2xl hover:bg-slate-50 dark:hover:bg-purple-950/30 transition-all cursor-pointer group active:scale-95 text-center select-none"
+            title="Liquidar deudas y saldar cuentas en un toque"
+          >
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl sm:rounded-3xl bg-[#EFF6FF] dark:bg-blue-950/50 border border-blue-200/70 dark:border-blue-800/60 flex items-center justify-center text-[#2563EB] dark:text-blue-400 shadow-2xs group-hover:scale-105 group-hover:shadow-md transition-all">
+              <ArrowLeftRight className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
+            </div>
+            <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 group-hover:text-blue-600 transition-colors leading-tight">
+              Liquidar
+            </span>
+          </button>
+
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* 5. HERRAMIENTAS PRO: SCORE Y FLUJO DE CAJA (SEGÚN DISEÑO)           */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-5 border border-slate-200/80 dark:border-purple-900/40 shadow-xs transition-all">
+        {/* Cabecera del contenedor: ✨ Herramientas PRO */}
+        <div className="flex items-center justify-between mb-3.5">
+          <div className="flex items-center gap-2">
+            <span className="text-base select-none">✨</span>
+            <h3 className="text-xs sm:text-sm font-black text-slate-800 dark:text-white tracking-wide">
+              Herramientas PRO
+            </h3>
+          </div>
+        </div>
+
         {/* Fila superior: Score y Flujo de caja uno al lado del otro */}
         <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
           
           {/* Card 1: Score Financiero */}
           <div
             onClick={() => setIsScoreModalOpen(true)}
-            className="flex items-center justify-between p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-purple-50/70 to-slate-50 dark:from-purple-950/40 dark:to-[#1f153d] border border-purple-100/80 dark:border-purple-900/40 hover:border-purple-300 dark:hover:border-purple-700 cursor-pointer transition-all group shadow-2xs"
+            className="flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-slate-50/60 hover:bg-purple-50/50 dark:bg-[#1f153d] dark:hover:bg-purple-950/40 border border-slate-200/80 dark:border-purple-900/50 hover:border-purple-300 dark:hover:border-purple-700 cursor-pointer transition-all group shadow-2xs select-none min-h-[110px] sm:min-h-[120px]"
             title="Ver detalle del score financiero"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setIsScoreModalOpen(true); }}
           >
-            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-[#7928CA] to-[#9333EA] text-white flex items-center justify-center text-lg sm:text-xl font-black shadow-md shadow-purple-500/25 shrink-0">
-                {dailyScore?.total ?? 82}
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-[#6D3FEA] shrink-0 shadow-xs ring-2 ring-purple-300/40 dark:ring-purple-700/60" />
+                <span className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-tight">
+                  Score
+                </span>
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white truncate">
-                    Score financiero
-                  </h4>
-                  <span className="text-[10px] font-bold text-emerald-500 dark:text-emerald-400 shrink-0">
-                    ¡Vas bien!
-                  </span>
-                </div>
-                <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate hidden sm:block">
-                  Tu gasto está 12% por debajo del promedio
-                </p>
-              </div>
+              <p className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-tight mt-0.5 pl-0.5">
+                Financiero
+              </p>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+
+            <div className="flex items-center justify-between pt-3 mt-auto">
+              <span className="text-[11px] sm:text-xs font-black text-slate-500 dark:text-slate-400 group-hover:text-[#6D3FEA] dark:group-hover:text-purple-300 transition-colors uppercase tracking-wider">
+                PRO
+              </span>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#6D3FEA] dark:group-hover:text-purple-300 group-hover:translate-x-0.5 transition-all" />
+            </div>
           </div>
 
-          {/* Card 2: Flujo de caja (Achicado: sólo se ve el título) */}
+          {/* Card 2: Flujo de caja */}
           <div
             onClick={() => setIsCashFlowExpanded(prev => !prev)}
-            className={`flex items-center justify-between p-3 sm:p-4 rounded-2xl border transition-all cursor-pointer group shadow-2xs ${
+            className={`flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border transition-all cursor-pointer group shadow-2xs select-none min-h-[110px] sm:min-h-[120px] ${
               isCashFlowExpanded
-                ? 'bg-purple-50 dark:bg-purple-950/70 border-purple-300 dark:border-purple-700 text-[#7928CA] dark:text-purple-300'
-                : 'bg-gradient-to-br from-slate-50 to-purple-50/40 dark:from-[#1a1233] dark:to-purple-950/30 border-slate-100 dark:border-purple-900/40 hover:border-purple-300 dark:hover:border-purple-700 text-slate-800 dark:text-white'
+                ? 'bg-orange-50/70 dark:bg-purple-950/70 border-orange-400 dark:border-orange-500 shadow-xs'
+                : 'bg-slate-50/60 hover:bg-orange-50/40 dark:bg-[#1f153d] dark:hover:bg-purple-950/40 border-slate-200/80 dark:border-purple-900/50 hover:border-orange-300 dark:hover:border-orange-600'
             }`}
             title={isCashFlowExpanded ? "Cerrar flujo de caja" : "Ver flujo de caja"}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setIsCashFlowExpanded(prev => !prev); }}
           >
-            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-[#2E0854] to-[#7928CA] text-white flex items-center justify-center text-lg sm:text-xl shadow-xs font-bold shrink-0">
-                🔮
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-[#F95420] shrink-0 shadow-xs ring-2 ring-orange-300/40 dark:ring-orange-700/60" />
+                <span className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-tight">
+                  Flujo
+                </span>
               </div>
-              <div className="min-w-0">
-                <h4 className="text-xs sm:text-sm font-bold truncate group-hover:text-[#7928CA] dark:group-hover:text-purple-300 transition-colors">
-                  Flujo de caja
-                </h4>
-              </div>
+              <p className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-tight mt-0.5 pl-0.5">
+                de caja
+              </p>
             </div>
-            
-            <div className="shrink-0 text-slate-400 group-hover:text-[#7928CA] dark:group-hover:text-purple-300">
-              <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isCashFlowExpanded ? 'rotate-180 text-[#7928CA]' : ''}`} />
+
+            <div className="flex items-center justify-between pt-3 mt-auto">
+              <span className="text-[11px] sm:text-xs font-black text-slate-500 dark:text-slate-400 group-hover:text-[#F95420] dark:group-hover:text-orange-300 transition-colors uppercase tracking-wider">
+                PRO
+              </span>
+              <ChevronRight className={`w-4 h-4 text-slate-400 group-hover:text-[#F95420] dark:group-hover:text-orange-300 transition-transform duration-200 ${isCashFlowExpanded ? 'rotate-90 text-[#F95420]' : 'group-hover:translate-x-0.5'}`} />
             </div>
           </div>
 
@@ -1534,154 +1647,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
           </div>
         )}
-      </div>
-
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* 5.1 METAS Y GASTOS EN CUOTAS (DOS CAJAS / BOTONES INTERACTIVOS)     */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        
-        {/* Caja 1: Metas de Ahorro */}
-        <div
-          onClick={() => setIsGoalsModalOpen(true)}
-          className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#181332] border border-slate-100 dark:border-purple-900/40 hover:border-blue-400 dark:hover:border-blue-600 shadow-xs hover:shadow-md cursor-pointer transition-all group flex flex-col justify-between"
-          title="Ver movimientos y aportes de metas"
-        >
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-2.5">
-              <div className="flex items-center gap-2.5 sm:gap-3">
-                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-lg sm:text-xl shadow-md shadow-blue-500/20 shrink-0">
-                  🎯
-                </div>
-                <div>
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                    Metas de Ahorro
-                  </h4>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
-                    {goalsMetrics.activeCount} {goalsMetrics.activeCount === 1 ? 'meta activa' : 'metas activas'}
-                  </span>
-                </div>
-              </div>
-
-              <span className="px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 text-[10px] font-black uppercase shrink-0">
-                {goalsMetrics.percent}% acumulado
-              </span>
-            </div>
-
-            {/* Middle: Total Saved & Target */}
-            <div className="mt-2 mb-3">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-base sm:text-xl font-black text-slate-900 dark:text-white">
-                  {isBalanceHidden ? "$ •••••" : ars(goalsMetrics.totalSaved)}
-                </span>
-                <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
-                  meta {isBalanceHidden ? "$ •••" : ars(goalsMetrics.totalTarget)}
-                </span>
-              </div>
-
-              {/* Progress bar */}
-              <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-purple-950/80 overflow-hidden mt-2">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-500"
-                  style={{ width: `${goalsMetrics.percent}%` }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Footer strip */}
-          <div className="pt-2.5 border-t border-slate-100 dark:border-purple-900/20 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-            <span className="font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1">
-              <span>{goalsMetrics.totalMovements} aportes registrados</span>
-            </span>
-            <div className="flex items-center gap-0.5 text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all font-bold text-xs">
-              <span>Ver movimientos</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </div>
-          </div>
-        </div>
-
-        {/* Caja 2: Gastos en Cuotas (con indicador de cuántas cuotas se terminan este mes) */}
-        <div
-          onClick={() => setIsInstallmentsModalOpen(true)}
-          className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#181332] border border-slate-100 dark:border-purple-900/40 hover:border-amber-400 dark:hover:border-amber-600 shadow-xs hover:shadow-md cursor-pointer transition-all group flex flex-col justify-between"
-          title="Ver gastos y compras en cuotas"
-        >
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-2.5">
-              <div className="flex items-center gap-2.5 sm:gap-3">
-                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center text-lg sm:text-xl shadow-md shadow-amber-500/20 shrink-0">
-                  💳
-                </div>
-                <div>
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
-                    Gastos en Cuotas
-                  </h4>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
-                    {cuotasMetrics.activePlansCount} compras activas
-                  </span>
-                </div>
-              </div>
-
-              {/* Indicador de cuántas cuotas se terminan ese mes */}
-              {cuotasMetrics.endingThisMonthCount > 0 ? (
-                <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 text-[10px] sm:text-[11px] font-black flex items-center gap-1 shadow-2xs animate-pulse shrink-0">
-                  <span>🏁</span>
-                  <span>
-                    {cuotasMetrics.endingThisMonthCount} {cuotasMetrics.endingThisMonthCount === 1 ? 'termina este mes' : 'terminan este mes'}
-                  </span>
-                </span>
-              ) : (
-                <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-purple-950/60 text-slate-500 dark:text-slate-400 text-[10px] font-bold shrink-0">
-                  0 terminan este mes
-                </span>
-              )}
-            </div>
-
-            {/* Middle: Monthly commitment & Pending */}
-            <div className="mt-2 mb-3">
-              <div className="flex items-baseline justify-between gap-2">
-                <div>
-                  <span className="text-base sm:text-xl font-black text-amber-600 dark:text-amber-400">
-                    {isBalanceHidden ? "$ •••••" : ars(cuotasMetrics.monthlyThisMonth)}
-                  </span>
-                  <span className="text-xs font-bold text-slate-400 ml-1">/ mes</span>
-                </div>
-                <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
-                  pendiente {isBalanceHidden ? "$ •••" : ars(cuotasMetrics.totalPending)}
-                </span>
-              </div>
-
-              {/* Liberated money hint if ending this month */}
-              <div className="mt-2">
-                {cuotasMetrics.endingThisMonthCount > 0 ? (
-                  <div className="flex items-center gap-1.5 text-[11px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50/60 dark:bg-emerald-950/30 px-2.5 py-1 rounded-xl border border-emerald-200/50 dark:border-emerald-800/30">
-                    <span>🎉</span>
-                    <span>
-                      ¡Liberas {isBalanceHidden ? "$ •••••" : ars(cuotasMetrics.endingMonthlyLiberated)}/mes al finalizar!
-                    </span>
-                  </div>
-                ) : (
-                  <div className="text-[11px] text-slate-400 dark:text-slate-500">
-                    {cuotasMetrics.totalInstallments} compras registradas en cuotas
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Footer strip */}
-          <div className="pt-2.5 border-t border-slate-100 dark:border-purple-900/20 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-            <span className="font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
-              <span>{cuotasMetrics.totalInstallments} compras registradas</span>
-            </span>
-            <div className="flex items-center gap-0.5 text-slate-400 group-hover:text-amber-600 dark:group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all font-bold text-xs">
-              <span>Ver movimientos</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </div>
-          </div>
-        </div>
-
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
