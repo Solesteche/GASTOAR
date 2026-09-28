@@ -377,7 +377,7 @@ export const CurrencyModal: React.FC<CurrencyModalProps> = ({
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="bg-gradient-to-br from-[#2E0854] via-[#45108A] to-[#6F2EC5] border border-purple-400/40 rounded-2xl p-5 text-center shadow-lg shadow-purple-950/40"
+                  className="bg-gradient-to-br from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] border border-purple-400/40 rounded-2xl p-5 text-center shadow-lg shadow-purple-950/20"
                 >
                   <p className="text-xs text-purple-200 mb-1 font-bold">
                     {parseFloat(calcAmount).toLocaleString('es-AR')} {calcFrom} equivale a:

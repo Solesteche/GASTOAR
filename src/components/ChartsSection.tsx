@@ -261,8 +261,8 @@ export const ChartsSection: React.FC<ChartsSectionProps> = ({
         </button>
       </div>
 
-      {/* Main Spend Stat Highlight */}
-      <div className="bg-gradient-to-br from-[#1b0633] via-[#260a47] to-[#120324] rounded-[28px] p-6 text-white shadow-xl border border-purple-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Main Spend Stat Highlight (#6D3FEA) */}
+      <div className="bg-gradient-to-br from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] rounded-[28px] p-6 text-white shadow-xl border border-purple-400/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="text-3xl sm:text-4xl font-black text-white tracking-tight">
             $ {formatNumberWithDots(totalSpent)},00

@@ -57,9 +57,9 @@ interface InstallmentsSectionProps {
   onCompleteInstallment?: (txId: string) => void;
 }
 
-const P = "#6F2EC5";
+const P = "#6D3FEA";
 const P_LIGHT = "#F5EFFF";
-const P_MID = "#A77BEE";
+const P_MID = "#8B5CF6";
 const P_ORANGE = "#F95420";
 
 export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
@@ -364,57 +364,50 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
         </div>
       </div>
 
-      {/* 2. Hero Balance Card (Estilo Resumen: Saldo por pagar & % Amortizado) */}
-      <div className="bg-white rounded-3xl p-5 shadow-sm border border-white">
+      {/* 2. Hero Balance Card (Estilo Resumen: Saldo por pagar & % Amortizado con color #6D3FEA) */}
+      <div className="bg-gradient-to-br from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-300/30">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold mb-2" style={{ color: P }}>Saldo total por pagar</p>
+            <p className="text-xs font-semibold text-purple-200/90 mb-1.5 tracking-wide">Saldo total por pagar</p>
             <div className="flex items-center gap-2 mb-2">
-              <p className="text-3xl font-bold font-outfit text-gray-900 tracking-tight leading-none">
+              <p className="text-2xl sm:text-3xl lg:text-4xl font-black font-outfit text-white tracking-tight leading-none">
                 {formatCurrency(metrics.totalPending, currency)}
               </p>
             </div>
-            <div className="h-1.5 rounded-full overflow-hidden mb-2" style={{ backgroundColor: P_LIGHT }}>
+            <div className="h-2 rounded-full overflow-hidden mb-2 bg-white/20">
               <div
-                className="h-full rounded-full transition-all duration-700"
+                className="h-full rounded-full transition-all duration-700 bg-[#F95420]"
                 style={{ 
                   width: `${Math.min(100, Math.max(5, metrics.percentPaid))}%`, 
-                  background: `linear-gradient(90deg, ${P_MID}, ${P})` 
                 }}
               />
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-400">
+            <div className="flex items-center gap-2 text-xs text-purple-200">
               <span>Total financiado:{" "}
-                <span className="font-semibold text-gray-700">{formatCurrency(metrics.totalCommitted, currency)}</span>
+                <span className="font-semibold text-white">{formatCurrency(metrics.totalCommitted, currency)}</span>
               </span>
               <span>•</span>
               <span>Pagado:{" "}
-                <span className="font-semibold text-emerald-600">{formatCurrency(metrics.totalPaidSoFar, currency)}</span>
+                <span className="font-semibold text-emerald-300">{formatCurrency(metrics.totalPaidSoFar, currency)}</span>
               </span>
             </div>
           </div>
 
-          {/* Circular Progress Gauge (Igual al de Resumen) */}
+          {/* Circular Progress Gauge */}
           <div className="relative flex-shrink-0" style={{ width: 110, height: 110 }}>
             <svg width="110" height="110" viewBox="0 0 100 100">
-              <defs>
-                <linearGradient id="installmentCg" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor={P_MID} />
-                  <stop offset="100%" stopColor={P} />
-                </linearGradient>
-              </defs>
-              <circle cx={cx} cy={cy} r={r} fill="none" stroke={P_LIGHT} strokeWidth="7" />
+              <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255, 255, 255, 0.15)" strokeWidth="7" />
               <circle
                 cx={cx} cy={cy} r={r} fill="none"
-                stroke="url(#installmentCg)" strokeWidth="7" strokeLinecap="round"
+                stroke="#F95420" strokeWidth="7" strokeLinecap="round"
                 strokeDasharray={`${dash} ${circ}`}
                 transform={`rotate(-90 ${cx} ${cy})`}
                 className="transition-all duration-1000 ease-out"
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <p className="text-xl font-bold font-outfit leading-none" style={{ color: P }}>{metrics.percentPaid}%</p>
-              <p className="text-[9px] text-gray-400 text-center mt-0.5 leading-tight">del total<br />amortizado</p>
+              <p className="text-xl font-bold font-outfit leading-none text-white">{metrics.percentPaid}%</p>
+              <p className="text-[9px] text-purple-200 text-center mt-0.5 leading-tight">del total<br />amortizado</p>
             </div>
           </div>
         </div>

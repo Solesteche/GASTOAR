@@ -146,8 +146,8 @@ export const CashFlowSection: React.FC<CashFlowSectionProps> = ({
   return (
     <div className="space-y-4">
 
-      {/* Header */}
-      <div className={`rounded-2xl p-5 border ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 border-blue-900/30'}`}>
+      {/* Header (#6D3FEA) */}
+      <div className="rounded-3xl p-5 sm:p-6 border shadow-xl text-white bg-gradient-to-br from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] border-purple-400/30">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center shadow-lg">

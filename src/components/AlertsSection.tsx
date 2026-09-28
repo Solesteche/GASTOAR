@@ -784,8 +784,8 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
 
   return (
     <div className="space-y-4 max-w-xl mx-auto pb-28 sm:pb-8">
-      {/* 1. Header Card (Hero) */}
-      <section className="bg-gradient-to-br from-[#6D28D9] via-[#7C3AED] to-[#8B5CF6] text-white rounded-3xl p-3 sm:p-5 shadow-md shadow-purple-600/15 border border-purple-300/30 space-y-2.5 sm:space-y-3.5 relative overflow-hidden">
+      {/* 1. Header Card (Hero con #6D3FEA) */}
+      <section className="bg-gradient-to-br from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] text-white rounded-3xl p-3 sm:p-5 shadow-xl border border-purple-300/30 space-y-2.5 sm:space-y-3.5 relative overflow-hidden">
         {/* Ambient decorative glow */}
         <div className="absolute -right-8 -top-8 w-36 h-36 bg-[#F95420]/20 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute -left-8 -bottom-8 w-36 h-36 bg-pink-400/20 rounded-full blur-2xl pointer-events-none" />

@@ -129,7 +129,7 @@ export const ProActionsBar: React.FC<ProActionsBarProps> = ({
       <button
         type="button"
         onClick={handleCashFlowClick}
-        className="group relative overflow-hidden flex flex-col justify-between bg-gradient-to-br from-[#2E0854] via-[#45108A] to-[#6F2EC5] hover:from-[#370A64] hover:to-[#7928CA] text-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 border border-purple-400/30 hover:border-purple-300/60 transition-all cursor-pointer text-left shadow-lg shadow-purple-950/30 active:scale-[0.99] min-h-[92px]"
+        className="group relative overflow-hidden flex flex-col justify-between bg-gradient-to-br from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] hover:from-[#5A2FD1] hover:to-[#451BA8] text-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 border border-purple-300/30 hover:border-purple-200/50 transition-all cursor-pointer text-left shadow-lg shadow-purple-950/20 active:scale-[0.99] min-h-[92px]"
       >
         {/* Glow decorativo sutil en esquina */}
         <div className="absolute top-0 right-0 w-24 h-24 bg-purple-400/15 rounded-full blur-2xl pointer-events-none group-hover:bg-purple-300/20 transition-all" />

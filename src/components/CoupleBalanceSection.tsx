@@ -41,7 +41,7 @@ interface CoupleBalanceSectionProps {
   onDeleteTransaction?: (id: string) => void;
 }
 
-const P = "#6F2EC5";
+const P = "#6D3FEA";
 
 export const CoupleBalanceSection: React.FC<CoupleBalanceSectionProps> = ({
   transactions = [],
@@ -102,23 +102,22 @@ export const CoupleBalanceSection: React.FC<CoupleBalanceSectionProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* 1. TOP HEADER & BALANCE CARD (Matches visual language of Lista de Gastos) */}
-      <section className="bg-white rounded-3xl p-5 sm:p-6 shadow-xs border border-slate-200/80 space-y-5">
+      {/* 1. TOP HEADER & BALANCE CARD (#6D3FEA) */}
+      <section className="bg-gradient-to-br from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-400/20 space-y-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div 
-              className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0"
-              style={{ backgroundColor: P }}
+              className="w-11 h-11 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0 bg-white/15 border border-white/20 backdrop-blur-xs"
             >
               <Scale className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl font-black text-slate-900 tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                   Cuenta Compartida
                 </h1>
               </div>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-xs sm:text-sm text-purple-200 font-medium">
                 Cuentas claras entre {profile.user1Name} y {profile.user2Name} sin discusiones.
               </p>
             </div>
@@ -128,16 +127,15 @@ export const CoupleBalanceSection: React.FC<CoupleBalanceSectionProps> = ({
             <button
               type="button"
               onClick={onOpenSettlementModal}
-              className="px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white border border-white/20 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer backdrop-blur-xs active:scale-95"
             >
-              <Receipt className="w-4 h-4 text-slate-500" />
+              <Receipt className="w-4 h-4 text-purple-200" />
               <span>Liquidar Cuentas</span>
             </button>
             <button
               type="button"
               onClick={onOpenTransactionModal}
-              className="px-4 py-2.5 rounded-2xl text-white font-bold text-xs shadow-xs hover:opacity-95 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
-              style={{ backgroundColor: P }}
+              className="px-4 py-2.5 rounded-2xl bg-[#F95420] hover:bg-[#E04412] text-white font-bold text-xs shadow-lg active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
               <span>Registrar Gasto en Pareja</span>

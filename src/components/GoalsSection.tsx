@@ -237,18 +237,18 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
   return (
     <div className="space-y-7 max-w-6xl mx-auto animate-in fade-in duration-200">
       
-      {/* 1. Header & Summary Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* 1. Header & Summary Section (#6D3FEA) */}
+      <div className="bg-gradient-to-br from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-400/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-purple-100 text-[#7928CA] flex items-center justify-center shadow-xs">
-              <Target className="w-5 h-5" />
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-white/15 text-white border border-white/20 backdrop-blur-xs flex items-center justify-center shadow-xs shrink-0">
+              <Target className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black text-[#2E0854] tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                 Metas & Cajas
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 font-medium">
+              <p className="text-xs sm:text-sm text-purple-200 font-medium">
                 Crea cajas personalizadas para ahorrar para viajes, saldar deudas o crear fondos de respaldo
               </p>
             </div>
@@ -258,7 +258,7 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
         {/* New Goal CTA */}
         <button
           onClick={handleOpenCreate}
-          className="px-4 py-2.5 bg-[#6F2EC5] hover:bg-[#5C23A6] text-white font-bold text-xs sm:text-sm rounded-2xl shadow-xs transition-all flex items-center justify-center gap-2 self-start sm:self-auto active:scale-95 cursor-pointer"
+          className="px-4 py-2.5 bg-[#F95420] hover:bg-[#E04412] text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 self-start sm:self-auto active:scale-95 cursor-pointer"
         >
           <Plus className="w-4 h-4 stroke-[3]" />
           <span>+ Nueva Caja de Meta</span>

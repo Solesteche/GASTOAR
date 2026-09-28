@@ -420,8 +420,8 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   return (
     <div className="space-y-4 max-w-7xl mx-auto font-sans pb-16">
 
-      {/* ROW 1: HERO MOVIMIENTOS CARD (Full Width with Purple Gradient matching Resumen) */}
-      <div className="w-full bg-gradient-to-br from-[#2E0854] via-[#45108A] to-[#6F2EC5] rounded-3xl p-5 sm:p-6 text-white shadow-lg shadow-purple-950/20 border border-purple-400/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* ROW 1: HERO MOVIMIENTOS CARD (Full Width with Purple Gradient matching Resumen con #6D3FEA) */}
+      <div className="w-full bg-gradient-to-br from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] rounded-3xl p-5 sm:p-6 text-white shadow-xl border border-purple-400/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         
         {/* Left: Icon + Title + Subtitle */}
         <div className="flex items-center gap-3.5 sm:gap-4">

@@ -378,8 +378,8 @@ export const MultiCurrencyWidget: React.FC<MultiCurrencyWidgetProps> = ({
         ? 'bg-slate-900/90 border-purple-900/40 text-white shadow-xl' 
         : 'bg-white border-purple-100 text-slate-900 shadow-lg shadow-purple-500/5'
     }`}>
-      {/* Header bar */}
-      <div className="p-5 bg-gradient-to-r from-[#2E0854] via-[#5B1E9B] to-[#7928CA] text-white">
+      {/* Header bar (#6D3FEA) */}
+      <div className="p-5 bg-gradient-to-r from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] text-white">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-xl shadow-inner">

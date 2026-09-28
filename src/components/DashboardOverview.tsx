@@ -1028,7 +1028,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* 3. HERO "SALDO DISPONIBLE" CARD                                     */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="bg-gradient-to-br from-[#2E0B5B] via-[#431478] to-[#3B0D6F] text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-400/20 relative overflow-hidden">
+      <div className="bg-gradient-to-br from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-300/30 relative overflow-hidden">
         {/* Ambient glow in background */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -1137,7 +1137,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════ */}
       <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
         {/* Card 1: Límite de gasto diario restante */}
-        <div className="bg-gradient-to-br from-[#2E0B5B] via-[#431478] to-[#3B0D6F] text-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-lg border border-purple-400/20 flex flex-col justify-between">
+        <div className="bg-gradient-to-br from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] text-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-lg border border-purple-300/30 flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2 sm:gap-2.5 mb-2">
               <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-2xs">
@@ -1174,8 +1174,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           onClick={() => setIsBudgetAlertsModalOpen(true)}
           className={`rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-lg border flex flex-col justify-between cursor-pointer transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] group ${
             criticalCategoriesCount > 0
-              ? 'bg-gradient-to-br from-[#2E0B5B] via-[#480E54] to-[#3B0744] text-white border-rose-500/40 hover:border-rose-400/80 shadow-rose-950/30'
-              : 'bg-gradient-to-br from-[#2E0B5B] via-[#431478] to-[#3B0D6F] text-white border-purple-400/20 hover:border-purple-300/40'
+              ? 'bg-gradient-to-br from-[#6D3FEA] via-[#8B2375] to-[#731B4D] text-white border-rose-500/40 hover:border-rose-400/80 shadow-rose-950/30'
+              : 'bg-gradient-to-br from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] text-white border-purple-300/30 hover:border-purple-200/50'
           }`}
           title="Hacé click para ver el estado de las categorías y subcategorías críticas según tus parámetros"
           role="button"
