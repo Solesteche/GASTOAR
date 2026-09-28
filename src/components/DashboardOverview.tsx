@@ -32,6 +32,7 @@ import {
   CoupleProfile,
   DailyFinancialScore,
   ExpenseMode,
+  Goal,
   Transaction,
   Vencimiento
 } from '../types';
@@ -40,6 +41,11 @@ import { DailyScoreModal } from './DailyScoreModal';
 import { CurrencyModal } from './CurrencyModal';
 import { CashFlowModal } from './CashFlowModal';
 import { RecentMovementsModal } from './RecentMovementsModal';
+import { BudgetAlertsModal, CriticalBudgetItem, CriticalSubcategoryItem } from './BudgetAlertsModal';
+import { GoalsMovementsModal } from './GoalsMovementsModal';
+import { InstallmentsMovementsModal } from './InstallmentsMovementsModal';
+import { getInstallmentPlanDetails } from '../utils/installmentCalculations';
+import { DEFAULT_BUDGETS, DEFAULT_GOALS } from '../data/initialData';
 import { CashFlowEngine, CashFlowProjection } from '../CashFlowEngine';
 
 export type { Vencimiento };
@@ -50,6 +56,7 @@ interface DashboardOverviewProps {
   categoryColors: CategoryColors;
   categoryMap: CategoryMap;
   budgets: Budgets;
+  goals?: Goal[];
   isDemoMode?: boolean;
   activeMode?: ExpenseMode;
   onModeChange?: (mode: ExpenseMode) => void;
@@ -98,6 +105,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   categoryColors = {},
   categoryMap,
   budgets,
+  goals = [],
   activeMode = 'all',
   onModeChange,
   onOpenTransactionModal,
@@ -131,8 +139,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const [isCashFlowModalOpen, setIsCashFlowModalOpen] = useState(false);
   const [isCashFlowExpanded, setIsCashFlowExpanded] = useState(false);
 
+  // Modales de Metas de Ahorro y Gastos en Cuotas
+  const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
+  const [isInstallmentsModalOpen, setIsInstallmentsModalOpen] = useState(false);
+
   // Modal de Últimos Movimientos (al hacer click en el porcentaje)
   const [isRecentMovementsModalOpen, setIsRecentMovementsModalOpen] = useState(false);
+
+  // Modal de Alertas de Límites de Presupuesto (Estado Crítico)
+  const [isBudgetAlertsModalOpen, setIsBudgetAlertsModalOpen] = useState(false);
 
   // Ocultar / Mostrar Saldo
   const [isBalanceHidden, setIsBalanceHidden] = useState<boolean>(() => {
@@ -401,6 +416,287 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     const avg7Days = spentThisWeek > 0 ? Math.round(spentThisWeek / 7) : 3650;
     return { avg7Days, diffPct: 78 };
   }, [transactions, now]);
+
+  // ─── Metas de Ahorro y Gastos en Cuotas ──────────────────────────────────
+  const effectiveGoals = useMemo(() => {
+    if (goals && goals.length > 0) return goals;
+    try {
+      const saved = localStorage.getItem('control_gastos_goals_v1');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_GOALS;
+  }, [goals]);
+
+  const goalsMetrics = useMemo(() => {
+    let totalTarget = 0;
+    let totalSaved = 0;
+    let completedCount = 0;
+    let activeCount = 0;
+    let totalMovements = 0;
+
+    effectiveGoals.forEach(g => {
+      totalTarget += g.montoObjetivo || 0;
+      totalSaved += g.montoActual || 0;
+      if (g.completada || (g.montoActual >= g.montoObjetivo && g.montoObjetivo > 0)) {
+        completedCount++;
+      } else {
+        activeCount++;
+      }
+      totalMovements += (g.historial || []).length;
+    });
+
+    const percent = totalTarget > 0 ? Math.min(100, Math.round((totalSaved / totalTarget) * 100)) : 0;
+
+    return {
+      totalTarget,
+      totalSaved,
+      completedCount,
+      activeCount,
+      percent,
+      totalMovements,
+    };
+  }, [effectiveGoals]);
+
+  const cuotasMetrics = useMemo(() => {
+    const today = new Date();
+    const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    
+    const installmentTxs = transactions.filter(tx => 
+      Boolean(tx.esCuotas || (tx.cuotasTotal && tx.cuotasTotal > 1))
+    );
+
+    let totalCommitted = 0;
+    let monthlyThisMonth = 0;
+    let totalPending = 0;
+    let activePlansCount = 0;
+    let completedPlansCount = 0;
+    let endingThisMonthCount = 0;
+    let endingMonthlyLiberated = 0;
+
+    installmentTxs.forEach(tx => {
+      const details = getInstallmentPlanDetails(tx);
+      const totalCuotas = Math.max(1, tx.cuotasTotal || 1);
+      const cuotaActual = Math.max(0, Math.min(totalCuotas, tx.cuotaActual || 1));
+      const cuotaMonto = tx.montoCuota || (tx.monto / totalCuotas);
+      const isCompleted = cuotaActual >= totalCuotas || details.isCompleted;
+
+      totalCommitted += tx.monto || 0;
+
+      if (!isCompleted) {
+        activePlansCount++;
+        monthlyThisMonth += cuotaMonto;
+        totalPending += details.remainingAmount;
+      } else {
+        completedPlansCount++;
+      }
+
+      // Check if ending this month
+      let isEndingThisMonth = false;
+      if (details.schedule && details.schedule.length > 0) {
+        const lastItem = details.schedule[details.schedule.length - 1];
+        if (lastItem.monthKey === currentMonthKey) {
+          isEndingThisMonth = true;
+        }
+      }
+      if (!isEndingThisMonth && cuotaActual === totalCuotas && details.finalDueDate?.startsWith(currentMonthKey)) {
+        isEndingThisMonth = true;
+      }
+
+      if (isEndingThisMonth) {
+        endingThisMonthCount++;
+        endingMonthlyLiberated += cuotaMonto;
+      }
+    });
+
+    return {
+      totalCommitted,
+      monthlyThisMonth,
+      totalPending,
+      activePlansCount,
+      completedPlansCount,
+      endingThisMonthCount,
+      endingMonthlyLiberated,
+      totalInstallments: installmentTxs.length,
+    };
+  }, [transactions]);
+
+  // ─── Alertas de Límites de Presupuesto (Parámetros del Usuario) ───────────
+  // 1. Umbral de alerta definido por el usuario (default 80%)
+  const alertThreshold = budgets?.alertThresholdPercent ?? 80;
+
+  // 2. Diccionarios de presupuestos configurados por el usuario
+  const userCatBudgets = useMemo(() => {
+    if (budgets?.categories && Object.keys(budgets.categories).length > 0) {
+      return budgets.categories;
+    }
+    return DEFAULT_BUDGETS.categories || {};
+  }, [budgets?.categories]);
+
+  const userSubBudgets = useMemo(() => {
+    if (budgets?.subcategories && Object.keys(budgets.subcategories).length > 0) {
+      return budgets.subcategories;
+    }
+    return DEFAULT_BUDGETS.subcategories || {};
+  }, [budgets?.subcategories]);
+
+  const modeMultiplier = activeMode === 'individual' ? 0.5 : 1.0;
+
+  // 3. Gastos por categoría y por subcategoría en el período actual
+  const { catSpentMap, subSpentMap } = useMemo<{
+    catSpentMap: Record<string, number>;
+    subSpentMap: Record<string, { total: number; parentCat: string }>;
+  }>(() => {
+    const cMap: Record<string, number> = {};
+    const sMap: Record<string, { total: number; parentCat: string }> = {};
+
+    const list = monthExpensesList.length > 0 ? monthExpensesList : (transactions || []).filter(t => t.tipoTransaccion !== 'ingreso');
+
+    list.forEach(t => {
+      if (!t) return;
+      const cat = t.categoria || 'Otros';
+      const amt = Number(t.monto) || 0;
+      cMap[cat] = (cMap[cat] || 0) + amt;
+
+      const sub = t.subcategoria || t.concepto;
+      if (sub) {
+        if (!sMap[sub]) {
+          sMap[sub] = { total: 0, parentCat: cat };
+        }
+        sMap[sub].total += amt;
+      }
+    });
+
+    return { catSpentMap: cMap, subSpentMap: sMap };
+  }, [monthExpensesList, transactions]);
+
+  // Helper de búsqueda con normalización de nombres
+  const getBudgetForName = (name: string, budgetDict: Record<string, number>): number => {
+    if (budgetDict[name] !== undefined) return Number(budgetDict[name]) || 0;
+    const lower = name.toLowerCase().trim();
+    for (const [k, v] of Object.entries(budgetDict)) {
+      const kLower = k.toLowerCase().trim();
+      if (kLower === lower || kLower.includes(lower) || lower.includes(kLower)) {
+        return Number(v) || 0;
+      }
+    }
+    return 0;
+  };
+
+  const getSpentForName = (name: string, spentDict: Record<string, number>): number => {
+    if (spentDict[name] !== undefined) return spentDict[name];
+    const lower = name.toLowerCase().trim();
+    for (const [k, v] of Object.entries(spentDict)) {
+      const kLower = k.toLowerCase().trim();
+      if (kLower === lower || kLower.includes(lower) || lower.includes(kLower)) {
+        return v;
+      }
+    }
+    return 0;
+  };
+
+  // 4. Evaluar todas las categorías presupuestadas
+  const allBudgetCategoryItems = useMemo<CriticalBudgetItem[]>(() => {
+    const allCatNames = Array.from(new Set([
+      ...Object.keys(userCatBudgets),
+      ...Object.keys(catSpentMap),
+    ]));
+
+    const list: CriticalBudgetItem[] = [];
+
+    allCatNames.forEach((catName) => {
+      const rawBudget = getBudgetForName(catName, userCatBudgets);
+      const budget = Math.round(rawBudget * modeMultiplier);
+      const spent = getSpentForName(catName, catSpentMap);
+
+      if (budget <= 0 && spent <= 0) return;
+
+      const effectiveBudget = budget > 0 ? budget : 50000;
+      const pct = effectiveBudget > 0 ? Math.round((spent / effectiveBudget) * 100) : 0;
+      const isExceeded = pct >= 100;
+      const isCritical = pct >= alertThreshold;
+      const remaining = effectiveBudget - spent;
+
+      const relevantSubs: CriticalSubcategoryItem[] = [];
+      Object.keys(subSpentMap).forEach((subName) => {
+        const data = subSpentMap[subName];
+        if (!data) return;
+        if (data.parentCat === catName || catName.includes(data.parentCat) || data.parentCat.includes(catName)) {
+          const rawSubBudget = getBudgetForName(subName, userSubBudgets);
+          const subBudget = rawSubBudget > 0 ? Math.round(rawSubBudget * modeMultiplier) : undefined;
+          const subPct = subBudget ? Math.round((data.total / subBudget) * 100) : undefined;
+          relevantSubs.push({
+            name: subName,
+            parentCategory: catName,
+            spent: data.total,
+            budget: subBudget,
+            pct: subPct,
+            remaining: subBudget ? subBudget - data.total : undefined,
+            isCritical: subPct !== undefined ? subPct >= alertThreshold : false,
+            isExceeded: subPct !== undefined ? subPct >= 100 : false,
+          });
+        }
+      });
+
+      list.push({
+        id: `cat-${catName}`,
+        name: catName,
+        type: 'category',
+        spent,
+        budget: effectiveBudget,
+        pct,
+        remaining,
+        color: categoryColors[catName] || DEFAULT_CATEGORY_COLORS[catName] || '#7928CA',
+        isExceeded,
+        isCritical,
+        subcategories: relevantSubs,
+      });
+    });
+
+    return list.sort((a, b) => b.pct - a.pct);
+  }, [userCatBudgets, catSpentMap, subSpentMap, modeMultiplier, alertThreshold, categoryColors]);
+
+  // 5. Evaluar subcategorías críticas independientes
+  const criticalSubcategoriesList = useMemo<CriticalSubcategoryItem[]>(() => {
+    const list: CriticalSubcategoryItem[] = [];
+    Object.keys(subSpentMap).forEach((subName) => {
+      const data = subSpentMap[subName];
+      if (!data) return;
+      const rawSubBudget = getBudgetForName(subName, userSubBudgets);
+      if (rawSubBudget > 0) {
+        const subBudget = Math.round(rawSubBudget * modeMultiplier);
+        const pct = Math.round((data.total / subBudget) * 100);
+        if (pct >= alertThreshold) {
+          list.push({
+            name: subName,
+            parentCategory: data.parentCat,
+            spent: data.total,
+            budget: subBudget,
+            pct,
+            remaining: subBudget - data.total,
+            isCritical: pct >= alertThreshold,
+            isExceeded: pct >= 100,
+          });
+        }
+      }
+    });
+    return list.sort((a, b) => (b.pct || 0) - (a.pct || 0));
+  }, [subSpentMap, userSubBudgets, modeMultiplier, alertThreshold]);
+
+  // Categorías críticas (>= alertThreshold definido por el usuario)
+  const criticalCategoryItems = useMemo(() => {
+    return allBudgetCategoryItems.filter(c => c.isCritical);
+  }, [allBudgetCategoryItems]);
+
+  const criticalCategoriesCount = criticalCategoryItems.length;
+  const maxCriticalPct = useMemo(() => {
+    if (criticalCategoryItems.length > 0) {
+      return criticalCategoryItems[0].pct;
+    }
+    if (allBudgetCategoryItems.length > 0) {
+      return allBudgetCategoryItems[0].pct;
+    }
+    return 0;
+  }, [criticalCategoryItems, allBudgetCategoryItems]);
 
   // Vencimientos dinámicos (con fallback a la lista estética si está vacía)
   const upcomingBills = useMemo(() => {
@@ -873,32 +1169,86 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
-        {/* Card 2: Promedio de gasto diario */}
-        <div className="bg-gradient-to-br from-[#2E0B5B] via-[#431478] to-[#3B0D6F] text-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-lg border border-purple-400/20 flex flex-col justify-between">
+        {/* Card 2: Alertas de límites de presupuesto (Reemplaza Promedio de gasto diario) */}
+        <div
+          onClick={() => setIsBudgetAlertsModalOpen(true)}
+          className={`rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-lg border flex flex-col justify-between cursor-pointer transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] group ${
+            criticalCategoriesCount > 0
+              ? 'bg-gradient-to-br from-[#2E0B5B] via-[#480E54] to-[#3B0744] text-white border-rose-500/40 hover:border-rose-400/80 shadow-rose-950/30'
+              : 'bg-gradient-to-br from-[#2E0B5B] via-[#431478] to-[#3B0D6F] text-white border-purple-400/20 hover:border-purple-300/40'
+          }`}
+          title="Hacé click para ver el estado de las categorías y subcategorías críticas según tus parámetros"
+          role="button"
+          tabIndex={0}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setIsBudgetAlertsModalOpen(true); }}
+        >
           <div>
-            <div className="flex items-center gap-2 sm:gap-2.5 mb-2">
-              <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-sm sm:text-base shrink-0 shadow-2xs">
-                📈
+            <div className="flex items-center justify-between gap-1 mb-2">
+              <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                <div className={`w-7 h-7 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl flex items-center justify-center text-sm sm:text-base shrink-0 shadow-2xs ${
+                  criticalCategoriesCount > 0
+                    ? 'bg-rose-500/25 text-rose-300 border border-rose-400/40 animate-pulse'
+                    : 'bg-white/10 text-purple-200 border border-white/10'
+                }`}>
+                  {criticalCategoriesCount > 0 ? '⚠️' : '🎯'}
+                </div>
+                <span className="text-[11px] sm:text-xs font-semibold text-purple-200 leading-tight">
+                  Límites de presupuesto<br />
+                  <span className={criticalCategoriesCount > 0 ? 'text-rose-300 font-bold' : 'text-purple-300 font-medium'}>
+                    {criticalCategoriesCount > 0 ? 'Estado crítico' : 'Bajo control'}
+                  </span>
+                </span>
               </div>
-              <span className="text-[11px] sm:text-xs font-semibold text-purple-200 leading-tight">
-                Promedio de<br />gasto diario
-              </span>
+
+              {criticalCategoriesCount > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-rose-500 text-white shadow-xs shrink-0 animate-bounce">
+                  Alerta
+                </span>
+              )}
             </div>
 
-            <p className="text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight mt-1.5 sm:mt-2 tabular-nums">
-              {isBalanceHidden ? "$ •••••" : `$ ${(last7DaysStats.avg7Days || 3650).toLocaleString('es-AR')}`}
-            </p>
-            <p className="text-[10px] sm:text-xs text-purple-200/80 font-medium mt-0.5">
-              en los últimos 7 días
-            </p>
+            <div className="mt-1.5 sm:mt-2">
+              <div className="flex items-baseline gap-1.5 sm:gap-2">
+                <span className={`text-xl sm:text-3xl font-black tracking-tight tabular-nums ${
+                  criticalCategoriesCount > 0 ? 'text-rose-300' : 'text-emerald-300'
+                }`}>
+                  {criticalCategoriesCount}
+                </span>
+                <span className="text-xs sm:text-sm font-bold text-purple-100">
+                  {criticalCategoriesCount === 1 ? 'categoría crítica' : 'categorías críticas'}
+                </span>
+              </div>
+              <p className="text-[10px] sm:text-xs text-purple-200/80 font-medium mt-0.5">
+                {criticalCategoriesCount > 0
+                  ? `Umbral: ≥${alertThreshold}% ${criticalSubcategoriesList.length > 0 ? `· ${criticalSubcategoriesList.length} subcat.` : ''}`
+                  : `Todas bajo tu umbral del ${alertThreshold}%`}
+              </p>
+            </div>
           </div>
 
           <div>
-            <div className="my-2.5 sm:my-3 h-1.5 sm:h-2" />
-            <p className="text-[10px] sm:text-xs font-bold text-emerald-400 flex items-center gap-1">
-              <span>↓</span>
-              <span>{Math.abs(last7DaysStats.diffPct || 78)}% vs sem. ant.</span>
-            </p>
+            <div className="h-1.5 sm:h-2 rounded-full bg-white/15 overflow-hidden my-2.5 sm:my-3 w-full">
+              <div
+                className={`h-full rounded-full transition-all duration-700 ${
+                  criticalCategoriesCount > 0
+                    ? 'bg-gradient-to-r from-amber-400 to-rose-500'
+                    : 'bg-emerald-400'
+                }`}
+                style={{
+                  width: `${criticalCategoriesCount > 0 ? Math.min(100, Math.max(20, maxCriticalPct)) : 100}%`
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[10px] sm:text-xs font-bold">
+              <span className={criticalCategoriesCount > 0 ? 'text-rose-300' : 'text-emerald-400'}>
+                {criticalCategoriesCount > 0
+                  ? `${maxCriticalPct}% máx. consumido`
+                  : '100% saludable'}
+              </span>
+              <span className="text-purple-200 group-hover:text-white group-hover:translate-x-0.5 transition-all flex items-center gap-0.5 font-semibold">
+                Ver estado →
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -1187,6 +1537,154 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* 5.1 METAS Y GASTOS EN CUOTAS (DOS CAJAS / BOTONES INTERACTIVOS)     */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        
+        {/* Caja 1: Metas de Ahorro */}
+        <div
+          onClick={() => setIsGoalsModalOpen(true)}
+          className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#181332] border border-slate-100 dark:border-purple-900/40 hover:border-blue-400 dark:hover:border-blue-600 shadow-xs hover:shadow-md cursor-pointer transition-all group flex flex-col justify-between"
+          title="Ver movimientos y aportes de metas"
+        >
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-2.5">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-lg sm:text-xl shadow-md shadow-blue-500/20 shrink-0">
+                  🎯
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    Metas de Ahorro
+                  </h4>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
+                    {goalsMetrics.activeCount} {goalsMetrics.activeCount === 1 ? 'meta activa' : 'metas activas'}
+                  </span>
+                </div>
+              </div>
+
+              <span className="px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 text-[10px] font-black uppercase shrink-0">
+                {goalsMetrics.percent}% acumulado
+              </span>
+            </div>
+
+            {/* Middle: Total Saved & Target */}
+            <div className="mt-2 mb-3">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-base sm:text-xl font-black text-slate-900 dark:text-white">
+                  {isBalanceHidden ? "$ •••••" : ars(goalsMetrics.totalSaved)}
+                </span>
+                <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                  meta {isBalanceHidden ? "$ •••" : ars(goalsMetrics.totalTarget)}
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-purple-950/80 overflow-hidden mt-2">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-500"
+                  style={{ width: `${goalsMetrics.percent}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Footer strip */}
+          <div className="pt-2.5 border-t border-slate-100 dark:border-purple-900/20 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+            <span className="font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1">
+              <span>{goalsMetrics.totalMovements} aportes registrados</span>
+            </span>
+            <div className="flex items-center gap-0.5 text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all font-bold text-xs">
+              <span>Ver movimientos</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </div>
+          </div>
+        </div>
+
+        {/* Caja 2: Gastos en Cuotas (con indicador de cuántas cuotas se terminan este mes) */}
+        <div
+          onClick={() => setIsInstallmentsModalOpen(true)}
+          className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#181332] border border-slate-100 dark:border-purple-900/40 hover:border-amber-400 dark:hover:border-amber-600 shadow-xs hover:shadow-md cursor-pointer transition-all group flex flex-col justify-between"
+          title="Ver gastos y compras en cuotas"
+        >
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-2.5">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center text-lg sm:text-xl shadow-md shadow-amber-500/20 shrink-0">
+                  💳
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                    Gastos en Cuotas
+                  </h4>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
+                    {cuotasMetrics.activePlansCount} compras activas
+                  </span>
+                </div>
+              </div>
+
+              {/* Indicador de cuántas cuotas se terminan ese mes */}
+              {cuotasMetrics.endingThisMonthCount > 0 ? (
+                <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 text-[10px] sm:text-[11px] font-black flex items-center gap-1 shadow-2xs animate-pulse shrink-0">
+                  <span>🏁</span>
+                  <span>
+                    {cuotasMetrics.endingThisMonthCount} {cuotasMetrics.endingThisMonthCount === 1 ? 'termina este mes' : 'terminan este mes'}
+                  </span>
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-purple-950/60 text-slate-500 dark:text-slate-400 text-[10px] font-bold shrink-0">
+                  0 terminan este mes
+                </span>
+              )}
+            </div>
+
+            {/* Middle: Monthly commitment & Pending */}
+            <div className="mt-2 mb-3">
+              <div className="flex items-baseline justify-between gap-2">
+                <div>
+                  <span className="text-base sm:text-xl font-black text-amber-600 dark:text-amber-400">
+                    {isBalanceHidden ? "$ •••••" : ars(cuotasMetrics.monthlyThisMonth)}
+                  </span>
+                  <span className="text-xs font-bold text-slate-400 ml-1">/ mes</span>
+                </div>
+                <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                  pendiente {isBalanceHidden ? "$ •••" : ars(cuotasMetrics.totalPending)}
+                </span>
+              </div>
+
+              {/* Liberated money hint if ending this month */}
+              <div className="mt-2">
+                {cuotasMetrics.endingThisMonthCount > 0 ? (
+                  <div className="flex items-center gap-1.5 text-[11px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50/60 dark:bg-emerald-950/30 px-2.5 py-1 rounded-xl border border-emerald-200/50 dark:border-emerald-800/30">
+                    <span>🎉</span>
+                    <span>
+                      ¡Liberas {isBalanceHidden ? "$ •••••" : ars(cuotasMetrics.endingMonthlyLiberated)}/mes al finalizar!
+                    </span>
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-slate-400 dark:text-slate-500">
+                    {cuotasMetrics.totalInstallments} compras registradas en cuotas
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer strip */}
+          <div className="pt-2.5 border-t border-slate-100 dark:border-purple-900/20 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+            <span className="font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+              <span>{cuotasMetrics.totalInstallments} compras registradas</span>
+            </span>
+            <div className="flex items-center gap-0.5 text-slate-400 group-hover:text-amber-600 dark:group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all font-bold text-xs">
+              <span>Ver movimientos</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* 6. BOTTOM 2-COLUMN GRID                                             */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1404,6 +1902,39 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         isBalanceHidden={isBalanceHidden}
         onNavigateTab={onNavigateTab}
         onOpenTransactionModal={onOpenTransactionModal}
+      />
+
+      {/* Modal de Alertas de Presupuesto (Categorías y Subcategorías Críticas según parámetros de usuario) */}
+      <BudgetAlertsModal
+        isOpen={isBudgetAlertsModalOpen}
+        onClose={() => setIsBudgetAlertsModalOpen(false)}
+        alertThreshold={alertThreshold}
+        criticalCategories={criticalCategoryItems}
+        criticalSubcategories={criticalSubcategoriesList}
+        allBudgetItems={allBudgetCategoryItems}
+        onOpenBudgetModal={onOpenBudgetModal}
+        onSelectCategory={onSelectCategory}
+        onNavigateTab={onNavigateTab}
+        isBalanceHidden={isBalanceHidden}
+      />
+
+      {/* Modal de Movimientos y Ahorro en Metas */}
+      <GoalsMovementsModal
+        isOpen={isGoalsModalOpen}
+        onClose={() => setIsGoalsModalOpen(false)}
+        goals={effectiveGoals}
+        currency={profile?.currency || 'ARS'}
+        onNavigateTab={onNavigateTab}
+      />
+
+      {/* Modal de Movimientos y Gastos en Cuotas */}
+      <InstallmentsMovementsModal
+        isOpen={isInstallmentsModalOpen}
+        onClose={() => setIsInstallmentsModalOpen(false)}
+        transactions={transactions}
+        profile={profile}
+        currency={profile?.currency || 'ARS'}
+        onNavigateTab={onNavigateTab}
       />
 
     </div>

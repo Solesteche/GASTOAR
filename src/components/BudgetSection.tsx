@@ -9,6 +9,7 @@ import { Budgets, CategoryColors, CategoryMap, Transaction } from '../types';
 import { formatCurrency } from '../utils/formatters';
 import { BudgetComparisonView } from './BudgetComparisonView';
 import { InflationModeSection } from './InflationModeSection';
+import { BudgetInsightsSection } from './budget/BudgetInsightsSection';
 import {
   InflationModeEngine,
   InflationSettings,
@@ -33,7 +34,7 @@ interface BudgetSectionProps {
 }
 
 const DEFAULT_BUDGETS: Budgets = { categories: {}, subcategories: {} };
-type BudgetView = 'budget' | 'alerts' | 'projection' | 'comparison';
+type BudgetView = 'budget' | 'insights' | 'alerts' | 'projection' | 'comparison';
 
 export const BudgetSection: React.FC<BudgetSectionProps> = ({
   budgets = DEFAULT_BUDGETS,
@@ -182,6 +183,7 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
 
   const tabs: Array<[BudgetView, string, React.ElementType]> = [
     ['budget', 'Presupuesto', WalletCards],
+    ['insights', 'Insights', Sparkles],
     ['alerts', 'Alertas y Límites', BellRing],
     ['projection', 'Proyección & IPC', TrendingUp],
     ['comparison', 'Comparativa', BarChart3],
@@ -233,6 +235,43 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
               <div className="flex justify-between mt-2 text-[11px] font-bold"><span className="text-slate-500">{formatCurrency(summary.totalSpent, currency)} gastado</span><span className="text-slate-700 dark:text-slate-200">{formatCurrency(summary.totalBudget, currency)} total</span></div>
             </div>
 
+            {/* Quick Insights Banner */}
+            <div className="rounded-3xl border border-purple-200 dark:border-purple-800/80 bg-gradient-to-r from-purple-50 via-white to-amber-50/60 dark:from-purple-950/40 dark:via-[#16072b] dark:to-amber-950/20 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#7928CA] to-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-black text-[#2E0854] dark:text-purple-100 text-sm sm:text-base">
+                      Insights de Presupuesto
+                    </h3>
+                    {rows.filter(r => r.limit > 0 && r.pct >= 90).length > 0 ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-800 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 text-amber-600" />
+                        <span>{rows.filter(r => r.limit > 0 && r.pct >= 90).length} superan el 90%</span>
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
+                        Bajo control (&lt;90%)
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-xl">
+                    Visualizá la comparativa de gasto real contra el límite en gráficos de barras horizontales, con detección inmediata de categorías en zona de riesgo.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setView('insights')}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#2E0854] to-[#7928CA] hover:from-[#3D0B6F] hover:to-[#8E32EC] text-white text-xs font-black flex items-center justify-center gap-1.5 shrink-0 transition-all shadow-sm active:scale-95 cursor-pointer"
+              >
+                <span>Explorar Insights</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
             <div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3"><div><h3 className="font-black text-[#2E0854] dark:text-white">Tus categorías</h3><p className="text-[11px] text-slate-500">Editá cada límite sin salir de esta pantalla.</p></div><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar categoría..." className="w-full sm:w-56 rounded-xl border border-slate-200 dark:border-purple-900 bg-slate-50 dark:bg-[#190731] px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-purple-500/20" /></div>
               <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -244,6 +283,21 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
               <div className="rounded-2xl border border-purple-100 bg-purple-50/60 dark:bg-purple-950/20 dark:border-purple-900/40 p-4"><div className="flex items-start gap-3"><Lightbulb className="w-5 h-5 text-[#7928CA] mt-0.5" /><div><p className="text-xs font-black text-[#2E0854] dark:text-purple-100">¿Querés ahorrar tiempo?</p><p className="text-[11px] text-slate-600 dark:text-slate-300 mt-1">Creá un nuevo presupuesto copiando el actual o usando tus gastos reales como base.</p></div></div></div>
               <button onClick={() => setView('projection')} className="rounded-2xl border border-orange-100 bg-orange-50/60 dark:bg-orange-950/20 dark:border-orange-900/40 p-4 text-left flex items-center justify-between group"><div><p className="text-xs font-black text-orange-900 dark:text-orange-200">Proyección automática</p><p className="text-[11px] text-orange-800/70 dark:text-orange-300/70 mt-1">Ajustá tus límites según inflación o consumo real.</p></div><ChevronRight className="w-5 h-5 text-orange-500 group-hover:translate-x-1 transition-transform" /></button>
             </div>
+          </div>
+        )}
+
+        {view === 'insights' && (
+          <div className="p-4 sm:p-6">
+            <BudgetInsightsSection
+              budgets={budgets}
+              categoryMap={categoryMap}
+              categoryColors={categoryColors}
+              transactions={transactions}
+              currency={currency}
+              onEditCategory={(category, currentLimit) => openQuick(category, currentLimit)}
+              onSelectCategory={onSelectCategory}
+              onOpenBudgetModal={onOpenBudgetModal}
+            />
           </div>
         )}
 

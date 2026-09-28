@@ -463,6 +463,53 @@ export const DEFAULT_TRANSACTIONS: Transaction[] = [
     montoCuota: 40000.00,
     tarjetaNombre: "Amex Galicia",
     primerMesCuota: "2026-06"
+  },
+  {
+    id: "21",
+    concepto: "Cafetera Nespresso Vertuo",
+    descripcion: "Cafetera y cápsulas en 3 cuotas fijas (¡Última cuota este mes!)",
+    monto: 105000.00,
+    moneda: "ARS",
+    categoria: "Tecnología, Electro & Bazar",
+    subcategoria: "Electrodomésticos para el Hogar",
+    fecha: formatDate(65),
+    tipo: "pareja",
+    pagadoPor: "user1",
+    splitType: "50_50",
+    metodoPago: "Crédito",
+    esCuotas: true,
+    cuotasTotal: 3,
+    cuotaActual: 3,
+    montoCuota: 35000.00,
+    tarjetaNombre: "Visa Santander",
+    primerMesCuota: (() => {
+      const d = new Date();
+      const start = new Date(d.getFullYear(), d.getMonth() - 2, 10);
+      return `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
+    })()
+  },
+  {
+    id: "22",
+    concepto: "Campera Térmica Columbia",
+    descripcion: "Indumentaria en 6 cuotas (¡Finaliza este mes!)",
+    monto: 180000.00,
+    moneda: "ARS",
+    categoria: "Indumentaria & Calzado",
+    subcategoria: "Indumentaria de Invierno",
+    fecha: formatDate(150),
+    tipo: "individual",
+    pagadoPor: "user2",
+    metodoPago: "Crédito",
+    esCuotas: true,
+    cuotasTotal: 6,
+    cuotaActual: 6,
+    montoCuota: 30000.00,
+    tarjetaNombre: "Mastercard BBVA",
+    primerMesCuota: (() => {
+      const d = new Date();
+      const start = new Date(d.getFullYear(), d.getMonth() - 5, 10);
+      return `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
+    })()
   }
 ];
 

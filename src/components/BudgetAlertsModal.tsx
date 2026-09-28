@@ -3,606 +3,615 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
   AlertTriangle,
-  ShieldAlert,
-  ChevronRight,
   Sliders,
+  ChevronRight,
   TrendingUp,
-  Tag,
+  Search,
   CheckCircle2,
-  ExternalLink,
-  Pencil
+  AlertCircle,
+  ArrowUpRight,
+  Layers,
+  PieChart as PieIcon,
+  ShieldAlert,
+  ChevronDown
 } from 'lucide-react';
-import { Budgets, CategoryColors, CategoryMap, Transaction } from '../types';
 
-export interface CategoryAlertDetail {
-  category: string;
-  budget: number;
+export interface CriticalSubcategoryItem {
+  name: string;
+  parentCategory: string;
   spent: number;
-  percentage: number;
-  status: 'exceeded' | 'warning' | 'ok';
-  overspent: number;
+  budget?: number;
+  pct?: number;
+  remaining?: number;
+  isCritical?: boolean;
+  isExceeded?: boolean;
+  emoji?: string;
+}
+
+export interface CriticalBudgetItem {
+  id: string;
+  name: string;
+  type: 'category' | 'subcategory';
+  parentCategory?: string;
+  spent: number;
+  budget: number;
+  pct: number;
   remaining: number;
-  color: string;
-  emoji: string;
-  subcategories: {
-    name: string;
-    spent: number;
-    budget: number;
-    percentage: number;
-    isCritical: boolean;
-  }[];
+  color?: string;
+  emoji?: string;
+  isExceeded: boolean;
+  isCritical: boolean;
+  subcategories?: CriticalSubcategoryItem[];
 }
 
 interface BudgetAlertsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  budgets?: Budgets;
-  categoryMap?: CategoryMap;
-  categoryColors?: CategoryColors;
-  monthExpensesList?: Transaction[];
-  generalBudget?: number;
-  isBalanceHidden?: boolean;
+  alertThreshold: number; // Parámetro definido por el usuario (ej. 80%)
+  criticalCategories: CriticalBudgetItem[];
+  criticalSubcategories: CriticalSubcategoryItem[];
+  allBudgetItems: CriticalBudgetItem[];
   onOpenBudgetModal?: () => void;
   onSelectCategory?: (category: string) => void;
   onNavigateTab?: (tab: string) => void;
+  isBalanceHidden?: boolean;
 }
 
-const DEFAULT_CATEGORY_COLORS: Record<string, string> = {
-  'Alimentación': '#3B82F6',
-  'Supermercado': '#3B82F6',
-  'Vivienda': '#EC4899',
-  'Alquiler': '#EC4899',
-  'Transporte': '#8B5CF6',
-  'Salud': '#10B981',
-  'Farmacia': '#10B981',
-  'Ocio': '#F59E0B',
-  'Gastronomía': '#F59E0B',
-  'Servicios': '#06B6D4',
-  'Internet': '#06B6D4',
-  'Otros': '#64748B',
-};
-
-const DEFAULT_EMOJIS: Record<string, string> = {
-  'Alimentación': '🛒',
-  'Supermercado': '🛒',
-  'Vivienda': '🏠',
-  'Alquiler': '🏠',
-  'Transporte': '🚗',
-  'Salud': '💊',
-  'Farmacia': '💊',
-  'Ocio': '🍿',
-  'Gastronomía': '☕',
-  'Servicios': '⚡',
-  'Internet': '🌐',
-  'Otros': '📦',
+const getCategoryEmoji = (name: string): string => {
+  const n = name.toLowerCase();
+  if (n.includes('supermercado') || n.includes('alimento') || n.includes('comestible')) return '🛒';
+  if (n.includes('gastro') || n.includes('restauran') || n.includes('bar') || n.includes('delivery') || n.includes('comida') || n.includes('café') || n.includes('cafe')) return '🍔';
+  if (n.includes('alquiler') || n.includes('vivienda') || n.includes('hogar')) return '🏠';
+  if (n.includes('expensa')) return '🏢';
+  if (n.includes('transporte') || n.includes('auto') || n.includes('nafta') || n.includes('combustible') || n.includes('sube') || n.includes('colectivo') || n.includes('uber')) return '🚗';
+  if (n.includes('servicio') || n.includes('luz') || n.includes('gas') || n.includes('agua') || n.includes('aysa') || n.includes('internet') || n.includes('wifi') || n.includes('cable')) return '💡';
+  if (n.includes('salud') || n.includes('farmacia') || n.includes('medic') || n.includes('prepaga') || n.includes('osde')) return '💊';
+  if (n.includes('ocio') || n.includes('entretenimiento') || n.includes('salida') || n.includes('cine')) return '🎟️';
+  if (n.includes('suscrip') || n.includes('stream') || n.includes('plataforma') || n.includes('spotify') || n.includes('netflix')) return '📱';
+  if (n.includes('educaci') || n.includes('curso') || n.includes('facultad') || n.includes('libro')) return '📚';
+  if (n.includes('mascota') || n.includes('veterinar') || n.includes('perro') || n.includes('gato')) return '🐾';
+  if (n.includes('indument') || n.includes('ropa') || n.includes('calzado') || n.includes('zapat')) return '👗';
+  if (n.includes('tecnolog') || n.includes('electro') || n.includes('computad') || n.includes('celular')) return '💻';
+  return '🏷️';
 };
 
 export const BudgetAlertsModal: React.FC<BudgetAlertsModalProps> = ({
   isOpen,
   onClose,
-  budgets,
-  categoryMap = {},
-  categoryColors = {},
-  monthExpensesList = [],
-  generalBudget = 770000,
-  isBalanceHidden = false,
+  alertThreshold,
+  criticalCategories,
+  criticalSubcategories,
+  allBudgetItems,
   onOpenBudgetModal,
   onSelectCategory,
   onNavigateTab,
+  isBalanceHidden = false,
 }) => {
-  const [filterMode, setFilterMode] = useState<'critical' | 'all'>('critical');
+  const [filterTab, setFilterTab] = useState<'critical' | 'categories' | 'subcategories' | 'all'>('critical');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
-  const alertThreshold = budgets?.alertThresholdPercent || 80;
+  const toggleCategoryExpand = (id: string) => {
+    setExpandedCategories(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const ars = (n: number) =>
-    "$ " + Math.round(Math.abs(n)).toLocaleString("es-AR", { maximumFractionDigits: 0 });
+    isBalanceHidden ? '$ •••••' : '$ ' + Math.round(Math.abs(n)).toLocaleString('es-AR');
 
-  // Compute all category & subcategory limits and spending
-  const alertDetails = useMemo(() => {
-    // 1. Group expenses by category and subcategory
-    const catSpent: Record<string, { total: number; subcategories: Record<string, number> }> = {};
+  const totalCriticalCount = criticalCategories.length + criticalSubcategories.length;
 
-    monthExpensesList.forEach(tx => {
-      if (!tx || tx.tipoTransaccion === 'ingreso') return;
-      const cat = tx.categoria || 'Otros';
-      const sub = tx.subcategoria || 'Varios';
-      const amt = tx.monto || 0;
+  // Filter items based on current active tab and search query
+  const displayedItems = useMemo(() => {
+    let list: (CriticalBudgetItem | (CriticalSubcategoryItem & { id: string; type: 'subcategory'; budget: number }))[] = [];
 
-      if (!catSpent[cat]) {
-        catSpent[cat] = { total: 0, subcategories: {} };
-      }
-      catSpent[cat].total += amt;
-      catSpent[cat].subcategories[sub] = (catSpent[cat].subcategories[sub] || 0) + amt;
-    });
-
-    // 2. Collect all tracked categories (from categoryMap, budgets, or expenses)
-    const allCatKeys = Array.from(
-      new Set([
-        ...Object.keys(budgets?.categories || {}),
-        ...Object.keys(categoryMap || {}),
-        ...Object.keys(catSpent),
-      ])
-    );
-
-    // Fallback baseline distribution if user hasn't set custom category budgets yet
-    const fallbackPctMap: Record<string, number> = {
-      'Alimentación': 0.28,
-      'Vivienda': 0.22,
-      'Transporte': 0.15,
-      'Salud': 0.10,
-      'Ocio': 0.10,
-      'Servicios': 0.08,
-      'Otros': 0.07,
-    };
-
-    const hasAnyCustomBudget = Object.values(budgets?.categories || {}).some(v => (Number(v) || 0) > 0);
-
-    const list: CategoryAlertDetail[] = allCatKeys.map(cat => {
-      let budget = budgets?.categories?.[cat] || 0;
-      if (!hasAnyCustomBudget && budget === 0) {
-        const factor = fallbackPctMap[cat] || 0.10;
-        budget = Math.round(generalBudget * factor);
-      }
-
-      const spentData = catSpent[cat] || { total: 0, subcategories: {} };
-      const spent = spentData.total;
-      const pct = budget > 0 ? Math.round((spent / budget) * 100) : (spent > 0 ? 100 : 0);
-
-      let status: 'exceeded' | 'warning' | 'ok' = 'ok';
-      if (pct >= 100) {
-        status = 'exceeded';
-      } else if (pct >= alertThreshold) {
-        status = 'warning';
-      }
-
-      const overspent = Math.max(0, spent - budget);
-      const remaining = Math.max(0, budget - spent);
-
-      // Subcategories breakdown
-      const declaredSubs = categoryMap[cat] || [];
-      const spentSubs = Object.keys(spentData.subcategories);
-      const allSubs = Array.from(new Set([...declaredSubs, ...spentSubs]));
-
-      const subcategories = allSubs.map(sub => {
-        const subSpent = spentData.subcategories[sub] || 0;
-        const subBudget = budgets?.subcategories?.[sub] || 0;
-        const subPct = subBudget > 0
-          ? Math.round((subSpent / subBudget) * 100)
-          : (budget > 0 ? Math.round((subSpent / budget) * 100) : 0);
-
-        const isCritical = subBudget > 0 ? subPct >= alertThreshold : (status !== 'ok' && subSpent > 0);
-
-        return {
-          name: sub,
-          spent: subSpent,
-          budget: subBudget,
-          percentage: subPct,
-          isCritical,
-        };
-      }).sort((a, b) => b.spent - a.spent);
-
-      return {
-        category: cat,
-        budget,
-        spent,
-        percentage: pct,
-        status,
-        overspent,
-        remaining,
-        color: categoryColors[cat] || DEFAULT_CATEGORY_COLORS[cat] || '#8B5CF6',
-        emoji: DEFAULT_EMOJIS[cat] || '📦',
-        subcategories,
-      };
-    });
-
-    // If transactions list was empty, provide realistic preset so user sees informative state
-    if (list.length === 0 || list.every(i => i.spent === 0)) {
-      const demoItems: CategoryAlertDetail[] = [
-        {
-          category: 'Alimentación',
-          budget: 180000,
-          spent: 198720,
-          percentage: 110,
-          status: 'exceeded',
-          overspent: 18720,
-          remaining: 0,
-          color: '#3B82F6',
-          emoji: '🛒',
-          subcategories: [
-            { name: 'Supermercado', spent: 145000, budget: 130000, percentage: 111, isCritical: true },
-            { name: 'Carnicería / Verdulería', spent: 53720, budget: 50000, percentage: 107, isCritical: true },
-          ]
-        },
-        {
-          category: 'Transporte',
-          budget: 95000,
-          spent: 93150,
-          percentage: 98,
-          status: 'warning',
-          overspent: 0,
-          remaining: 1850,
-          color: '#8B5CF6',
-          emoji: '🚗',
-          subcategories: [
-            { name: 'Combustible', spent: 65000, budget: 60000, percentage: 108, isCritical: true },
-            { name: 'Uber / Cabify', spent: 28150, budget: 35000, percentage: 80, isCritical: true },
-          ]
-        },
-        {
-          category: 'Ocio',
-          budget: 50000,
-          spent: 49680,
-          percentage: 99,
-          status: 'warning',
-          overspent: 0,
-          remaining: 320,
-          color: '#F59E0B',
-          emoji: '🍿',
-          subcategories: [
-            { name: 'Salidas / Bares', spent: 34000, budget: 30000, percentage: 113, isCritical: true },
-            { name: 'Cine y Eventos', spent: 15680, budget: 20000, percentage: 78, isCritical: false },
-          ]
-        },
-        {
-          category: 'Vivienda',
-          budget: 200000,
-          spent: 149040,
-          percentage: 75,
-          status: 'ok',
-          overspent: 0,
-          remaining: 50960,
-          color: '#EC4899',
-          emoji: '🏠',
-          subcategories: [
-            { name: 'Alquiler', spent: 110000, budget: 150000, percentage: 73, isCritical: false },
-            { name: 'Expensas', spent: 39040, budget: 50000, percentage: 78, isCritical: false },
-          ]
-        },
-        {
-          category: 'Salud',
-          budget: 80000,
-          spent: 55890,
-          percentage: 70,
-          status: 'ok',
-          overspent: 0,
-          remaining: 24110,
-          color: '#10B981',
-          emoji: '💊',
-          subcategories: [
-            { name: 'Farmacia', spent: 35000, budget: 50000, percentage: 70, isCritical: false },
-            { name: 'Consultas', spent: 20890, budget: 30000, percentage: 70, isCritical: false },
-          ]
-        },
+    if (filterTab === 'critical') {
+      // Both critical categories and critical subcategories
+      list = [
+        ...criticalCategories,
+        ...criticalSubcategories.map(s => ({
+          ...s,
+          id: `sub-${s.name}`,
+          type: 'subcategory' as const,
+          budget: s.budget || 0,
+          pct: s.pct || 0,
+          remaining: s.remaining ?? ((s.budget || 0) - s.spent),
+          isExceeded: Boolean(s.isExceeded),
+          isCritical: Boolean(s.isCritical),
+        }))
       ];
-      return demoItems;
+    } else if (filterTab === 'categories') {
+      list = [...criticalCategories];
+    } else if (filterTab === 'subcategories') {
+      list = criticalSubcategories.map(s => ({
+        ...s,
+        id: `sub-${s.name}`,
+        type: 'subcategory' as const,
+        budget: s.budget || 0,
+        pct: s.pct || 0,
+        remaining: s.remaining ?? ((s.budget || 0) - s.spent),
+        isExceeded: Boolean(s.isExceeded),
+        isCritical: Boolean(s.isCritical),
+      }));
+    } else {
+      // All items with budget
+      list = [...allBudgetItems];
     }
 
-    // Sort by status: exceeded first, then warning, then ok
-    return list.sort((a, b) => b.percentage - a.percentage);
-  }, [budgets, categoryMap, monthExpensesList, generalBudget, alertThreshold, categoryColors]);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(item => {
+        const matchesName = item.name.toLowerCase().includes(q);
+        const matchesParent = 'parentCategory' in item && item.parentCategory ? item.parentCategory.toLowerCase().includes(q) : false;
+        return matchesName || matchesParent;
+      });
+    }
 
-  const criticalItems = useMemo(() => {
-    return alertDetails.filter(item => item.status === 'exceeded' || item.status === 'warning');
-  }, [alertDetails]);
+    // Sort by pct descending (highest consumed first)
+    return list.sort((a, b) => b.pct - a.pct);
+  }, [filterTab, criticalCategories, criticalSubcategories, allBudgetItems, searchQuery]);
 
-  const exceededItems = useMemo(() => {
-    return alertDetails.filter(item => item.status === 'exceeded');
-  }, [alertDetails]);
+  // Overall metrics
+  const totalCriticalSpent = useMemo(() => {
+    return criticalCategories.reduce((acc, c) => acc + c.spent, 0);
+  }, [criticalCategories]);
 
-  const totalOverspent = useMemo(() => {
-    return alertDetails.reduce((sum, item) => sum + item.overspent, 0);
-  }, [alertDetails]);
+  const totalCriticalBudget = useMemo(() => {
+    return criticalCategories.reduce((acc, c) => acc + c.budget, 0);
+  }, [criticalCategories]);
 
-  const displayItems = filterMode === 'critical' ? criticalItems : alertDetails;
+  if (!isOpen) return null;
 
   return (
     <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity"
-          />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+        {/* Backdrop */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs"
+        />
 
-          {/* Modal Card */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 15 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 15 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-            className="relative w-full max-w-xl bg-white dark:bg-[#181332] rounded-3xl shadow-2xl border border-purple-100 dark:border-purple-900/50 overflow-hidden z-10 flex flex-col max-h-[90vh]"
-          >
-            {/* Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-purple-900/30 flex items-center justify-between gap-3 bg-gradient-to-r from-rose-50/60 via-purple-50/40 to-amber-50/40 dark:from-rose-950/40 dark:via-[#181332] dark:to-amber-950/30">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#EF4444] to-[#B91C1C] text-white flex items-center justify-center text-lg shadow-sm font-bold shrink-0">
-                  ⚠️
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-white tracking-tight truncate">
-                      Alertas de Límites de Presupuesto
-                    </h3>
-                    <span className="px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-black text-[11px] shrink-0">
-                      {criticalItems.length} {criticalItems.length === 1 ? 'crítica' : 'críticas'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-                    Control de límites y semáforo de riesgo según tu umbral del {alertThreshold}%
-                  </p>
-                </div>
+        {/* Modal Dialog */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 15 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 15 }}
+          transition={{ duration: 0.2 }}
+          className="relative w-full max-w-2xl bg-white dark:bg-[#160d2b] rounded-3xl shadow-2xl border border-purple-100 dark:border-purple-900/60 overflow-hidden flex flex-col max-h-[92vh] z-10 font-sans"
+        >
+          {/* Header */}
+          <div className="bg-gradient-to-r from-[#2E0854] via-[#4A0E78] to-[#7928CA] text-white p-4 sm:p-5 flex items-center justify-between shrink-0 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/20 text-rose-300 border border-rose-400/30 flex items-center justify-center text-lg shrink-0 shadow-xs">
+                <AlertTriangle className="w-5 h-5 text-rose-300" />
               </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-extrabold text-base sm:text-lg leading-tight text-white">
+                    Límites de Presupuesto
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500 text-white shadow-xs">
+                    Estado Crítico
+                  </span>
+                </div>
+                <p className="text-xs text-purple-200 mt-0.5">
+                  Categorías y subcategorías que alcanzaron o superaron el umbral fijado ({alertThreshold}%)
+                </p>
+              </div>
+            </div>
 
-              {/* Close Button */}
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-purple-200 hover:text-white p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+              title="Cerrar ventana"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* User Parameters Info Bar */}
+          <div className="bg-gradient-to-br from-amber-500/10 via-purple-500/5 to-rose-500/10 dark:from-purple-950/40 dark:to-[#1a0f35] px-4 py-3 border-b border-purple-100 dark:border-purple-900/40 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+              </span>
+              <span className="font-bold text-slate-800 dark:text-purple-100">
+                Parámetro definido por usuario:
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-800 dark:text-amber-300 font-extrabold text-[11px] border border-amber-300/60 dark:border-amber-700/60">
+                Alerta a partir de {alertThreshold}%
+              </span>
+            </div>
+
+            {onOpenBudgetModal && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenBudgetModal();
+                }}
+                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#7928CA] dark:text-purple-300 hover:underline cursor-pointer"
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>Modificar umbral o límites</span>
+              </button>
+            )}
+          </div>
+
+          {/* KPI Summary Grid */}
+          <div className="grid grid-cols-3 gap-2 p-3 sm:p-4 bg-slate-50/70 dark:bg-purple-950/20 border-b border-slate-100 dark:border-purple-900/30 text-center shrink-0">
+            <div className="p-2 sm:p-2.5 rounded-2xl bg-white dark:bg-[#1a1233] border border-slate-200/80 dark:border-purple-800/40 shadow-2xs">
+              <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-semibold truncate">
+                Categorías críticas
+              </p>
+              <p className="text-base sm:text-xl font-black text-rose-500 dark:text-rose-400 mt-0.5">
+                {criticalCategories.length}
+              </p>
+            </div>
+
+            <div className="p-2 sm:p-2.5 rounded-2xl bg-white dark:bg-[#1a1233] border border-slate-200/80 dark:border-purple-800/40 shadow-2xs">
+              <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-semibold truncate">
+                Subcategorías críticas
+              </p>
+              <p className="text-base sm:text-xl font-black text-amber-500 dark:text-amber-400 mt-0.5">
+                {criticalSubcategories.length}
+              </p>
+            </div>
+
+            <div className="p-2 sm:p-2.5 rounded-2xl bg-white dark:bg-[#1a1233] border border-slate-200/80 dark:border-purple-800/40 shadow-2xs">
+              <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-semibold truncate">
+                Gasto rubros críticos
+              </p>
+              <p className="text-sm sm:text-base font-black text-purple-700 dark:text-purple-300 mt-1 truncate">
+                {ars(totalCriticalSpent)}
+              </p>
+            </div>
+          </div>
+
+          {/* Filter Tabs & Search Bar */}
+          <div className="p-3 sm:p-4 border-b border-slate-100 dark:border-purple-900/30 space-y-2.5 shrink-0 bg-white dark:bg-[#160d2b]">
+            <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+              <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-purple-950/60 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setFilterTab('critical')}
+                  className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    filterTab === 'critical'
+                      ? 'bg-white dark:bg-[#251842] text-rose-600 dark:text-rose-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  Todas las críticas ({totalCriticalCount})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFilterTab('categories')}
+                  className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    filterTab === 'categories'
+                      ? 'bg-white dark:bg-[#251842] text-rose-600 dark:text-rose-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  Categorías ({criticalCategories.length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFilterTab('subcategories')}
+                  className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    filterTab === 'subcategories'
+                      ? 'bg-white dark:bg-[#251842] text-amber-600 dark:text-amber-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  Subcategorías ({criticalSubcategories.length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFilterTab('all')}
+                  className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    filterTab === 'all'
+                      ? 'bg-white dark:bg-[#251842] text-[#7928CA] dark:text-purple-300 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  Todas con límite ({allBudgetItems.length})
+                </button>
+              </div>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar categoría o subcategoría..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-purple-950/40 border border-slate-200 dark:border-purple-800/40 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#7928CA] dark:text-white"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* List of Items */}
+          <div className="p-3 sm:p-5 overflow-y-auto space-y-3.5 flex-1 divide-y divide-transparent">
+            {displayedItems.length === 0 ? (
+              <div className="text-center py-10 px-4 bg-slate-50 dark:bg-purple-950/30 rounded-2xl border border-dashed border-slate-200 dark:border-purple-800/40">
+                <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl mb-3 shadow-xs">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <h4 className="font-extrabold text-sm sm:text-base text-slate-800 dark:text-white">
+                  {filterTab === 'critical' || filterTab === 'categories' || filterTab === 'subcategories'
+                    ? `¡Todo en orden! Ninguna ${filterTab === 'subcategories' ? 'subcategoría' : 'categoría'} supera el ${alertThreshold}%`
+                    : 'No se encontraron resultados con ese criterio'}
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1">
+                  Los gastos actuales se encuentran bajo el umbral de alerta que definiste ({alertThreshold}%).
+                  Podés consultar las categorías con presupuesto asignado cambiando a la pestaña "Todas con límite".
+                </p>
+                {filterTab !== 'all' && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterTab('all')}
+                    className="mt-3 px-3.5 py-1.5 rounded-xl bg-purple-100 dark:bg-purple-900/60 text-[#7928CA] dark:text-purple-200 text-xs font-bold hover:bg-purple-200 transition-colors cursor-pointer"
+                  >
+                    Ver todas las categorías con presupuesto
+                  </button>
+                )}
+              </div>
+            ) : (
+              displayedItems.map((item) => {
+                const isSub = item.type === 'subcategory';
+                const isExceeded = item.pct >= 100;
+                const isCritical = item.pct >= alertThreshold;
+                const hasSubcategories = 'subcategories' in item && Boolean(item.subcategories && item.subcategories.length > 0);
+                const isExpanded = Boolean(expandedCategories[item.id]);
+
+                // Badge styling
+                let badgeBg = 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700';
+                let badgeText = `Saludable (${item.pct}%)`;
+                let barColor = 'from-emerald-400 to-emerald-500';
+
+                if (isExceeded) {
+                  badgeBg = 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700';
+                  badgeText = `Superado por ${ars(Math.abs(item.remaining))} (${item.pct}%)`;
+                  barColor = 'from-rose-500 to-red-600';
+                } else if (isCritical) {
+                  badgeBg = 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700';
+                  badgeText = `Crítico: Quedan ${ars(item.remaining)} (${item.pct}%)`;
+                  barColor = 'from-amber-400 to-rose-500';
+                }
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`p-3.5 sm:p-4 rounded-2xl border transition-all ${
+                      isExceeded
+                        ? 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50 shadow-2xs'
+                        : isCritical
+                        ? 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50 shadow-2xs'
+                        : 'bg-white dark:bg-[#1a1233] border-slate-200/80 dark:border-purple-800/40'
+                    }`}
+                  >
+                    {/* Top Row: Icon, Title, Badge */}
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center text-base sm:text-lg shrink-0 shadow-2xs"
+                          style={{
+                            backgroundColor: item.color ? `${item.color}20` : '#7928CA20',
+                            color: item.color || '#7928CA',
+                          }}
+                        >
+                          {item.emoji || getCategoryEmoji(item.name)}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white truncate">
+                              {item.name}
+                            </h4>
+                            {isSub && item.parentCategory && (
+                              <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 truncate">
+                                de {item.parentCategory}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                            {isSub ? 'Subcategoría' : 'Categoría principal'} · Límite fijado: {ars(item.budget)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Status Badge */}
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold border shrink-0 ${badgeBg}`}>
+                        {badgeText}
+                      </span>
+                    </div>
+
+                    {/* Progress Bar with Alert Threshold Marker */}
+                    <div className="mt-3 relative">
+                      <div className="h-2.5 sm:h-3 rounded-full bg-slate-200/80 dark:bg-white/10 overflow-hidden relative w-full">
+                        <div
+                          className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all duration-700`}
+                          style={{ width: `${Math.min(100, item.pct)}%` }}
+                        />
+                      </div>
+
+                      {/* Threshold indicator line at the alertThreshold% position */}
+                      <div
+                        className="absolute top-0 bottom-0 w-0.5 bg-slate-800 dark:bg-white z-10 opacity-70 pointer-events-none"
+                        style={{ left: `${Math.min(100, Math.max(0, alertThreshold))}%` }}
+                        title={`Umbral de alerta definido: ${alertThreshold}%`}
+                      >
+                        <span className="absolute -top-4 -translate-x-1/2 text-[9px] font-bold text-slate-600 dark:text-slate-300">
+                          {alertThreshold}%
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Financial details row */}
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-purple-900/30 flex items-center justify-between text-xs">
+                      <div>
+                        <span className="text-slate-500 dark:text-slate-400 text-[11px]">Gastado: </span>
+                        <span className="font-extrabold text-slate-800 dark:text-white tabular-nums">
+                          {ars(item.spent)}
+                        </span>
+                        <span className="text-slate-400 dark:text-slate-500 text-[11px] ml-1">
+                          ({item.pct}% de {ars(item.budget)})
+                        </span>
+                      </div>
+
+                      <div className="text-right">
+                        {isExceeded ? (
+                          <span className="text-rose-600 dark:text-rose-400 font-extrabold text-[11px]">
+                            Exceso: +{ars(Math.abs(item.remaining))}
+                          </span>
+                        ) : (
+                          <span className="text-slate-600 dark:text-slate-300 font-semibold text-[11px]">
+                            Disponible: {ars(item.remaining)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Subcategories list if available */}
+                    {hasSubcategories && (
+                      <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-purple-900/30">
+                        <button
+                          type="button"
+                          onClick={() => toggleCategoryExpand(item.id)}
+                          className="flex items-center justify-between w-full text-[11px] font-bold text-[#7928CA] dark:text-purple-300 hover:opacity-80 cursor-pointer"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Layers className="w-3.5 h-3.5" />
+                            <span>Ver desglose de subcategorías ({item.subcategories?.length})</span>
+                          </span>
+                          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {isExpanded && item.subcategories && (
+                          <div className="mt-2 space-y-1.5 pl-2 sm:pl-3 border-l-2 border-purple-200 dark:border-purple-800 animate-in fade-in duration-150">
+                            {item.subcategories.map(sub => {
+                              const subIsCrit = (sub.pct || 0) >= alertThreshold;
+                              const subIsExceed = (sub.pct || 0) >= 100;
+                              return (
+                                <div
+                                  key={sub.name}
+                                  className="flex items-center justify-between py-1 px-2 rounded-lg bg-slate-50 dark:bg-purple-950/40 text-[11px]"
+                                >
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="text-xs">{sub.emoji || getCategoryEmoji(sub.name)}</span>
+                                    <span className="font-semibold text-slate-700 dark:text-slate-200 truncate">
+                                      {sub.name}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="tabular-nums font-bold text-slate-800 dark:text-purple-100">
+                                      {ars(sub.spent)}
+                                    </span>
+                                    {sub.budget ? (
+                                      <span className={`px-1.5 py-0.2 rounded font-bold text-[10px] ${
+                                        subIsExceed
+                                          ? 'bg-rose-500/20 text-rose-600 dark:text-rose-300'
+                                          : subIsCrit
+                                          ? 'bg-amber-500/20 text-amber-600 dark:text-amber-300'
+                                          : 'text-slate-500'
+                                      }`}>
+                                        {sub.pct}%
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Quick action buttons */}
+                    <div className="mt-3 flex items-center justify-end gap-2 text-xs">
+                      {onSelectCategory && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onClose();
+                            onSelectCategory(isSub && item.parentCategory ? item.parentCategory : item.name);
+                          }}
+                          className="px-2.5 py-1 rounded-xl bg-purple-50 dark:bg-purple-950/70 text-[#7928CA] dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900/60 font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Search className="w-3 h-3" />
+                          <span>Ver movimientos</span>
+                        </button>
+                      )}
+
+                      {onOpenBudgetModal && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onClose();
+                            onOpenBudgetModal();
+                          }}
+                          className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-purple-900/40 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-purple-900/70 font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Sliders className="w-3 h-3" />
+                          <span>Ajustar límite</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="p-4 bg-slate-50 dark:bg-[#120724] border-t border-slate-100 dark:border-purple-900/40 flex items-center justify-between gap-3 shrink-0">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">
+              Presupuestos calculados según los parámetros definidos en tus configuraciones.
+            </p>
+
+            <div className="flex items-center gap-2 ml-auto w-full sm:w-auto">
+              {onNavigateTab && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onNavigateTab('budgets');
+                  }}
+                  className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-white dark:bg-purple-950 border border-slate-200 dark:border-purple-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Ir a Presupuestos
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={onClose}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-purple-900/50 transition-colors cursor-pointer shrink-0"
-                title="Cerrar"
-                aria-label="Cerrar modal"
+                className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-gradient-to-r from-[#7928CA] to-[#9333EA] text-white text-xs font-extrabold shadow-sm hover:opacity-95 transition-opacity cursor-pointer"
               >
-                <X className="w-5 h-5 stroke-[2.5]" />
+                Entendido
               </button>
             </div>
-
-            {/* KPI Banner */}
-            <div className="px-4 sm:px-5 py-3.5 bg-gradient-to-br from-[#2E0B5B] via-[#431478] to-[#3B0D6F] text-white">
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="bg-white/10 rounded-xl p-2 border border-white/10">
-                  <p className="text-[10px] text-purple-200/80 font-semibold uppercase tracking-wider">Umbral definido</p>
-                  <p className="text-base sm:text-lg font-black text-amber-300 mt-0.5">
-                    {alertThreshold}%
-                  </p>
-                  <p className="text-[9px] text-purple-200/70">Alerta preventiva</p>
-                </div>
-
-                <div className="bg-white/10 rounded-xl p-2 border border-white/10">
-                  <p className="text-[10px] text-purple-200/80 font-semibold uppercase tracking-wider">Límite excedido</p>
-                  <p className="text-base sm:text-lg font-black text-rose-300 mt-0.5">
-                    {exceededItems.length} {exceededItems.length === 1 ? 'categoría' : 'categorías'}
-                  </p>
-                  <p className="text-[9px] text-purple-200/70">≥ 100% presupuestado</p>
-                </div>
-
-                <div className="bg-white/10 rounded-xl p-2 border border-white/10">
-                  <p className="text-[10px] text-purple-200/80 font-semibold uppercase tracking-wider">Exceso total</p>
-                  <p className="text-base sm:text-lg font-black text-white mt-0.5 truncate">
-                    {isBalanceHidden ? '$ •••••' : ars(totalOverspent)}
-                  </p>
-                  <p className="text-[9px] text-rose-300 font-bold">Por encima del tope</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Filter Tabs */}
-            <div className="p-3 sm:px-5 border-b border-slate-100 dark:border-purple-900/30 flex items-center justify-between gap-2">
-              <div className="flex items-center bg-slate-100 dark:bg-purple-950/60 p-1 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300">
-                <button
-                  type="button"
-                  onClick={() => setFilterMode('critical')}
-                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                    filterMode === 'critical'
-                      ? 'bg-white dark:bg-[#2A184A] text-[#EF4444] dark:text-rose-300 shadow-xs font-black'
-                      : 'hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  Solo críticas ({criticalItems.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterMode('all')}
-                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                    filterMode === 'all'
-                      ? 'bg-white dark:bg-[#2A184A] text-[#7928CA] dark:text-purple-300 shadow-xs font-black'
-                      : 'hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  Todas ({alertDetails.length})
-                </button>
-              </div>
-
-              {onOpenBudgetModal && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenBudgetModal();
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-xl text-[#7928CA] dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/50 transition-colors cursor-pointer"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Configurar límites</span>
-                </button>
-              )}
-            </div>
-
-            {/* Categories & Subcategories List */}
-            <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-3 max-h-[420px]">
-              {displayItems.length > 0 ? (
-                displayItems.map((item) => {
-                  const isExceeded = item.status === 'exceeded';
-                  const isWarning = item.status === 'warning';
-
-                  return (
-                    <div
-                      key={item.category}
-                      className={`p-3.5 sm:p-4 rounded-2xl border transition-all ${
-                        isExceeded
-                          ? 'bg-rose-50/70 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/60 shadow-xs'
-                          : isWarning
-                          ? 'bg-amber-50/70 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/60 shadow-xs'
-                          : 'bg-slate-50/80 dark:bg-purple-950/20 border-slate-200/80 dark:border-purple-900/40'
-                      }`}
-                    >
-                      {/* Header of Category Card */}
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div
-                            className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0 shadow-2xs"
-                            style={{ backgroundColor: `${item.color}20` }}
-                          >
-                            <span>{item.emoji}</span>
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h4 className="text-sm font-black text-slate-800 dark:text-white truncate">
-                                {item.category}
-                              </h4>
-                              {isExceeded && (
-                                <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white font-black text-[10px] uppercase tracking-wide shrink-0">
-                                  Excedido
-                                </span>
-                              )}
-                              {isWarning && (
-                                <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] uppercase tracking-wide shrink-0">
-                                  Alerta {item.percentage}%
-                                </span>
-                              )}
-                              {!isExceeded && !isWarning && (
-                                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold text-[10px] shrink-0">
-                                  Bajo control
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                              {isExceeded ? (
-                                <span className="text-rose-600 dark:text-rose-400 font-bold">
-                                  Superó el límite por {isBalanceHidden ? '$ •••••' : ars(item.overspent)}
-                                </span>
-                              ) : isWarning ? (
-                                <span className="text-amber-600 dark:text-amber-400 font-semibold">
-                                  Riesgo crítico: quedan {isBalanceHidden ? '$ •••••' : ars(item.remaining)}
-                                </span>
-                              ) : (
-                                <span>Disponible: {isBalanceHidden ? '$ •••••' : ars(item.remaining)}</span>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Amounts */}
-                        <div className="text-right shrink-0">
-                          <p className={`text-sm sm:text-base font-black tabular-nums ${
-                            isExceeded
-                              ? 'text-rose-600 dark:text-rose-400'
-                              : isWarning
-                              ? 'text-amber-600 dark:text-amber-400'
-                              : 'text-slate-800 dark:text-white'
-                          }`}>
-                            {isBalanceHidden ? '$ •••••' : ars(item.spent)}
-                          </p>
-                          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">
-                            de {isBalanceHidden ? '$ •••••' : ars(item.budget)}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Progress Bar with Alert Threshold Marker */}
-                      <div className="relative pt-1 pb-1">
-                        <div className="h-2 rounded-full bg-slate-200 dark:bg-purple-950/60 overflow-hidden w-full relative">
-                          <div
-                            className={`h-full rounded-full transition-all duration-700 ${
-                              isExceeded
-                                ? 'bg-rose-500'
-                                : isWarning
-                                ? 'bg-amber-500'
-                                : 'bg-emerald-500'
-                            }`}
-                            style={{ width: `${Math.min(100, item.percentage)}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Subcategories Breakdown */}
-                      {item.subcategories && item.subcategories.length > 0 && (
-                        <div className="mt-2.5 pt-2.5 border-t border-slate-200/70 dark:border-purple-900/40 space-y-1.5">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center justify-between">
-                            <span>Subcategorías asociadas</span>
-                            <span>Gasto / Consumo</span>
-                          </p>
-                          <div className="space-y-1">
-                            {item.subcategories.map(sub => (
-                              <div
-                                key={sub.name}
-                                className={`flex items-center justify-between px-2 py-1 rounded-xl text-xs ${
-                                  sub.isCritical
-                                    ? 'bg-rose-100/70 dark:bg-rose-950/40 text-rose-900 dark:text-rose-200 font-bold'
-                                    : 'text-slate-600 dark:text-slate-300'
-                                }`}
-                              >
-                                <span className="flex items-center gap-1.5 truncate">
-                                  <span className={`w-1.5 h-1.5 rounded-full ${
-                                    sub.isCritical ? 'bg-rose-500' : 'bg-slate-400'
-                                  }`} />
-                                  <span className="truncate">{sub.name}</span>
-                                  {sub.budget > 0 && (
-                                    <span className="text-[9px] font-semibold text-slate-400">
-                                      (límite {ars(sub.budget)})
-                                    </span>
-                                  )}
-                                </span>
-                                <span className="font-extrabold tabular-nums shrink-0 ml-2">
-                                  {isBalanceHidden ? '$ •••••' : ars(sub.spent)}
-                                  <span className="text-[10px] font-normal text-slate-400 ml-1">
-                                    ({sub.percentage}%)
-                                  </span>
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="py-12 text-center text-slate-400 dark:text-slate-500 space-y-2">
-                  <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto text-xl">
-                    ✓
-                  </div>
-                  <p className="text-xs font-bold text-slate-800 dark:text-white">
-                    ¡No hay categorías en estado crítico!
-                  </p>
-                  <p className="text-[11px] text-slate-400">
-                    Todos los gastos se mantienen por debajo del umbral del {alertThreshold}%.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="p-3 sm:p-4 bg-slate-50/90 dark:bg-purple-950/40 border-t border-slate-100 dark:border-purple-900/30 flex items-center justify-between gap-2">
-              {onOpenBudgetModal && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenBudgetModal();
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/50 dark:hover:bg-purple-900 text-[#7928CA] dark:text-purple-300 text-xs font-bold transition-colors cursor-pointer"
-                >
-                  <Sliders className="w-3.5 h-3.5" />
-                  <span>Ajustar umbral y límites</span>
-                </button>
-              )}
-
-              <div className="flex items-center gap-2 ml-auto">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-1.5 rounded-xl bg-slate-200/80 hover:bg-slate-300 dark:bg-purple-950 dark:hover:bg-purple-900 text-slate-700 dark:text-slate-300 text-xs font-bold transition-colors cursor-pointer"
-                >
-                  Cerrar
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
+          </div>
+        </motion.div>
+      </div>
     </AnimatePresence>
   );
 };

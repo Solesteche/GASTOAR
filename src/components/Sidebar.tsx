@@ -2,7 +2,6 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { 
   LayoutDashboard, 
-  User, 
   Users, 
   FolderPlus, 
   Sliders, 
@@ -112,7 +111,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'goals', label: 'Metas & Cajas', icon: Target, badge: null },
     { id: 'categories', label: 'Categorías y Subcategorías', icon: FolderPlus, badge: null },
     { id: 'ai', label: 'Gasto por Voz', icon: Mic, badge: 'IA', isModal: true },
-    { id: 'profile', label: 'Mi Perfil', icon: User, badge: null },
     { id: 'settings', label: 'Configuración', icon: Settings, badge: null },
     { id: 'subscriptions', label: 'Suscripción PRO', icon: BadgePercent, badge: 'PRO' },
   ];
@@ -334,14 +332,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onOpenProfileModal();
                   onCloseMobile();
                 }}
-                className={`flex items-center space-x-2 min-w-0 text-left cursor-pointer group ${!isPinned ? 'md:hidden' : ''}`}
-                title="Ver Mi Cuenta, Contraseña, Plan y Ajustes"
+                className={`flex items-center space-x-2 min-w-0 text-left cursor-pointer group ${!isPinned ? 'md:justify-center' : ''}`}
+                title={`Mi Perfil: ${currentUserName} (Tocar para ver perfil, contraseña y ajustes)`}
               >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#7928CA] to-[#F95420] text-white font-bold flex items-center justify-center text-xs shrink-0 shadow-xs border border-white group-hover:scale-105 transition-transform">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#7928CA] to-[#F95420] text-white font-bold flex items-center justify-center text-xs shrink-0 shadow-xs border border-white group-hover:scale-110 transition-transform">
                   {currentUserName.charAt(0).toUpperCase()}
                 </div>
-                <div className="truncate">
+                {isPinned && (
+                  <div className="truncate hidden md:block">
+                    <p className="text-xs font-bold text-slate-900 truncate group-hover:text-purple-900">{currentUserName}</p>
+                    <p className="text-[10px] text-purple-600 font-medium">Mi Perfil</p>
+                  </div>
+                )}
+                <div className="truncate md:hidden">
                   <p className="text-xs font-bold text-slate-900 truncate group-hover:text-purple-900">{currentUserName}</p>
+                  <p className="text-[10px] text-purple-600 font-medium">Mi Perfil</p>
                 </div>
               </button>
 

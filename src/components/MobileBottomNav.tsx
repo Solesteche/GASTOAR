@@ -16,7 +16,6 @@ import {
   CalendarClock,
   X,
   Mic,
-  User,
   Settings,
   BadgePercent,
   TrendingUp,
@@ -189,16 +188,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                   <Mic className="w-4.5 h-4.5" />
                 </div>
                 <span>Gasto por Voz</span>
-              </button>
-
-              <button
-                onClick={() => handleMoreItemClick('profile')}
-                className="p-3 rounded-2xl border bg-slate-50 border-slate-200 text-slate-700 flex flex-col items-center gap-1.5 transition-all cursor-pointer"
-              >
-                <div className="w-9 h-9 rounded-xl bg-purple-100 text-[#7928CA] flex items-center justify-center">
-                  <User className="w-4.5 h-4.5" />
-                </div>
-                <span>Mi Perfil</span>
               </button>
 
               <button

@@ -32,7 +32,8 @@ import { Budgets, Transaction, UserAccount } from '../types';
 
 // 1. Initialize Firebase App and Firestore with required firestoreDatabaseId
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const databaseId = (firebaseConfig as any).firestoreDatabaseId;
+export const db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
 export const auth = getAuth(app);
 
 // Forzar la persistencia local en el navegador/dispositivo para acelerar y mantener el inicio de sesión
@@ -41,6 +42,28 @@ setPersistence(auth, browserLocalPersistence).catch((error) => {
 });
 
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope('https://www.googleapis.com/auth/calendar.events');
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
+
+let cachedAccessToken: string | null = null;
+let isSigningIn = false;
+
+export const getAccessToken = async (): Promise<string | null> => {
+  return cachedAccessToken;
+};
+
+export const setCachedAccessToken = (token: string | null) => {
+  cachedAccessToken = token;
+};
+
+onAuthStateChanged(auth, (user) => {
+  if (!user) {
+    cachedAccessToken = null;
+  }
+});
+
 export { onAuthStateChanged, setPersistence, browserLocalPersistence };
 
 // 2. Error Handler with strict FirestoreErrorInfo JSON serialization
@@ -468,17 +491,81 @@ export async function sendPasswordResetFirebase(email: string): Promise<void> {
  */
 export async function signInWithGoogle(): Promise<FirebaseUser | null> {
   try {
+    isSigningIn = true;
     const result = await signInWithPopup(auth, googleProvider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (credential?.accessToken) {
+      cachedAccessToken = credential.accessToken;
+    }
     return result.user;
   } catch (error) {
     console.error('Error in signInWithGoogle:', error);
     throw error;
+  } finally {
+    isSigningIn = false;
   }
+}
+
+/**
+ * Solicita o reutiliza el token de acceso para Google Calendar
+ */
+export async function requestGoogleCalendarAccessToken(): Promise<string> {
+  if (cachedAccessToken) {
+    return cachedAccessToken;
+  }
+
+  try {
+    isSigningIn = true;
+    const result = await signInWithPopup(auth, googleProvider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (credential?.accessToken) {
+      cachedAccessToken = credential.accessToken;
+      return credential.accessToken;
+    }
+  } catch (err: any) {
+    console.warn('Firebase popup calendar auth:', err);
+    if (err?.code === 'auth/popup-closed-by-user') {
+      throw new Error('La ventana de autorización de Google fue cerrada antes de completar el permiso.');
+    }
+  } finally {
+    isSigningIn = false;
+  }
+
+  if (typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2) {
+    const clientId = firebaseConfig?.oAuthClientId || '680075201806-lgen61pj6kgv1q9otflvuanfkj6ckskg.apps.googleusercontent.com';
+    return new Promise((resolve, reject) => {
+      try {
+        const client = (window as any).google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'https://www.googleapis.com/auth/calendar.events',
+          callback: (res: any) => {
+            if (res && res.access_token) {
+              cachedAccessToken = res.access_token;
+              resolve(res.access_token);
+            } else if (res && res.error) {
+              reject(new Error(res.error));
+            } else {
+              reject(new Error('No se pudo obtener el token de acceso de Google'));
+            }
+          },
+          error_callback: (err: any) => {
+            reject(new Error(err?.message || 'Error en Google Identity Services'));
+          }
+        });
+        client.requestAccessToken({ prompt: 'consent' });
+      } catch (gisError) {
+        reject(gisError);
+      }
+    });
+  }
+
+  throw new Error('No se pudo obtener acceso a Google Calendar. Por favor autoriza la conexión con Google.');
 }
 
 /**
  * Cerrar sesión
  */
 export async function logOutFirebase(): Promise<void> {
+  cachedAccessToken = null;
   await firebaseSignOut(auth);
 }

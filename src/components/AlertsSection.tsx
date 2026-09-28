@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Bell, BellRing, Building2, Calendar, CalendarClock, Check,
+  Bell, BellRing, Building2, Calendar, CalendarClock, CalendarPlus, Check,
   CheckCircle2, ChevronLeft, ChevronRight, Clock, Copy,
-  CreditCard, Droplets, Edit3, FileText, Flame, HeartPulse, Home, Landmark,
-  MoreHorizontal, Plus, Search, Trash2, Tv, Wifi, X, Zap, Volume2, AlertTriangle
+  CreditCard, Download, Droplets, Edit3, ExternalLink, FileText, Flame, HeartPulse, Home, Landmark,
+  MoreHorizontal, Plus, Search, Trash2, Tv, Wifi, X, Zap, Volume2, AlertTriangle, Sparkles
 } from 'lucide-react';
 import { CoupleProfile, Transaction } from '../types';
 import { formatCurrency } from '../utils/formatters';
@@ -15,6 +15,10 @@ import {
   convertDueDayToDateStr,
   calculateHoursUntilDue,
 } from '../services/localNotificationService';
+import { CalendarExportModal } from './CalendarExportModal';
+import { GoogleCalendarSyncModal } from './GoogleCalendarSyncModal';
+import { AppleCalendarSyncModal } from './AppleCalendarSyncModal';
+import { generateVencimientosICS, downloadICS, openInAppleCalendar, isIOS } from '../utils/icsExport';
 
 export type AlertItemCategory = 'tarjeta' | 'alquiler' | 'expensas' | 'servicio' | 'impuesto' | 'suscripcion' | 'salud' | 'otro';
 
@@ -134,6 +138,29 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   const [calendarYear, setCalendarYear] = useState(currentYear);
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<number>(currentDay);
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => localStorage.getItem('gastoar_vencimientos_notif_v1') === 'true');
+  const [isCalendarExportModalOpen, setIsCalendarExportModalOpen] = useState(false);
+  const [isGoogleCalendarModalOpen, setIsGoogleCalendarModalOpen] = useState(false);
+  const [isAppleCalendarModalOpen, setIsAppleCalendarModalOpen] = useState(false);
+
+  const handleDirectExportICS = (onlyPending = true) => {
+    const targetItems = onlyPending ? items.filter(i => !i.paidThisMonth) : items;
+    if (targetItems.length === 0) {
+      onShowToast('No hay pagos pendientes para exportar.', 'info');
+      return;
+    }
+    try {
+      const ics = generateVencimientosICS(items, {
+        currency: profile.currency,
+        onlyPending,
+        calendarName: 'Vencimientos Pendientes - GastoAR'
+      });
+      downloadICS(ics, onlyPending ? 'vencimientos_pendientes_gastoar.ics' : 'todos_vencimientos_gastoar.ics');
+      onShowToast(`✓ ${targetItems.length} pagos pendientes exportados a .ics`, 'success');
+    } catch (e) {
+      console.error(e);
+      onShowToast('Error al generar el archivo .ics', 'error');
+    }
+  };
 
   const [formCategory, setFormCategory] = useState<AlertItemCategory>('servicio');
   const [formName, setFormName] = useState('');
@@ -536,6 +563,67 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
               )}
               <button
                 type="button"
+                onClick={() => setIsGoogleCalendarModalOpen(true)}
+                className="px-3 py-2.5 rounded-xl border border-blue-200 text-blue-700 bg-blue-50/70 hover:bg-blue-100 text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 transition-colors"
+                title="Sincronizar en Google Calendar automáticamente"
+              >
+                <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 40 40">
+                  <rect width="40" height="40" rx="8" fill="#FFFFFF"/>
+                  <path d="M28 8H12C9.79 8 8 9.79 8 12V28C8 30.21 9.79 32 12 32H28C30.21 32 32 30.21 32 28V12C32 9.79 30.21 8 28 8Z" fill="#FFFFFF"/>
+                  <path d="M28 8H12C9.79 8 8 9.79 8 12V15H32V12C32 9.79 30.21 8 28 8Z" fill="#1A73E8"/>
+                  <circle cx="13" cy="11.5" r="1.5" fill="#FFFFFF"/>
+                  <circle cx="27" cy="11.5" r="1.5" fill="#FFFFFF"/>
+                  <text x="20" y="26" fontSize="11" fontWeight="900" fill="#1A73E8" textAnchor="middle" fontFamily="sans-serif">
+                    31
+                  </text>
+                </svg>
+                <span>Google Cal</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    openInAppleCalendar([item], { currency: profile.currency, onlyPending: false });
+                    onShowToast(`✓ Vencimiento "${item.name}" abierto para Apple Calendar`, 'success');
+                  } catch (e) {
+                    console.error(e);
+                    onShowToast('Error al exportar a Apple Calendar', 'error');
+                  }
+                }}
+                className="px-3 py-2.5 rounded-xl border border-rose-200 text-rose-700 bg-rose-50/70 hover:bg-rose-100 text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 transition-colors"
+                title="Añadir este pago a Apple Calendar (iOS / iPhone / Mac)"
+              >
+                <div className="w-3.5 h-3.5 rounded bg-white flex flex-col items-center justify-center overflow-hidden shrink-0 border border-slate-200">
+                  <div className="w-full bg-[#FF3B30] text-[4px] leading-none py-0.2" />
+                  <span className="text-[7px] font-black text-slate-900 leading-none">{item.dueDay}</span>
+                </div>
+                <span>Apple Cal</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    const ics = generateVencimientosICS([item], {
+                      currency: profile.currency,
+                      onlyPending: false,
+                      calendarName: `Pago: ${item.name} - GastoAR`
+                    });
+                    const safeName = item.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                    downloadICS(ics, `vencimiento_${safeName}.ics`);
+                    onShowToast(`✓ Vencimiento "${item.name}" exportado a .ics para tu calendario`, 'success');
+                  } catch (e) {
+                    console.error(e);
+                    onShowToast('Error al exportar este pago', 'error');
+                  }
+                }}
+                className="px-3 py-2.5 rounded-xl border border-purple-200 text-purple-700 bg-purple-50/70 hover:bg-purple-100 text-xs font-bold cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-colors"
+                title="Exportar este pago a Google Calendar / Apple Calendar (.ics)"
+              >
+                <CalendarPlus className="w-3.5 h-3.5 text-purple-600" />
+                <span>Exportar .ics</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => openEdit(item)}
                 className="px-3 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold cursor-pointer flex items-center justify-center gap-1 active:scale-95"
               >
@@ -697,48 +785,48 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   return (
     <div className="space-y-4 max-w-xl mx-auto pb-28 sm:pb-8">
       {/* 1. Header Card (Hero) */}
-      <section className="bg-gradient-to-br from-[#2E0854] via-[#45108A] to-[#6F2EC5] text-white rounded-3xl p-4 sm:p-5 shadow-lg shadow-purple-950/20 border border-purple-400/20 space-y-3.5 relative overflow-hidden">
+      <section className="bg-gradient-to-br from-[#6D28D9] via-[#7C3AED] to-[#8B5CF6] text-white rounded-3xl p-3 sm:p-5 shadow-md shadow-purple-600/15 border border-purple-300/30 space-y-2.5 sm:space-y-3.5 relative overflow-hidden">
         {/* Ambient decorative glow */}
-        <div className="absolute -right-8 -top-8 w-36 h-36 bg-[#F95420]/15 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute -left-8 -bottom-8 w-36 h-36 bg-[#7928CA]/30 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -right-8 -top-8 w-36 h-36 bg-[#F95420]/20 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -left-8 -bottom-8 w-36 h-36 bg-pink-400/20 rounded-full blur-2xl pointer-events-none" />
 
         {/* Top row: Icon + Title + Subtitle */}
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-xs flex items-center justify-center shrink-0">
+        <div className="relative z-10 flex items-center gap-2.5 sm:gap-3">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/15 border border-white/25 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-xs">
             <div className="relative">
-              <CalendarClock className="w-6 h-6 text-white" />
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-[#F95420] rounded-full ring-2 ring-[#2E0854]" />
+              <CalendarClock className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-[#F95420] rounded-full ring-2 ring-[#7C3AED]" />
             </div>
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-tight">Vencimientos</h1>
-            <p className="text-xs text-purple-200 font-normal mt-0.5">Organizá tus pagos y evitá recargos.</p>
+            <h1 className="text-lg sm:text-2xl font-black text-white tracking-tight leading-tight">Vencimientos</h1>
+            <p className="text-xs text-purple-100 font-normal mt-0.5">Organizá tus pagos y evitá recargos.</p>
           </div>
         </div>
 
-        {/* Second row: Avisos, Calendario & Flujo Pro pills */}
-        <div className={`relative z-10 grid ${onOpenCashFlow ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
+        {/* Second row: Avisos, Calendario, Google Cal, Apple Cal, Exportar .ics & Flujo Pro pills */}
+        <div className={`relative z-10 grid ${onOpenCashFlow ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'} gap-1.5 sm:gap-2`}>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={toggleNotifications}
-              className={`flex-1 py-2.5 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
+              className={`flex-1 py-2 px-2 sm:py-2.5 sm:px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 ${
                 notificationsEnabled 
-                  ? 'border-white/30 bg-white/20 text-white shadow-xs' 
-                  : 'border-white/15 bg-white/10 text-white hover:bg-white/15'
+                  ? 'border-white/40 bg-white/25 text-white shadow-xs' 
+                  : 'border-white/20 bg-white/10 text-white hover:bg-white/15'
               }`}
             >
-              {notificationsEnabled ? <BellRing className="w-4 h-4 text-[#FFA785]" /> : <Bell className="w-4 h-4 text-purple-200" />}
+              {notificationsEnabled ? <BellRing className="w-3.5 h-3.5 text-[#FFA785]" /> : <Bell className="w-3.5 h-3.5 text-purple-100" />}
               <span className="truncate">{notificationsEnabled ? 'Avisos (<48h)' : 'Avisos'}</span>
             </button>
             {notificationsEnabled && (
               <button
                 type="button"
                 onClick={handleTestNotification}
-                className="py-2.5 px-2 rounded-xl border border-white/20 bg-white/10 text-white hover:bg-white/20 text-xs font-bold flex items-center justify-center shrink-0 cursor-pointer active:scale-95"
+                className="py-2 px-2 sm:py-2.5 sm:px-2 rounded-xl border border-white/20 bg-white/10 text-white hover:bg-white/20 text-xs font-bold flex items-center justify-center shrink-0 cursor-pointer active:scale-95"
                 title="Probar sonido y notificación local de 48 hs"
               >
-                <Volume2 className="w-4 h-4 text-amber-200" />
+                <Volume2 className="w-3.5 h-3.5 text-amber-200" />
               </button>
             )}
           </div>
@@ -746,24 +834,74 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
           <button
             type="button"
             onClick={() => setActiveView(activeView === 'calendario' ? 'proximos' : 'calendario')}
-            className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 ${
+            className={`py-2 px-2 sm:py-2.5 sm:px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
               activeView === 'calendario'
-                ? 'border-white/40 bg-white/25 text-white shadow-xs'
-                : 'border-white/15 bg-white/10 text-white hover:bg-white/15'
+                ? 'border-white/50 bg-white/30 text-white shadow-xs'
+                : 'border-white/20 bg-white/10 text-white hover:bg-white/15'
             }`}
           >
-            <Calendar className="w-4 h-4 text-white" />
+            <Calendar className="w-3.5 h-3.5 text-white" />
             <span className="truncate">Calendario</span>
+          </button>
+
+          {/* Sincronizar Google Calendar */}
+          <button
+            type="button"
+            onClick={() => setIsGoogleCalendarModalOpen(true)}
+            className="py-2 px-2 sm:py-2.5 sm:px-2.5 rounded-xl border border-blue-300/40 bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs"
+            title="Sincronizar pagos con Google Calendar automáticamente"
+          >
+            <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 40 40">
+              <rect width="40" height="40" rx="8" fill="#FFFFFF"/>
+              <path d="M28 8H12C9.79 8 8 9.79 8 12V28C8 30.21 9.79 32 12 32H28C30.21 32 32 30.21 32 28V12C32 9.79 30.21 8 28 8Z" fill="#FFFFFF"/>
+              <path d="M28 8H12C9.79 8 8 9.79 8 12V15H32V12C32 9.79 30.21 8 28 8Z" fill="#1A73E8"/>
+              <circle cx="13" cy="11.5" r="1.5" fill="#FFFFFF"/>
+              <circle cx="27" cy="11.5" r="1.5" fill="#FFFFFF"/>
+              <text x="20" y="26" fontSize="11" fontWeight="900" fill="#1A73E8" textAnchor="middle" fontFamily="sans-serif">
+                31
+              </text>
+            </svg>
+            <span className="truncate">Google Cal</span>
+            {stats.pendingCount > 0 && (
+              <span className="px-1.5 py-0.2 bg-blue-400/40 text-blue-100 rounded-md text-[10px] font-black">
+                {stats.pendingCount}
+              </span>
+            )}
+          </button>
+
+          {/* Apple Calendar (iOS) */}
+          <button
+            type="button"
+            onClick={() => setIsAppleCalendarModalOpen(true)}
+            className="py-2 px-2 sm:py-2.5 sm:px-2.5 rounded-xl border border-rose-300/40 bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs"
+            title="Sincronizar con Apple Calendar (iPhone / iPad / Mac)"
+          >
+            <div className="w-3.5 h-3.5 rounded bg-white flex flex-col items-center justify-center overflow-hidden shrink-0">
+              <div className="w-full bg-[#FF3B30] text-[4px] leading-none py-0.2" />
+              <span className="text-[7px] font-black text-slate-900 leading-none">{new Date().getDate()}</span>
+            </div>
+            <span className="truncate">Apple Cal</span>
+          </button>
+
+          {/* Exportar a Calendar (.ics) */}
+          <button
+            type="button"
+            onClick={() => setIsCalendarExportModalOpen(true)}
+            className="py-2 px-2 sm:py-2.5 sm:px-2.5 rounded-xl border border-amber-300/40 bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs"
+            title="Exportar pagos pendientes a un archivo .ics para Google Calendar o Apple Calendar"
+          >
+            <CalendarPlus className="w-3.5 h-3.5 text-amber-200" />
+            <span className="truncate">Exportar .ics</span>
           </button>
 
           {onOpenCashFlow && (
             <button
               type="button"
               onClick={onOpenCashFlow}
-              className="py-2.5 px-2 rounded-xl border border-purple-300/40 bg-gradient-to-r from-purple-500/30 to-pink-500/30 hover:bg-white/25 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95"
+              className="py-2 px-2 sm:py-2.5 sm:px-2 rounded-xl border border-purple-200/40 bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
               title="Proyección de Flujo de Caja Pro"
             >
-              <span className="text-amber-300">🔮</span>
+              <span className="text-amber-200">🔮</span>
               <span className="truncate">Flujo Pro</span>
             </button>
           )}
@@ -773,9 +911,9 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
         <button
           type="button"
           onClick={() => openCreate()}
-          className="relative z-10 w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#F95420] via-[#FF6B3D] to-[#FA541C] hover:from-[#E04412] hover:to-[#F95420] text-white text-sm font-black flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 active:scale-[0.98] transition-all cursor-pointer"
+          className="relative z-10 w-full py-2.5 sm:py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#F95420] via-[#FF6B3D] to-[#FA541C] hover:from-[#E04412] hover:to-[#F95420] text-white text-xs sm:text-sm font-black flex items-center justify-center gap-2 shadow-md shadow-orange-500/20 active:scale-[0.98] transition-all cursor-pointer"
         >
-          <Plus className="w-5 h-5 stroke-[2.5]" />
+          <Plus className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
           <span>Nuevo vencimiento</span>
         </button>
       </section>
@@ -834,20 +972,29 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
         </button>
 
         {/* Card 2: PENDIENTES */}
-        <div className="bg-[#F5F7FF] border border-[#E4E9FC] rounded-2xl p-3 sm:p-4">
+        <button
+          type="button"
+          onClick={() => setIsCalendarExportModalOpen(true)}
+          className="text-left bg-[#F5F7FF] border border-[#E4E9FC] rounded-2xl p-3 sm:p-4 cursor-pointer hover:border-indigo-300 transition-all active:scale-[0.98] group"
+          title="Click para exportar pagos pendientes a Google Calendar o Apple Calendar (.ics)"
+        >
           <div className="flex items-center justify-between">
             <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-[#4F6BE8]">
               PENDIENTES
             </span>
-            <FileText className="w-4 h-4 text-[#4F6BE8] shrink-0" />
+            <div className="flex items-center gap-1 text-[#4F6BE8]">
+              <CalendarPlus className="w-3.5 h-3.5 opacity-80 group-hover:scale-110 transition-transform" />
+              <FileText className="w-4 h-4 shrink-0" />
+            </div>
           </div>
           <div className="mt-1 sm:mt-2 text-xs sm:text-base font-black text-slate-900 leading-tight truncate">
             {formatCurrency(stats.pendingAmount, profile.currency)}
           </div>
-          <p className="text-[10px] sm:text-[11px] text-slate-500 mt-0.5 truncate">
-            {stats.pendingCount} {stats.pendingCount === 1 ? 'pago' : 'pagos'}
+          <p className="text-[10px] sm:text-[11px] text-[#4F6BE8] font-bold mt-0.5 truncate flex items-center justify-between">
+            <span>{stats.pendingCount} {stats.pendingCount === 1 ? 'pago' : 'pagos'}</span>
+            <span className="text-[9px] underline">.ics ➔</span>
           </p>
-        </div>
+        </button>
 
         {/* Card 3: PAGADOS */}
         <button
@@ -943,6 +1090,62 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
             )}
           </div>
 
+          {/* Calendar Sync Banner */}
+          {stats.pendingCount > 0 && activeView !== 'pagados' && (
+            <div className="bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-purple-50/70 border border-blue-200/80 rounded-2xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-white border border-blue-200 text-blue-600 flex items-center justify-center shrink-0 shadow-2xs">
+                  <Calendar className="w-4.5 h-4.5 text-blue-600" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-xs font-black text-slate-900 truncate">
+                      Sincronizá tus vencimientos en tu calendario
+                    </p>
+                    <span className="text-[9px] bg-blue-600 text-white font-extrabold uppercase px-1.5 py-0.2 rounded-full">
+                      Auto-Sync
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 truncate mt-0.5">
+                    {stats.pendingCount} {stats.pendingCount === 1 ? 'pago pendiente' : 'pagos pendientes'} con alarmas automáticas en Google y Apple Calendar.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setIsGoogleCalendarModalOpen(true)}
+                  className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1 shadow-2xs cursor-pointer active:scale-95 transition-all"
+                  title="Sincronizar con Google Calendar"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Google Cal</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAppleCalendarModalOpen(true)}
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95 transition-all"
+                  title="Añadir a Apple Calendar (iOS / iPhone / Mac)"
+                >
+                  <div className="w-3.5 h-3.5 rounded bg-white flex flex-col items-center justify-center overflow-hidden shrink-0">
+                    <div className="w-full bg-[#FF3B30] text-[4px] leading-none py-0.2" />
+                    <span className="text-[7px] font-black text-slate-900 leading-none">{new Date().getDate()}</span>
+                  </div>
+                  <span>Apple Cal</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCalendarExportModalOpen(true)}
+                  className="px-2 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Descargar archivo manual .ics"
+                >
+                  <Download className="w-3 h-3 text-slate-500" />
+                  <span>.ics</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* 6. List of Items */}
           <section className="space-y-2.5">
             {/* List Heading */}
@@ -950,14 +1153,67 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
               <h2 className="text-sm sm:text-base font-black text-slate-900">
                 {activeView === 'pagados' ? 'Pagados este mes' : activeView === 'todos' ? 'Todos los vencimientos' : 'Próximos vencimientos'}
               </h2>
-              <button
-                type="button"
-                onClick={() => setActiveView('todos')}
-                className="text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-0.5 cursor-pointer"
-              >
-                <span>Ver todos</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {stats.pendingCount > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsGoogleCalendarModalOpen(true)}
+                      className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-2xs"
+                      title="Sincronizar pagos con Google Calendar"
+                    >
+                      <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 40 40">
+                        <rect width="40" height="40" rx="8" fill="#FFFFFF"/>
+                        <path d="M28 8H12C9.79 8 8 9.79 8 12V28C8 30.21 9.79 32 12 32H28C30.21 32 32 30.21 32 28V12C32 9.79 30.21 8 28 8Z" fill="#FFFFFF"/>
+                        <path d="M28 8H12C9.79 8 8 9.79 8 12V15H32V12C32 9.79 30.21 8 28 8Z" fill="#1A73E8"/>
+                        <circle cx="13" cy="11.5" r="1.5" fill="#FFFFFF"/>
+                        <circle cx="27" cy="11.5" r="1.5" fill="#FFFFFF"/>
+                        <text x="20" y="26" fontSize="11" fontWeight="900" fill="#1A73E8" textAnchor="middle" fontFamily="sans-serif">
+                          31
+                        </text>
+                      </svg>
+                      <span className="hidden sm:inline">Google Cal</span>
+                      <span className="sm:hidden">GCal</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsAppleCalendarModalOpen(true)}
+                      className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-2xs"
+                      title="Añadir a Apple Calendar (iOS / iPhone / Mac)"
+                    >
+                      <div className="w-3.5 h-3.5 rounded bg-white flex flex-col items-center justify-center overflow-hidden shrink-0 border border-slate-200">
+                        <div className="w-full bg-[#FF3B30] text-[4px] leading-none py-0.2" />
+                        <span className="text-[7px] font-black text-slate-900 leading-none">{new Date().getDate()}</span>
+                      </div>
+                      <span className="hidden sm:inline">Apple Cal</span>
+                      <span className="sm:hidden">Apple</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsCalendarExportModalOpen(true)}
+                      className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#F95420] border border-orange-200 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-2xs"
+                      title="Exportar pagos pendientes a un archivo .ics para Google Calendar o Apple Calendar"
+                    >
+                      <CalendarPlus className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Exportar .ics</span>
+                      <span className="sm:hidden">.ics</span>
+                      <span className="px-1.5 py-0.2 rounded-full bg-[#F95420] text-white text-[10px] font-black">
+                        {stats.pendingCount}
+                      </span>
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveView('todos')}
+                  className="text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-0.5 cursor-pointer"
+                >
+                  <span>Ver todos</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             {filteredItems.length ? (
@@ -1282,6 +1538,44 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
           </div>
         </div>
       )}
+
+      {/* Calendar Export Modal (.ics for Google Calendar and Apple Calendar) */}
+      <CalendarExportModal
+        isOpen={isCalendarExportModalOpen}
+        onClose={() => setIsCalendarExportModalOpen(false)}
+        items={items}
+        currency={profile.currency}
+        onShowToast={onShowToast}
+        onOpenGoogleCalendarSync={() => setIsGoogleCalendarModalOpen(true)}
+        onOpenAppleCalendarSync={() => setIsAppleCalendarModalOpen(true)}
+      />
+
+      {/* Google Calendar Direct Automated Sync Modal */}
+      <GoogleCalendarSyncModal
+        isOpen={isGoogleCalendarModalOpen}
+        onClose={() => setIsGoogleCalendarModalOpen(false)}
+        items={items}
+        currency={profile.currency}
+        onShowToast={onShowToast}
+        onSyncComplete={() => {
+          try {
+            const saved = localStorage.getItem('gastoar_vencimientos_alerts_v5');
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              if (Array.isArray(parsed)) setItems(parsed);
+            }
+          } catch {}
+        }}
+      />
+
+      {/* Apple Calendar (iOS / iPhone / Mac) Native Sync Modal */}
+      <AppleCalendarSyncModal
+        isOpen={isAppleCalendarModalOpen}
+        onClose={() => setIsAppleCalendarModalOpen(false)}
+        items={items}
+        currency={profile.currency}
+        onShowToast={onShowToast}
+      />
     </div>
   );
 };

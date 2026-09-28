@@ -2086,6 +2086,7 @@ export default function App() {
                 categoryColors={categoryColors}
                 categoryMap={categoryMap}
                 budgets={budgets}
+                goals={goals}
                 isDemoMode={isDemoMode}
                 activeMode={activeMode}
                 onModeChange={handleModeChange}

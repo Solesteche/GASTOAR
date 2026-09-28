@@ -1898,7 +1898,7 @@ export default function App() {
         profile={profile}
         onOpenTransactionModal={() => { setEditingTransaction(null); setInitialIsCuotas(false); setTxModalInitialType('gasto'); setIsTxModalOpen(true); }}
         onOpenIncomeModal={() => setIsIncomeModalOpen(true)}
-        onOpenProfileModal={() => setActiveTab('profile')}
+        onOpenProfileModal={() => setIsProfileModalOpen(true)}
         onOpenCategoryModal={() => setIsCategoryModalOpen(true)}
         onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
         onOpenAiModal={() => setIsAiModalOpen(true)}
@@ -1929,7 +1929,7 @@ export default function App() {
             setIsTxModalOpen(true); 
           }}
           onOpenIncomeModal={() => setIsIncomeModalOpen(true)}
-          onOpenProfileModal={() => setActiveTab('profile')}
+          onOpenProfileModal={() => setIsProfileModalOpen(true)}
           onOpenAiModal={() => setIsAiModalOpen(true)}
           onNavigateHome={() => setActiveTab('dashboard')}
           onToggleSidebar={() => setIsSidebarOpenMobile(prev => !prev)}
@@ -2122,6 +2122,7 @@ export default function App() {
                 categoryColors={categoryColors}
                 categoryMap={categoryMap}
                 budgets={budgets}
+                goals={goals}
                 isDemoMode={isDemoMode}
                 activeMode={activeMode}
                 onModeChange={handleModeChange}
@@ -2267,6 +2268,8 @@ export default function App() {
           {activeTab === 'profile' && (
             <div className="max-w-md mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-purple-100">
               <ProfileScreen
+                onBack={() => setActiveTab('dashboard')}
+                onClose={() => setActiveTab('dashboard')}
                 userAccount={currentUserAccount}
                 profile={profile}
                 subscription={activeUserSub}
