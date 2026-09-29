@@ -1375,13 +1375,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* 4.5 BOTONES DE ACCIONES RÁPIDAS (SEGÚN DISEÑO)                      */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-5 border border-purple-100/80 dark:border-purple-900/40 shadow-xs transition-all">
+      <div className="bg-white rounded-3xl p-4 sm:p-5 border border-purple-100/80 shadow-xs transition-all">
         {/* Cabecera: ACCIONES RÁPIDAS con línea divisoria */}
         <div className="flex items-center gap-2.5 mb-3 sm:mb-4">
-          <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-[#6D3FEA] dark:text-purple-400 select-none">
+          <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-[#6D3FEA] select-none">
             ACCIONES RÁPIDAS
           </span>
-          <div className="flex-1 h-px bg-purple-100 dark:bg-purple-900/40" />
+          <div className="flex-1 h-px bg-purple-100" />
         </div>
 
         {/* 4 Cajas de Acciones Rápidas (según diseño exacto de imagen) */}
@@ -1394,21 +1394,21 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               if (onNavigateTab) onNavigateTab('installments');
               else setIsInstallmentsModalOpen(true);
             }}
-            className="flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl bg-[#F6F2FF] hover:bg-[#F0EAFF] dark:bg-purple-950/40 dark:hover:bg-purple-950/60 border border-[#ECE4FD] dark:border-purple-800/40 shadow-2xs hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer group text-left select-none"
+            className="flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl bg-[#F6F2FF] hover:bg-[#F0EAFF] border border-[#ECE4FD] shadow-2xs hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer group text-left select-none"
             title="Ver compras y gastos en cuotas"
           >
             {/* Top row: Squircle icon on left, Chevron circle on right */}
             <div className="flex items-center justify-between w-full">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#EAE0FE] dark:bg-purple-900/60 flex items-center justify-center text-[#6D3FEA] dark:text-purple-300 shadow-2xs group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#EAE0FE] flex items-center justify-center text-[#6D3FEA] shadow-2xs group-hover:scale-105 transition-transform">
                 <CreditCard className="w-5 h-5 stroke-[2]" />
               </div>
-              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#EAE0FE]/70 dark:bg-purple-900/50 flex items-center justify-center text-[#6D3FEA] dark:text-purple-300 shadow-2xs group-hover:translate-x-0.5 transition-transform">
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#EAE0FE]/70 flex items-center justify-center text-[#6D3FEA] shadow-2xs group-hover:translate-x-0.5 transition-transform">
                 <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
               </div>
             </div>
 
             {/* Bottom: Label */}
-            <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white mt-3 sm:mt-4 leading-tight">
+            <span className="text-xs sm:text-sm font-bold text-slate-900 mt-3 sm:mt-4 leading-tight">
               Cuotas
             </span>
           </button>
@@ -1420,21 +1420,21 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               if (onNavigateTab) onNavigateTab('goals');
               else setIsGoalsModalOpen(true);
             }}
-            className="flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl bg-[#FFF9ED] hover:bg-[#FFF3DF] dark:bg-amber-950/30 dark:hover:bg-amber-950/50 border border-[#FEEFD0] dark:border-amber-900/40 shadow-2xs hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer group text-left select-none"
+            className="flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl bg-[#FFF9ED] hover:bg-[#FFF3DF] border border-[#FEEFD0] shadow-2xs hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer group text-left select-none"
             title="Ver cajas y metas de ahorro"
           >
             {/* Top row: Squircle icon on left, Chevron circle on right */}
             <div className="flex items-center justify-between w-full">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#FEEFD0] dark:bg-amber-900/50 flex items-center justify-center text-[#F97316] dark:text-amber-400 shadow-2xs group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#FEEFD0] flex items-center justify-center text-[#F97316] shadow-2xs group-hover:scale-105 transition-transform">
                 <Target className="w-5 h-5 stroke-[2]" />
               </div>
-              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#FEEFD0]/70 dark:bg-amber-900/50 flex items-center justify-center text-[#F97316] dark:text-amber-400 shadow-2xs group-hover:translate-x-0.5 transition-transform">
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#FEEFD0]/70 flex items-center justify-center text-[#F97316] shadow-2xs group-hover:translate-x-0.5 transition-transform">
                 <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
               </div>
             </div>
 
             {/* Bottom: Label */}
-            <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white mt-3 sm:mt-4 leading-tight">
+            <span className="text-xs sm:text-sm font-bold text-slate-900 mt-3 sm:mt-4 leading-tight">
               Metas
             </span>
           </button>
@@ -1445,21 +1445,21 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             onClick={() => {
               if (onNavigateTab) onNavigateTab('couple_balance');
             }}
-            className="flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl bg-[#FEF2F5] hover:bg-[#FDE8ED] dark:bg-pink-950/30 dark:hover:bg-pink-950/50 border border-[#FCE0E7] dark:border-pink-900/40 shadow-2xs hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer group text-left select-none"
+            className="flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl bg-[#FEF2F5] hover:bg-[#FDE8ED] border border-[#FCE0E7] shadow-2xs hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer group text-left select-none"
             title="Ver balance y quién le debe a quién en pareja (Dúo)"
           >
             {/* Top row: Squircle icon on left, Chevron circle on right */}
             <div className="flex items-center justify-between w-full">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#FCE0E7] dark:bg-pink-900/50 flex items-center justify-center text-[#E11D48] dark:text-pink-400 shadow-2xs group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#FCE0E7] flex items-center justify-center text-[#E11D48] shadow-2xs group-hover:scale-105 transition-transform">
                 <Scale className="w-5 h-5 stroke-[2]" />
               </div>
-              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#FCE0E7]/70 dark:bg-pink-900/50 flex items-center justify-center text-[#E11D48] dark:text-pink-400 shadow-2xs group-hover:translate-x-0.5 transition-transform">
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#FCE0E7]/70 flex items-center justify-center text-[#E11D48] shadow-2xs group-hover:translate-x-0.5 transition-transform">
                 <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
               </div>
             </div>
 
             {/* Bottom: Label */}
-            <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white mt-3 sm:mt-4 leading-tight">
+            <span className="text-xs sm:text-sm font-bold text-slate-900 mt-3 sm:mt-4 leading-tight">
               Balance Duo
             </span>
           </button>
@@ -1470,21 +1470,21 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             onClick={() => {
               if (onOpenSettlementModal) onOpenSettlementModal();
             }}
-            className="flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl bg-[#EDF5FE] hover:bg-[#E3EFFD] dark:bg-blue-950/30 dark:hover:bg-blue-950/50 border border-[#DAEBFC] dark:border-blue-900/40 shadow-2xs hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer group text-left select-none"
+            className="flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl bg-[#EDF5FE] hover:bg-[#E3EFFD] border border-[#DAEBFC] shadow-2xs hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer group text-left select-none"
             title="Liquidar deudas y saldar cuentas en un toque"
           >
             {/* Top row: Squircle icon on left, Chevron circle on right */}
             <div className="flex items-center justify-between w-full">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#DBEAFE] dark:bg-blue-900/50 flex items-center justify-center text-[#2563EB] dark:text-blue-400 shadow-2xs group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#DBEAFE] flex items-center justify-center text-[#2563EB] shadow-2xs group-hover:scale-105 transition-transform">
                 <ArrowLeftRight className="w-5 h-5 stroke-[2]" />
               </div>
-              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#DBEAFE]/70 dark:bg-blue-900/50 flex items-center justify-center text-[#2563EB] dark:text-blue-400 shadow-2xs group-hover:translate-x-0.5 transition-transform">
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#DBEAFE]/70 flex items-center justify-center text-[#2563EB] shadow-2xs group-hover:translate-x-0.5 transition-transform">
                 <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
               </div>
             </div>
 
             {/* Bottom: Label */}
-            <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white mt-3 sm:mt-4 leading-tight">
+            <span className="text-xs sm:text-sm font-bold text-slate-900 mt-3 sm:mt-4 leading-tight">
               Liquidar
             </span>
           </button>
@@ -1495,12 +1495,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* 4.8 PRÓXIMOS VENCIMIENTOS (DISEÑO EXACTO SEGÚN IMAGEN)             */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-5 border border-purple-100/80 dark:border-purple-900/40 shadow-xs transition-all">
+      <div className="bg-white rounded-3xl p-4 sm:p-5 border border-purple-100/80 shadow-xs transition-all">
         {/* Cabecera: Ícono Calendario violeta + Título + Ver todos → */}
-        <div className="flex items-center justify-between mb-2 sm:mb-3 pb-2.5 border-b border-purple-50/70 dark:border-purple-900/30">
+        <div className="flex items-center justify-between mb-2 sm:mb-3 pb-2.5 border-b border-purple-50/70">
           <div className="flex items-center gap-2.5">
             <Calendar className="w-5 h-5 text-[#6D3FEA] stroke-[2.2]" />
-            <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white leading-tight">
+            <h3 className="font-bold text-sm sm:text-base text-slate-900 leading-tight">
               Próximos vencimientos
             </h3>
           </div>
@@ -1508,7 +1508,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <button
               type="button"
               onClick={() => onNavigateTab('card_alerts')}
-              className="text-xs sm:text-sm font-semibold text-[#6D3FEA] hover:text-[#5A2FD1] dark:text-purple-300 dark:hover:text-purple-200 flex items-center gap-1 transition-colors cursor-pointer group"
+              className="text-xs sm:text-sm font-semibold text-[#6D3FEA] hover:text-[#5A2FD1] flex items-center gap-1 transition-colors cursor-pointer group"
             >
               <span>Ver todos</span>
               <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
@@ -1517,12 +1517,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
 
         {/* Lista de vencimientos según el diseño exacto de la imagen */}
-        <div className="divide-y divide-slate-100/80 dark:divide-purple-900/30">
+        <div className="divide-y divide-slate-100/80">
           {upcomingBills.map(bill => (
             <div
               key={bill.id}
               onClick={() => onNavigateTab ? onNavigateTab('card_alerts') : {}}
-              className="py-3 px-1.5 sm:px-2 flex items-center justify-between gap-3 hover:bg-slate-50/70 dark:hover:bg-purple-950/20 rounded-2xl transition-colors cursor-pointer group"
+              className="py-3 px-1.5 sm:px-2 flex items-center justify-between gap-3 hover:bg-slate-50/70 rounded-2xl transition-colors cursor-pointer group"
             >
               {/* Left: Ícono circular pastel + Título y Subtítulo */}
               <div className="flex items-center gap-3 min-w-0">
@@ -1530,10 +1530,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   <span>{bill.icon}</span>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-slate-900 dark:text-white truncate leading-snug">
+                  <p className="text-sm font-bold text-slate-900 truncate leading-snug">
                     {bill.title}
                   </p>
-                  <p className="text-xs text-slate-400 dark:text-slate-400 font-normal truncate mt-0.5">
+                  <p className="text-xs text-slate-400 font-normal truncate mt-0.5">
                     {bill.subtitle}
                   </p>
                 </div>
@@ -1541,10 +1541,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
               {/* Right: Monto + Píldora de fecha lila */}
               <div className="flex items-center gap-3 sm:gap-6 shrink-0">
-                <span className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tabular-nums">
+                <span className="text-sm sm:text-base font-bold text-slate-900 tabular-nums">
                   $ {bill.amount.toLocaleString('es-AR')}
                 </span>
-                <span className="px-3.5 py-1 rounded-full bg-[#F5EEFF] dark:bg-purple-950/60 text-[#7C3AED] dark:text-purple-300 text-xs font-semibold shrink-0 min-w-[66px] text-center shadow-2xs">
+                <span className="px-3.5 py-1 rounded-full bg-[#F5EEFF] text-[#7C3AED] text-xs font-semibold shrink-0 min-w-[66px] text-center shadow-2xs">
                   {bill.dueDateLabel}
                 </span>
               </div>
@@ -1556,12 +1556,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* 5. HERRAMIENTAS PRO: SCORE Y FLUJO DE CAJA (SEGÚN DISEÑO)           */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-5 lg:p-6 border border-slate-200/80 dark:border-purple-900/40 shadow-xs transition-all">
+      <div className="bg-white rounded-3xl p-4 sm:p-5 lg:p-6 border border-slate-200/80 shadow-xs transition-all">
         {/* Cabecera del contenedor: Herramientas PRO               Ver más → */}
         <div className="flex items-center justify-between mb-3.5 sm:mb-4">
           <div className="flex items-center gap-2">
             <h3 className="text-base sm:text-lg font-black tracking-tight">
-              <span className="text-slate-900 dark:text-white">Herramientas </span>
+              <span className="text-slate-900">Herramientas </span>
               <span className="text-[#6D3FEA]">PRO</span>
             </h3>
           </div>
@@ -1571,7 +1571,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               if (onUpgradeToPro) onUpgradeToPro();
               else setIsCashFlowModalOpen(true);
             }}
-            className="text-[#6D3FEA] hover:text-[#5A2FD1] dark:text-purple-300 dark:hover:text-purple-200 text-xs sm:text-sm font-bold flex items-center gap-1 transition-colors cursor-pointer group"
+            className="text-[#6D3FEA] hover:text-[#5A2FD1] text-xs sm:text-sm font-bold flex items-center gap-1 transition-colors cursor-pointer group"
           >
             <span>Ver más</span>
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
@@ -1584,7 +1584,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           {/* Card 1: Score Financiero */}
           <div
             onClick={() => setIsScoreModalOpen(true)}
-            className="flex items-center gap-3.5 sm:gap-4 p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-[#F8F6FF] dark:bg-[#1C1238]/70 hover:bg-[#F2EEFF] dark:hover:bg-[#231747] border border-purple-100/80 dark:border-purple-900/50 cursor-pointer transition-all duration-200 group shadow-2xs hover:shadow-md relative select-none"
+            className="flex items-center gap-3.5 sm:gap-4 p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-[#F8F6FF] hover:bg-[#F2EEFF] border border-purple-100/80 cursor-pointer transition-all duration-200 group shadow-2xs hover:shadow-md relative select-none"
             title="Ver detalle del score financiero"
             role="button"
             tabIndex={0}
@@ -1610,16 +1610,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
             {/* Contenido central */}
             <div className="flex-1 min-w-0 pr-8">
-              <h4 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-[#6D3FEA] transition-colors leading-tight">
+              <h4 className="font-bold text-sm sm:text-base text-slate-900 group-hover:text-[#6D3FEA] transition-colors leading-tight">
                 Score financiero
               </h4>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed line-clamp-2 sm:line-clamp-none">
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed line-clamp-2 sm:line-clamp-none">
                 Conocé tu salud financiera, hábitos de gasto y recomendaciones.
               </p>
             </div>
 
             {/* Chevron Right */}
-            <ChevronRight className="w-4 h-4 text-purple-400 dark:text-purple-300 group-hover:translate-x-0.5 transition-transform shrink-0" />
+            <ChevronRight className="w-4 h-4 text-purple-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
           </div>
 
           {/* Card 2: Flujo de caja */}
@@ -1627,8 +1627,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             onClick={() => setIsCashFlowExpanded(prev => !prev)}
             className={`flex items-center gap-3.5 sm:gap-4 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border transition-all duration-200 cursor-pointer group shadow-2xs hover:shadow-md relative select-none ${
               isCashFlowExpanded
-                ? 'bg-amber-50/70 dark:bg-purple-950/70 border-amber-300 dark:border-amber-700/60 shadow-xs'
-                : 'bg-[#F8F6FF] dark:bg-[#1C1238]/70 hover:bg-[#F2EEFF] dark:hover:bg-[#231747] border-purple-100/80 dark:border-purple-900/50'
+                ? 'bg-amber-50/70 border-amber-300 shadow-xs'
+                : 'bg-[#F8F6FF] hover:bg-[#F2EEFF] border-purple-100/80'
             }`}
             title={isCashFlowExpanded ? "Cerrar flujo de caja" : "Ver flujo de caja"}
             role="button"
@@ -1641,7 +1641,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </span>
 
             {/* Ícono 3 barras en círculo durazno/ámbar */}
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#FFEED4] dark:bg-amber-950/50 flex items-center justify-center shrink-0">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#FFEED4] flex items-center justify-center shrink-0">
               <div className="flex items-end gap-1 h-5">
                 <span className="w-1.5 h-2.5 rounded-full bg-[#FF9500]" />
                 <span className="w-1.5 h-3.5 rounded-full bg-[#FF9500]" />
@@ -1651,16 +1651,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
             {/* Contenido central */}
             <div className="flex-1 min-w-0 pr-8">
-              <h4 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-[#6D3FEA] transition-colors leading-tight">
+              <h4 className="font-bold text-sm sm:text-base text-slate-900 group-hover:text-[#6D3FEA] transition-colors leading-tight">
                 Flujo de caja
               </h4>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed line-clamp-2 sm:line-clamp-none">
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed line-clamp-2 sm:line-clamp-none">
                 Proyectá tus ingresos y gastos, anticipá tu saldo futuro y evitá sorpresas.
               </p>
             </div>
 
             {/* Chevron Right */}
-            <ChevronRight className={`w-4 h-4 text-purple-400 dark:text-purple-300 transition-transform duration-200 shrink-0 ${isCashFlowExpanded ? 'rotate-90 text-[#FF9500]' : 'group-hover:translate-x-0.5'}`} />
+            <ChevronRight className={`w-4 h-4 text-purple-400 transition-transform duration-200 shrink-0 ${isCashFlowExpanded ? 'rotate-90 text-[#FF9500]' : 'group-hover:translate-x-0.5'}`} />
           </div>
 
         </div>
@@ -1892,16 +1892,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         
         {/* ── CARD 1: Distribución de gastos ── */}
-        <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-5 border border-slate-100 dark:border-purple-900/40 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-50 dark:border-purple-900/30">
-            <h3 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
+        <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-100 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-50">
+            <h3 className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-1.5">
               <span>📊</span>
               <span>Distribución de gastos</span>
             </h3>
             <button
               type="button"
               onClick={() => setIsExpenseDistributionModalOpen(true)}
-              className="text-xs font-bold text-[#6D3FEA] hover:text-[#5A2FD1] dark:text-purple-300 dark:hover:text-white transition-colors flex items-center gap-1 cursor-pointer"
+              className="text-xs font-bold text-[#6D3FEA] hover:text-[#5A2FD1] transition-colors flex items-center gap-1 cursor-pointer"
               title="Ampliar distribución"
             >
               <span>Ver detalle</span>
@@ -1922,7 +1922,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     outerRadius={56}
                     dataKey="value"
                     strokeWidth={2}
-                    stroke={isDarkMode ? '#181332' : '#ffffff'}
+                    stroke="#ffffff"
                   >
                     {categoryPieData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
@@ -1932,7 +1932,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               </ResponsiveContainer>
 
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-                <span className="text-xs font-black text-slate-900 dark:text-white leading-tight">
+                <span className="text-xs font-black text-slate-900 leading-tight">
                   {isBalanceHidden ? '$ •••' : ars(totalExpenses)}
                 </span>
                 <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">Gastados</span>
@@ -1945,9 +1945,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 <div key={item.name} className="flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1.5 truncate">
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                    <span className="text-slate-600 dark:text-slate-300 truncate font-medium">{item.name}</span>
+                    <span className="text-slate-600 truncate font-medium">{item.name}</span>
                   </div>
-                  <span className="font-bold text-slate-900 dark:text-white tabular-nums flex-shrink-0">
+                  <span className="font-bold text-slate-900 tabular-nums flex-shrink-0">
                     {item.pct}%
                   </span>
                 </div>
@@ -1957,10 +1957,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
 
         {/* ── CARD 2: Últimos movimientos ── */}
-        <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-5 border border-slate-100 dark:border-purple-900/40 shadow-xs flex flex-col justify-between">
+        <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-100 shadow-xs flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-50 dark:border-purple-900/30">
-              <h3 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
+            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-50">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-1.5">
                 <span>⏱</span>
                 <span>Últimos movimientos</span>
               </h3>
@@ -1968,7 +1968,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 <button
                   type="button"
                   onClick={() => onNavigateTab('transactions')}
-                  className="text-xs font-semibold text-[#6D3FEA] hover:text-[#5A2FD1] dark:text-purple-400 hover:underline cursor-pointer flex items-center gap-1"
+                  className="text-xs font-semibold text-[#6D3FEA] hover:text-[#5A2FD1] hover:underline cursor-pointer flex items-center gap-1"
                 >
                   <span>Ver todos</span>
                   <span>→</span>
@@ -1976,25 +1976,25 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               )}
             </div>
 
-            <div className="divide-y divide-slate-50 dark:divide-purple-900/20">
+            <div className="divide-y divide-slate-50">
               {recentMovements.map((tx) => (
                 <div
                   key={tx.id}
                   onClick={() => onNavigateTab ? onNavigateTab('transactions') : {}}
-                  className="py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-purple-950/20 rounded-xl px-1.5 transition-colors cursor-pointer"
+                  className="py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/50 rounded-xl px-1.5 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-8 h-8 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center text-sm flex-shrink-0">
                       {tx.emoji}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{tx.title}</p>
+                      <p className="text-xs font-bold text-slate-800 truncate">{tx.title}</p>
                       <p className="text-[10px] text-slate-400 font-medium">{tx.subtitle}</p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-xs font-black text-rose-500 dark:text-rose-400 tabular-nums">
+                    <span className="text-xs font-black text-rose-500 tabular-nums">
                       - ${tx.amount.toLocaleString('es-AR')}
                     </span>
                     <ChevronRight className="w-3.5 h-3.5 text-slate-400" />

@@ -275,13 +275,16 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Dark Mode State
+  // Dark Mode State - Light mode is the default and canonical design of GastoAR
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    return localStorage.getItem('gastoar_dark_mode') === 'true';
+    // If mobile or client had legacy dark mode flag set, reset so mobile displays identical to web
+    const saved = localStorage.getItem('gastoar_dark_mode_v2');
+    return saved === 'true';
   });
 
   useEffect(() => {
-    localStorage.setItem('gastoar_dark_mode', String(isDarkMode));
+    localStorage.setItem('gastoar_dark_mode_v2', String(isDarkMode));
+    localStorage.removeItem('gastoar_dark_mode');
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
     } else {
