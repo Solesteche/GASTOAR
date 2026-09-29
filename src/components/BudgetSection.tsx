@@ -192,7 +192,10 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
   return (
     <div className="budget-responsive space-y-5 pb-24 sm:pb-5">
       <section className="rounded-[28px] border border-purple-200/80 bg-white shadow-[0_8px_30px_-12px_rgba(109,63,234,0.25)] overflow-hidden dark:bg-[#140728] dark:border-purple-900/40">
-        <div className="p-4 sm:p-6 bg-gradient-to-br from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] text-white">
+        <div
+          style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
+          className="p-4 sm:p-6 text-white"
+        >
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 flex-wrap">

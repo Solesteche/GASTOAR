@@ -164,8 +164,11 @@ export const CategoriesSection: React.FC<CategoriesSectionProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* 1. TOP HEADER (#6D3FEA) */}
-      <section className="bg-gradient-to-br from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-400/20 space-y-5">
+      {/* 1. TOP HEADER */}
+      <section
+        style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
+        className="text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-400/20 space-y-5"
+      >
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div 

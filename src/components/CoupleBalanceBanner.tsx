@@ -56,7 +56,10 @@ export const CoupleBalanceBanner: React.FC<CoupleBalanceBannerProps> = ({
   const coupPct = totalAll > 0 ? Math.round((coupSpent / totalAll) * 100) : 0;
 
   return (
-    <div className="bg-gradient-to-br from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-400/30 relative overflow-hidden">
+    <div
+      style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
+      className="text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-400/30 relative overflow-hidden"
+    >
       {/* Background ambient glow */}
       <div className="absolute -right-10 -top-10 w-48 h-48 bg-[#F95420]/15 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -left-10 -bottom-10 w-48 h-48 bg-purple-400/20 rounded-full blur-3xl pointer-events-none" />

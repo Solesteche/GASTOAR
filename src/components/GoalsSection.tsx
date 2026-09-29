@@ -237,8 +237,11 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
   return (
     <div className="space-y-7 max-w-6xl mx-auto animate-in fade-in duration-200">
       
-      {/* 1. Header & Summary Section (#6D3FEA) */}
-      <div className="bg-gradient-to-br from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-400/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* 1. Header & Summary Section */}
+      <div
+        style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
+        className="text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-400/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+      >
         <div>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-white/15 text-white border border-white/20 backdrop-blur-xs flex items-center justify-center shadow-xs shrink-0">

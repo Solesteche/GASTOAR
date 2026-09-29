@@ -364,8 +364,11 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
         </div>
       </div>
 
-      {/* 2. Hero Balance Card (Estilo Resumen: Saldo por pagar & % Amortizado con color #6D3FEA) */}
-      <div className="bg-gradient-to-br from-[#6D3FEA] via-[#5A2FD1] to-[#451BA8] text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-300/30">
+      {/* 2. Hero Balance Card (Estilo Resumen: Saldo por pagar & % Amortizado con linear-gradient) */}
+      <div
+        style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
+        className="text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-300/30"
+      >
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-purple-200/90 mb-1.5 tracking-wide">Saldo total por pagar</p>
