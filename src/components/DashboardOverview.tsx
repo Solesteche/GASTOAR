@@ -18,6 +18,10 @@ import {
   Target,
   Heart,
   Scale,
+  Clock,
+  ShoppingCart,
+  Fuel,
+  Utensils,
   ArrowLeftRight,
   ArrowUpRight,
   ArrowRight,
@@ -94,18 +98,71 @@ const MONTH_NAMES = [
 ];
 
 const DEFAULT_CATEGORY_COLORS: Record<string, string> = {
-  'Alimentación': '#3B82F6',
-  'Supermercado': '#3B82F6',
-  'Vivienda': '#EC4899',
-  'Alquiler': '#EC4899',
-  'Transporte': '#8B5CF6',
-  'Salud': '#10B981',
-  'Farmacia': '#10B981',
-  'Ocio': '#F59E0B',
-  'Gastronomía': '#F59E0B',
-  'Servicios': '#06B6D4',
-  'Internet': '#06B6D4',
+  'Alimentación & Bebidas': '#2563EB',
+  'Alimentación': '#2563EB',
+  'Supermercado': '#2563EB',
+  'Alquiler': '#9333EA',
+  'Vivienda': '#9333EA',
+  'Expensas': '#7E22CE',
+  'Servicios': '#F95420',
+  'Internet': '#F95420',
+  'Transporte & Movilidad': '#10B981',
+  'Transporte': '#10B981',
+  'Salud': '#EF4444',
+  'Farmacia': '#EF4444',
+  'Cuidado Personal': '#EC4899',
+  'Educación & Formación': '#3B82F6',
+  'Educación': '#3B82F6',
+  'Entretenimiento': '#D946EF',
+  'Entretenimiento & Ocio': '#D946EF',
+  'Entretenimiento, Ocio & Salidas': '#D946EF',
+  'Entretenimiento, Ocio & Suscripciones': '#D946EF',
+  'Ocio': '#D946EF',
+  'Indumentaria & Calzado': '#06B6D4',
+  'Indumentaria': '#06B6D4',
+  'Mascotas': '#F59E0B',
+  'Tecnología, Electrónica & Bazar': '#6366F1',
+  'Tecnología, Electro & Bazar': '#6366F1',
+  'Tecnología': '#6366F1',
+  'Suscripciones & Plataformas': '#A855F7',
+  'Suscripciones y Plataformas': '#A855F7',
+  'Suscripciones': '#A855F7',
+  'Salud & Cuidado Personal': '#EF4444',
   'Otros': '#64748B',
+};
+
+const DEFAULT_CATEGORY_BG_COLORS: Record<string, string> = {
+  'Alimentación & Bebidas': '#EFF6FF',
+  'Alimentación': '#EFF6FF',
+  'Supermercado': '#EFF6FF',
+  'Alquiler': '#FAF5FF',
+  'Vivienda': '#FAF5FF',
+  'Expensas': '#F5F3FF',
+  'Servicios': '#FFF4EF',
+  'Internet': '#FFF4EF',
+  'Transporte & Movilidad': '#ECFDF5',
+  'Transporte': '#ECFDF5',
+  'Salud': '#FEF2F2',
+  'Farmacia': '#FEF2F2',
+  'Cuidado Personal': '#FDF2F8',
+  'Educación & Formación': '#EFF6FF',
+  'Educación': '#EFF6FF',
+  'Entretenimiento': '#FDF4FF',
+  'Entretenimiento & Ocio': '#FDF4FF',
+  'Entretenimiento, Ocio & Salidas': '#FDF4FF',
+  'Entretenimiento, Ocio & Suscripciones': '#FDF4FF',
+  'Ocio': '#FDF4FF',
+  'Indumentaria & Calzado': '#ECFEFF',
+  'Indumentaria': '#ECFEFF',
+  'Mascotas': '#FFFBEB',
+  'Tecnología, Electrónica & Bazar': '#EEF2FF',
+  'Tecnología, Electro & Bazar': '#EEF2FF',
+  'Tecnología': '#EEF2FF',
+  'Suscripciones & Plataformas': '#FAF5FF',
+  'Suscripciones y Plataformas': '#FAF5FF',
+  'Suscripciones': '#FAF5FF',
+  'Salud & Cuidado Personal': '#FEF2F2',
+  'Otros': '#F1F5F9',
 };
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
@@ -701,15 +758,19 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   }, [allBudgetCategoryItems]);
 
   const criticalCategoriesCount = criticalCategoryItems.length;
-  const maxCriticalPct = useMemo(() => {
-    if (criticalCategoryItems.length > 0) {
-      return criticalCategoryItems[0].pct;
-    }
-    if (allBudgetCategoryItems.length > 0) {
-      return allBudgetCategoryItems[0].pct;
-    }
+  const totalCriticalAlertsCount = criticalCategoriesCount + criticalSubcategoriesList.length;
+  const hasCriticalBudgetAlert = totalCriticalAlertsCount > 0;
+
+  const maxCriticalAlertPct = useMemo(() => {
+    let max = 0;
+    criticalCategoryItems.forEach(c => { if (c.pct > max) max = c.pct; });
+    criticalSubcategoriesList.forEach(s => { if (s.pct > max) max = s.pct; });
+    if (max > 0) return max;
+    if (criticalCategoryItems.length > 0) return criticalCategoryItems[0].pct;
     return 0;
-  }, [criticalCategoryItems, allBudgetCategoryItems]);
+  }, [criticalCategoryItems, criticalSubcategoriesList]);
+
+  const maxCriticalPct = maxCriticalAlertPct;
 
   // Vencimientos dinámicos (con diseño y datos exactos según captura de pantalla)
   const upcomingBills = useMemo(() => {
@@ -878,7 +939,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     ];
   }, [vencimientos]);
 
-  // Distribución de gastos (Pie Data)
+  // Distribución de gastos (Pie Data) con paleta y proporciones de la imagen
   const categoryPieData = useMemo(() => {
     const catMap: Record<string, number> = {};
     (monthExpensesList || []).forEach(t => {
@@ -890,45 +951,167 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     const total = sorted.reduce((sum, item) => sum + item[1], 0) || 0;
 
     if (sorted.length > 0 && total > 0) {
-      return sorted.slice(0, 6).map(([name, amount], index) => {
+      const palette = ['#7C3AED', '#F97316', '#60A5FA', '#818CF8', '#BAE6FD'];
+      return sorted.slice(0, 5).map(([name, amount], index) => {
         const pct = Math.round((amount / total) * 100);
-        const color = categoryColors[name] || DEFAULT_CATEGORY_COLORS[name] || ['#3B82F6', '#EC4899', '#8B5CF6', '#10B981', '#F59E0B', '#64748B'][index % 6];
+        const color = categoryColors[name] || DEFAULT_CATEGORY_COLORS[name] || palette[index % palette.length];
         return { name, value: amount, pct, color };
       });
     }
 
-    // Default mock distribution matching screenshot exactly
+    // Default mock distribution matching screenshot exactly:
+    // Vivienda: 34% ($ 64.000) - Violeta #7C3AED
+    // Alimentación: 28% ($ 52.000) - Naranja #F97316
+    // Transporte: 15% ($ 28.000) - Celeste #60A5FA
+    // Servicios: 12% ($ 22.000) - Lavanda #818CF8
+    // Otros: 11% ($ 21.000) - Azul cielo #BAE6FD
+    // Total = $ 187.000
     return [
-      { name: 'Alimentación', value: 198720, pct: 32, color: '#3B82F6' },
-      { name: 'Vivienda', value: 149040, pct: 24, color: '#EC4899' },
-      { name: 'Transporte', value: 93150, pct: 15, color: '#8B5CF6' },
-      { name: 'Salud', value: 55890, pct: 9, color: '#10B981' },
-      { name: 'Ocio', value: 49680, pct: 8, color: '#F59E0B' },
-      { name: 'Otros', value: 74520, pct: 12, color: '#64748B' },
+      { name: 'Vivienda', value: 64000, pct: 34, color: '#7C3AED' },
+      { name: 'Alimentación', value: 52000, pct: 28, color: '#F97316' },
+      { name: 'Transporte', value: 28000, pct: 15, color: '#60A5FA' },
+      { name: 'Servicios', value: 22000, pct: 12, color: '#818CF8' },
+      { name: 'Otros', value: 21000, pct: 11, color: '#BAE6FD' },
     ];
   }, [monthExpensesList, categoryColors]);
 
-  // Últimos movimientos (con fallback para que coincida con el mockup)
+  const displayTotalExpenses = useMemo(() => {
+    if (monthExpensesList && monthExpensesList.length > 0 && totalExpenses > 0) {
+      return totalExpenses;
+    }
+    return 187000;
+  }, [monthExpensesList, totalExpenses]);
+
+  // Visuales para últimos movimientos
+  const getMovementVisuals = (categoria?: string, title?: string) => {
+    const text = `${categoria || ''} ${title || ''}`.toLowerCase();
+    if (
+      text.includes('combustible') ||
+      text.includes('nafta') ||
+      text.includes('ypf') ||
+      text.includes('shell') ||
+      text.includes('axion') ||
+      text.includes('estacion') ||
+      text.includes('estación')
+    ) {
+      return {
+        icon: <Fuel className="w-5 h-5 text-[#EA580C]" />,
+        iconBg: 'bg-[#FFF7ED] dark:bg-amber-950/40',
+        defaultTitle: 'Combustible',
+      };
+    }
+    if (
+      text.includes('restaurante') ||
+      text.includes('cafe') ||
+      text.includes('café') ||
+      text.includes('bar') ||
+      text.includes('gastronom') ||
+      text.includes('cena') ||
+      text.includes('almuerzo') ||
+      text.includes('pizza') ||
+      text.includes('hamburguesa')
+    ) {
+      return {
+        icon: <Utensils className="w-5 h-5 text-[#E11D48]" />,
+        iconBg: 'bg-[#FFF1F2] dark:bg-rose-950/40',
+        defaultTitle: 'Restaurante',
+      };
+    }
+    if (
+      text.includes('transferencia') ||
+      text.includes('transfer') ||
+      text.includes('envio') ||
+      text.includes('envío') ||
+      text.includes('servicio') ||
+      text.includes('expensas')
+    ) {
+      return {
+        icon: <ArrowLeftRight className="w-5 h-5 text-[#7C3AED]" />,
+        iconBg: 'bg-[#F5F3FF] dark:bg-purple-950/40',
+        defaultTitle: 'Transferencia',
+      };
+    }
+    // Default Supermercado / Shopping
+    return {
+      icon: <ShoppingCart className="w-5 h-5 text-[#4F46E5]" />,
+      iconBg: 'bg-[#F0F2FE] dark:bg-indigo-950/40',
+      defaultTitle: 'Supermercado',
+    };
+  };
+
+  // Últimos movimientos (con fallback exacto al diseño de la imagen)
   const recentMovements = useMemo(() => {
     const list = (monthExpensesList.length > 0 ? monthExpensesList : (transactions || []).filter(t => t.tipoTransaccion !== 'ingreso'))
       .slice(0, 4)
-      .map(t => ({
-        id: t.id,
-        title: t.descripcion || t.categoria || 'Gasto',
-        subtitle: `${t.fecha || 'Hoy'} · ${t.categoria || 'Varios'}`,
-        amount: t.monto || 0,
-        emoji: t.emoji || (t.categoria === 'Alimentación' ? '🛒' : t.categoria === 'Transporte' ? '🚗' : t.categoria === 'Salud' ? '💊' : '☕')
-      }));
+      .map(t => {
+        const visuals = getMovementVisuals(t.categoria, t.descripcion);
+        let timeLabel = 'Hoy, 12:34';
+        const todayStr = getTodayDateString();
+        if (t.fecha === todayStr) {
+          timeLabel = `Hoy, ${(t as any).hora || '12:34'}`;
+        } else if (t.fecha) {
+          const d = new Date(t.fecha + 'T00:00:00');
+          const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+          timeLabel = `${d.getDate()} ${months[d.getMonth()]}, ${d.getFullYear()}`;
+        }
+
+        return {
+          id: t.id,
+          title: t.descripcion || visuals.defaultTitle,
+          subtitle: timeLabel,
+          amount: Math.abs(t.monto || 0),
+          isPositive: t.tipoTransaccion === 'ingreso',
+          icon: visuals.icon,
+          iconBg: visuals.iconBg,
+        };
+      });
 
     if (list.length > 0) {
       return list;
     }
 
+    // Default mock matching image screenshot exactly:
+    // 1. Supermercado | Hoy, 12:34 | - $ 27.500 | ShoppingCart | #EEF2FF
+    // 2. Combustible | Ayer, 18:20 | - $ 42.000 | Fuel | #FFF7ED
+    // 3. Restaurante | Ayer, 13:15 | - $ 18.200 | Utensils | #FFF1F2
+    // 4. Transferencia | 25 sep, 2026 | - $ 65.000 | ArrowLeftRight | #F5F3FF
     return [
-      { id: 'm1', title: 'Supermercado', subtitle: 'Hoy · Alimentación', amount: 32500, emoji: '🛒' },
-      { id: 'm2', title: 'Café', subtitle: 'Hoy · Gastronomía', amount: 4500, emoji: '☕' },
-      { id: 'm3', title: 'Uber', subtitle: 'Ayer · Transporte', amount: 6800, emoji: '🚗' },
-      { id: 'm4', title: 'Farmacia', subtitle: 'Ayer · Salud', amount: 12300, emoji: '💊' },
+      {
+        id: 'm1',
+        title: 'Supermercado',
+        subtitle: 'Hoy, 12:34',
+        amount: 27500,
+        isPositive: false,
+        icon: <ShoppingCart className="w-5 h-5 text-[#4F46E5]" />,
+        iconBg: 'bg-[#F0F2FE] dark:bg-indigo-950/40',
+      },
+      {
+        id: 'm2',
+        title: 'Combustible',
+        subtitle: 'Ayer, 18:20',
+        amount: 42000,
+        isPositive: false,
+        icon: <Fuel className="w-5 h-5 text-[#EA580C]" />,
+        iconBg: 'bg-[#FFF7ED] dark:bg-amber-950/40',
+      },
+      {
+        id: 'm3',
+        title: 'Restaurante',
+        subtitle: 'Ayer, 13:15',
+        amount: 18200,
+        isPositive: false,
+        icon: <Utensils className="w-5 h-5 text-[#E11D48]" />,
+        iconBg: 'bg-[#FFF1F2] dark:bg-rose-950/40',
+      },
+      {
+        id: 'm4',
+        title: 'Transferencia',
+        subtitle: '25 sep, 2026',
+        amount: 65000,
+        isPositive: false,
+        icon: <ArrowLeftRight className="w-5 h-5 text-[#7C3AED]" />,
+        iconBg: 'bg-[#F5F3FF] dark:bg-purple-950/40',
+      },
     ];
   }, [monthExpensesList, transactions]);
 
@@ -1154,30 +1337,30 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════ */}
       <div
         style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
-        className="text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-300/30 relative overflow-hidden"
+        className="text-white rounded-3xl px-4 py-3.5 sm:px-6 sm:py-4 shadow-xl border border-purple-300/30 relative overflow-hidden"
       >
         {/* Ambient glow in background */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col gap-4">
+        <div className="relative z-10 flex flex-col gap-2.5 sm:gap-3">
           {/* Top Row: Saldo on left & Porcentaje de Presupuesto circular ring on right */}
-          <div className="flex flex-row items-center justify-between gap-3 sm:gap-6">
+          <div className="flex flex-row items-center justify-between gap-3 sm:gap-5">
             {/* Left section: balance */}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <span className="text-[13px] sm:text-sm font-medium text-white/80 tracking-wide">Saldo disponible</span>
+                <span className="text-xs sm:text-sm font-medium text-white/80 tracking-wide">Saldo disponible</span>
                 <button
                   type="button"
                   onClick={toggleHideBalance}
                   className="text-white/70 hover:text-white transition-colors cursor-pointer p-0.5 shrink-0"
                   title={isBalanceHidden ? "Mostrar saldo" : "Ocultar saldo"}
                 >
-                  {isBalanceHidden ? <EyeOff className="w-4 h-4 sm:w-5 h-5" /> : <Eye className="w-4 h-4 sm:w-5 h-5" />}
+                  {isBalanceHidden ? <EyeOff className="w-4 h-4 sm:w-4.5 sm:h-4.5" /> : <Eye className="w-4 h-4 sm:w-4.5 sm:h-4.5" />}
                 </button>
               </div>
 
-              <div className="flex items-center gap-2.5 sm:gap-3 mt-1.5 mb-1">
-                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-outfit tracking-tight leading-none text-white truncate">
+              <div className="flex items-center gap-2 mt-1 mb-0.5">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold font-outfit tracking-tight leading-none text-white truncate">
                   {isBalanceHidden ? "$ ••••••" : `$ ${availableBalance.toLocaleString('es-AR')}`}
                 </h2>
               </div>
@@ -1187,7 +1370,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <button
               type="button"
               onClick={() => setIsExpenseDistributionModalOpen(true)}
-              className="relative shrink-0 w-24 h-24 sm:w-32 sm:h-32 flex items-center justify-center cursor-pointer group transition-transform duration-200 hover:scale-105 active:scale-95 focus:outline-none rounded-full"
+              className="relative shrink-0 w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center cursor-pointer group transition-transform duration-200 hover:scale-105 active:scale-95 focus:outline-none rounded-full"
               title="Toca para ver la distribución de gastos"
               aria-label="Ver distribución de gastos del presupuesto"
             >
@@ -1214,13 +1397,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center px-1 text-center pointer-events-none">
-                <span className="text-xl sm:text-2xl lg:text-3xl font-black text-white leading-none tracking-tight group-hover:text-orange-200 transition-colors">
+                <span className="text-lg sm:text-xl lg:text-2xl font-black text-white leading-none tracking-tight group-hover:text-orange-200 transition-colors">
                   {budgetUsedPercent}%
                 </span>
-                <span className="text-[9px] sm:text-[10px] text-purple-200/90 font-medium leading-tight mt-0.5 group-hover:text-white transition-colors">
+                <span className="text-[8px] sm:text-[9px] text-purple-200/90 font-medium leading-tight mt-0.5 group-hover:text-white transition-colors">
                   del presupuesto<br />utilizado
                 </span>
-                <span className="text-[8px] font-extrabold text-orange-300 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 leading-none">
+                <span className="text-[7px] font-extrabold text-orange-300 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 leading-none">
                   Ver distribución ↗
                 </span>
               </div>
@@ -1228,15 +1411,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
 
           {/* Bottom section: Progress bar & Presupuesto mensual */}
-          <div className="pt-0.5">
-            <div className="h-2 sm:h-2.5 rounded-full bg-white/20 overflow-hidden mb-2.5 w-full">
+          <div>
+            <div className="h-1.5 sm:h-2 rounded-full bg-white/20 overflow-hidden mb-1.5 sm:mb-2 w-full">
               <div
                 className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#FFA234] via-[#F97316] to-[#F95420]"
                 style={{ width: `${Math.min(100, Math.max(5, budgetUsedPercent))}%` }}
               />
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm text-white/80 font-medium">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/80 font-medium">
               <div className="flex items-center gap-1.5">
                 <span className="font-normal text-white/80">Presupuesto mensual</span>
                 <span className="font-bold text-white">
@@ -1253,7 +1436,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   </button>
                 )}
               </div>
-              <span className="text-[11px] sm:text-xs text-white/70 font-semibold">
+              <span className="text-[11px] text-white/70 font-semibold">
                 {budgetUsedPercent}% consumido
               </span>
             </div>
@@ -1306,70 +1489,124 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
-        {/* Card 2: Alertas de límites de presupuesto */}
-        <div
-          onClick={() => setIsBudgetAlertsModalOpen(true)}
-          style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
-          className="text-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-lg border border-purple-300/30 flex flex-col justify-between cursor-pointer group transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] relative overflow-hidden"
-          title="Hacé click para ver alertas de presupuesto"
-          role="button"
-          tabIndex={0}
-          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setIsBudgetAlertsModalOpen(true); }}
-        >
-          {/* Top section with coral icon, label & status pill */}
-          <div>
-            <div className="flex items-center justify-between gap-1.5 mb-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF6B6B] to-[#FF4757] border border-white/20 flex items-center justify-center text-white shrink-0 shadow-xs">
-                  <AlertTriangle className="w-4 h-4 stroke-[2.5]" />
+        {/* Card 2: Alertas de límites de presupuesto (Naranja/Rojo SOLO si existe alerta real) */}
+        {hasCriticalBudgetAlert ? (
+          <div
+            onClick={() => setIsBudgetAlertsModalOpen(true)}
+            className="bg-[#FFF5F5] dark:bg-[#2A131E] rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-lg border border-rose-200/90 dark:border-rose-900/60 flex flex-col justify-between cursor-pointer group transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] relative overflow-hidden text-slate-900 dark:text-white"
+            title="Hacé click para revisar alertas de presupuesto"
+            role="button"
+            tabIndex={0}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setIsBudgetAlertsModalOpen(true); }}
+          >
+            {/* Top section: Red circle icon + "Alerta de presupuesto" + "Revisar" button */}
+            <div>
+              <div className="flex items-center justify-between gap-1.5 mb-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-[#EF4444] border border-rose-300/40 flex items-center justify-center text-white shrink-0 shadow-xs">
+                    <AlertTriangle className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                  <span className="text-xs sm:text-[13px] font-semibold text-slate-600 dark:text-slate-300 leading-tight truncate">
+                    Alerta de presupuesto
+                  </span>
                 </div>
-                <span className="text-[13px] sm:text-sm font-medium text-white/80 leading-tight truncate">
-                  Alerta de presupuesto
+
+                <span className="px-3.5 py-1 rounded-full text-xs font-bold text-white bg-[#F95420] hover:bg-[#ea4413] shadow-xs shrink-0 transition-colors">
+                  Revisar
                 </span>
               </div>
 
-              <span className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wide text-white shadow-xs shrink-0 ${
-                criticalCategoriesCount > 0 ? 'bg-[#FF4757]' : 'bg-[#FF4757]'
-              }`}>
-                {criticalCategoriesCount > 0 ? 'Crítico' : 'Crítico'}
-              </span>
+              {/* Sub-row: Category count */}
+              <div className="flex items-center justify-between gap-1 mt-1.5 mb-2">
+                <span className="text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate">
+                  {totalCriticalAlertsCount} {totalCriticalAlertsCount === 1 ? 'categoría crítica' : 'categorías críticas'}
+                </span>
+              </div>
             </div>
 
-            {/* Sub-row: Category count & Umbral */}
-            <div className="flex items-center justify-between gap-1 mt-2 mb-2.5">
-              <span className="text-sm sm:text-base font-bold text-white truncate">
-                {criticalCategoriesCount > 0
-                  ? `${criticalCategoriesCount} ${criticalCategoriesCount === 1 ? 'categoría crítica' : 'categorías críticas'}`
-                  : '1 categoría crítica'}
-              </span>
-              <span className="text-xs text-white/70 font-normal shrink-0">
-                Umbral: ≥{alertThreshold}%
-              </span>
+            {/* Bottom section: Orange progress bar & detail */}
+            <div>
+              <div className="h-2 sm:h-2.5 rounded-full bg-rose-100 dark:bg-rose-950/60 overflow-hidden mb-2 w-full">
+                <div
+                  className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#FF7A00] to-[#F95420]"
+                  style={{
+                    width: `${Math.min(100, Math.max(15, maxCriticalAlertPct))}%`
+                  }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">
+                  {maxCriticalAlertPct}% del límite en esta categoría
+                </span>
+                <span className="font-bold text-[#6D3FEA] hover:text-[#5B2FD1] transition-colors flex items-center gap-1">
+                  <span>Ver detalle</span>
+                  <span>→</span>
+                </span>
+              </div>
             </div>
           </div>
+        ) : (
+          <div
+            onClick={() => setIsBudgetAlertsModalOpen(true)}
+            style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
+            className="text-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-lg border border-purple-300/30 flex flex-col justify-between cursor-pointer group transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] relative overflow-hidden"
+            title="Hacé click para ver tus presupuestos"
+            role="button"
+            tabIndex={0}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setIsBudgetAlertsModalOpen(true); }}
+          >
+            {/* Top section with emerald icon & label & status pill */}
+            <div>
+              <div className="flex items-center justify-between gap-1.5 mb-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 shrink-0 shadow-xs">
+                    <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                  <span className="text-[13px] sm:text-sm font-medium text-white/80 leading-tight truncate">
+                    Alerta de presupuesto
+                  </span>
+                </div>
 
-          {/* Bottom section: Progress bar, % máx. consumido & Ver detalle */}
-          <div>
-            <div className="h-2 sm:h-2.5 rounded-full bg-white/20 overflow-hidden mb-2 w-full">
-              <div
-                className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#FF7A00] to-[#FF4757]"
-                style={{
-                  width: `${criticalCategoriesCount > 0 ? Math.min(100, Math.max(20, maxCriticalPct)) : 80}%`
-                }}
-              />
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wide text-white bg-emerald-500/80 shadow-xs shrink-0">
+                  Bajo control
+                </span>
+              </div>
+
+              {/* Sub-row: Category count & Umbral */}
+              <div className="flex items-center justify-between gap-1 mt-2 mb-2.5">
+                <span className="text-sm sm:text-base font-bold text-white truncate">
+                  Sin categorías críticas
+                </span>
+                <span className="text-xs text-white/70 font-normal shrink-0">
+                  Umbral: ≥{alertThreshold}%
+                </span>
+              </div>
             </div>
 
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-white/80 font-normal">
-                {criticalCategoriesCount > 0 ? `${maxCriticalPct}% máx. consumido` : '400% máx. consumido'}
-              </span>
-              <span className="font-bold text-white group-hover:text-white/90 group-hover:translate-x-0.5 transition-all flex items-center gap-1">
-                <span>Ver detalle</span>
-                <span>→</span>
-              </span>
+            {/* Bottom section: Progress bar, % máx. consumido & Ver límites */}
+            <div>
+              <div className="h-2 sm:h-2.5 rounded-full bg-white/20 overflow-hidden mb-2 w-full">
+                <div
+                  className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#00E676] to-[#10B981]"
+                  style={{
+                    width: `${Math.min(100, Math.max(10, budgetUsedPercent))}%`
+                  }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-white/80 font-normal">
+                  Gastos dentro de los límites
+                </span>
+                <span className="font-bold text-white group-hover:text-white/90 group-hover:translate-x-0.5 transition-all flex items-center gap-1">
+                  <span>Ver límites</span>
+                  <span>→</span>
+                </span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
@@ -1889,86 +2126,113 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* 6. BOTTOM 2-COLUMN GRID (DISTRIBUCIÓN DE GASTOS Y ÚLTIMOS MOVIMIENTOS) */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
         
         {/* ── CARD 1: Distribución de gastos ── */}
-        <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-100 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-50">
-            <h3 className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-1.5">
-              <span>📊</span>
-              <span>Distribución de gastos</span>
-            </h3>
-            <button
-              type="button"
-              onClick={() => setIsExpenseDistributionModalOpen(true)}
-              className="text-xs font-bold text-[#6D3FEA] hover:text-[#5A2FD1] transition-colors flex items-center gap-1 cursor-pointer"
-              title="Ampliar distribución"
-            >
-              <span>Ver detalle</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center gap-4 py-2">
-            {/* Donut chart */}
-            <div className="relative w-36 h-36 flex-shrink-0 flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={categoryPieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={36}
-                    outerRadius={56}
-                    dataKey="value"
-                    strokeWidth={2}
-                    stroke="#ffffff"
-                  >
-                    {categoryPieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-                <span className="text-xs font-black text-slate-900 leading-tight">
-                  {isBalanceHidden ? '$ •••' : ars(totalExpenses)}
-                </span>
-                <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">Gastados</span>
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-100 dark:border-slate-800 shadow-xs flex flex-col justify-between transition-colors">
+          <div>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4 sm:mb-5">
+              <div className="flex items-center gap-2">
+                <div className="flex items-end gap-[3px] h-5 justify-center">
+                  <span className="w-1.5 h-3 bg-[#7C3AED] rounded-full inline-block" />
+                  <span className="w-1.5 h-5 bg-[#7C3AED] rounded-full inline-block" />
+                  <span className="w-1.5 h-3.5 bg-[#7C3AED] rounded-full inline-block" />
+                </div>
+                <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white leading-tight">
+                  Distribución de gastos
+                </h3>
               </div>
+              <button
+                type="button"
+                onClick={() => setIsExpenseDistributionModalOpen(true)}
+                className="text-xs font-semibold text-[#6D3FEA] hover:text-[#5B2FD1] transition-colors flex items-center gap-1 cursor-pointer"
+                title="Ampliar distribución"
+              >
+                <span>Ver detalle</span>
+                <span>→</span>
+              </button>
             </div>
 
-            {/* Legend with percentages */}
-            <div className="flex-1 grid grid-cols-2 gap-x-2 gap-y-1.5 text-[11px] w-full">
-              {categoryPieData.map((item) => (
-                <div key={item.name} className="flex items-center justify-between gap-1">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                    <span className="text-slate-600 truncate font-medium">{item.name}</span>
-                  </div>
-                  <span className="font-bold text-slate-900 tabular-nums flex-shrink-0">
-                    {item.pct}%
+            {/* Content: Donut + Legend */}
+            <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-6 py-1">
+              {/* Donut chart */}
+              <div className="relative w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={categoryPieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={46}
+                      outerRadius={68}
+                      dataKey="value"
+                      strokeWidth={2}
+                      stroke="#ffffff"
+                      startAngle={90}
+                      endAngle={-270}
+                    >
+                      {categoryPieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                  <span className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight tracking-tight">
+                    {isBalanceHidden ? '$ •••••' : `$ ${displayTotalExpenses.toLocaleString('es-AR')}`}
+                  </span>
+                  <span className="text-[11px] sm:text-xs text-slate-400 font-normal">
+                    gasto total
                   </span>
                 </div>
-              ))}
+              </div>
+
+              {/* Legend with percentages and amounts */}
+              <div className="flex-1 w-full space-y-3 sm:space-y-3.5">
+                {categoryPieData.map((item) => (
+                  <div key={item.name} className="flex items-center justify-between text-xs sm:text-sm">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="font-bold text-slate-800 dark:text-slate-100 truncate">
+                        {item.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 sm:gap-5 flex-shrink-0">
+                      <span className="text-slate-400 dark:text-slate-400 font-medium tabular-nums w-8 text-right">
+                        {item.pct}%
+                      </span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-300 tabular-nums w-20 text-right">
+                        {isBalanceHidden ? '$ •••' : `$ ${item.value.toLocaleString('es-AR')}`}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
 
         {/* ── CARD 2: Últimos movimientos ── */}
-        <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-100 shadow-xs flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-100 dark:border-slate-800 shadow-xs flex flex-col justify-between transition-colors">
           <div>
-            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-50">
-              <h3 className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                <span>⏱</span>
-                <span>Últimos movimientos</span>
-              </h3>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-[#6D3FEA] stroke-[2.2]" />
+                <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white leading-tight">
+                  Últimos movimientos
+                </h3>
+              </div>
               {onNavigateTab && (
                 <button
                   type="button"
                   onClick={() => onNavigateTab('transactions')}
-                  className="text-xs font-semibold text-[#6D3FEA] hover:text-[#5A2FD1] hover:underline cursor-pointer flex items-center gap-1"
+                  className="text-xs font-semibold text-[#6D3FEA] hover:text-[#5B2FD1] transition-colors flex items-center gap-1 cursor-pointer"
                 >
                   <span>Ver todos</span>
                   <span>→</span>
@@ -1976,28 +2240,35 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               )}
             </div>
 
-            <div className="divide-y divide-slate-50">
+            {/* List of movements */}
+            <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {recentMovements.map((tx) => (
                 <div
                   key={tx.id}
                   onClick={() => onNavigateTab ? onNavigateTab('transactions') : {}}
-                  className="py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/50 rounded-xl px-1.5 transition-colors cursor-pointer"
+                  className="py-3 sm:py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 rounded-2xl px-2 transition-colors cursor-pointer"
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center text-sm flex-shrink-0">
-                      {tx.emoji}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${tx.iconBg}`}>
+                      {tx.icon}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-bold text-slate-800 truncate">{tx.title}</p>
-                      <p className="text-[10px] text-slate-400 font-medium">{tx.subtitle}</p>
+                      <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                        {tx.title}
+                      </p>
+                      <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-400 font-medium">
+                        {tx.subtitle}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-xs font-black text-rose-500 tabular-nums">
-                      - ${tx.amount.toLocaleString('es-AR')}
+                  <div className="flex-shrink-0 text-right">
+                    <span className={`text-xs sm:text-sm font-bold tabular-nums ${
+                      tx.isPositive ? 'text-emerald-500' : 'text-rose-500'
+                    }`}>
+                      {tx.isPositive ? '+ ' : '- '}
+                      {isBalanceHidden ? '$ •••••' : `$ ${tx.amount.toLocaleString('es-AR')}`}
                     </span>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                   </div>
                 </div>
               ))}

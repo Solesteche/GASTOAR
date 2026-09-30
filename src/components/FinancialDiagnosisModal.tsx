@@ -47,8 +47,8 @@ export const FinancialDiagnosisModal: React.FC<FinancialDiagnosisModalProps> = (
   const totalSpent = txList.reduce((acc, tx) => acc + (tx?.monto || 0), 0);
 
   // Group by 50/30/20 buckets
-  const needsCategories = ["Alimentación & Bebidas", "Alquiler", "Expensas", "Servicios", "Transporte & Movilidad", "Salud & Cuidado Personal", "Educación & Formación"];
-  const wantsCategories = ["Entretenimiento, Ocio & Suscripciones", "Indumentaria & Calzado", "Mascotas", "Tecnología, Electro & Bazar"];
+  const needsCategories = ["Alimentación & Bebidas", "Alquiler", "Expensas", "Servicios", "Transporte & Movilidad", "Salud", "Cuidado Personal", "Salud & Cuidado Personal", "Educación & Formación"];
+  const wantsCategories = ["Entretenimiento", "Entretenimiento & Ocio", "Entretenimiento, Ocio & Salidas", "Entretenimiento, Ocio & Suscripciones", "Suscripciones & Plataformas", "Suscripciones y Plataformas", "Suscripciones", "Indumentaria & Calzado", "Mascotas", "Tecnología, Electrónica & Bazar", "Tecnología, Electro & Bazar"];
 
   const needsSpent = txList
     .filter(tx => tx && needsCategories.includes(tx.categoria))

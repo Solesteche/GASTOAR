@@ -109,7 +109,6 @@ import {
   ScheduledPayment 
 } from './CashFlowEngine';
 import { useVencimientoNotifications } from './hooks/useVencimientoNotifications';
-import { VencimientoAlertBanner } from './components/VencimientoAlertBanner';
 import { 
   SplashScreen 
 } from './components/mobileScreens/SplashScreen';
@@ -309,8 +308,45 @@ export default function App() {
       try {
         const parsed: Transaction[] = JSON.parse(saved);
         return parsed.map(tx => {
+          if (tx.categoria === 'Salud & Cuidado Personal') {
+            const sub = ((tx.subcategoria || '') + ' ' + (tx.descripcion || '') + ' ' + (tx.concepto || '')).toLowerCase();
+            if (
+              sub.includes('peluquer') ||
+              sub.includes('barber') ||
+              sub.includes('estétic') ||
+              sub.includes('estetic') ||
+              sub.includes('gimnasio') ||
+              sub.includes('club') ||
+              sub.includes('pádel') ||
+              sub.includes('padel') ||
+              sub.includes('deport') ||
+              sub.includes('cosmétic') ||
+              sub.includes('facial') ||
+              sub.includes('spa') ||
+              sub.includes('uñas')
+            ) {
+              return { ...tx, categoria: 'Cuidado Personal' };
+            }
+            return { ...tx, categoria: 'Salud' };
+          }
           if (tx.subcategoria === 'Gimnasio, Club, Pádel & Deportes' && tx.categoria.toLowerCase().includes('entretenimiento')) {
-            return { ...tx, categoria: 'Salud & Cuidado Personal' };
+            return { ...tx, categoria: 'Cuidado Personal' };
+          }
+          if (
+            tx.categoria === 'Entretenimiento, Ocio & Suscripciones' ||
+            tx.categoria === 'Entretenimiento & Ocio' ||
+            tx.categoria === 'Entretenimiento, Ocio & Salidas'
+          ) {
+            return { ...tx, categoria: 'Entretenimiento' };
+          }
+          if (
+            tx.categoria === 'Suscripciones y Plataformas' ||
+            tx.categoria === 'Suscripciones'
+          ) {
+            return { ...tx, categoria: 'Suscripciones & Plataformas' };
+          }
+          if (tx.categoria === 'Tecnología, Electro & Bazar') {
+            return { ...tx, categoria: 'Tecnología, Electrónica & Bazar' };
           }
           return tx;
         });
@@ -320,32 +356,43 @@ export default function App() {
   });
 
   const [categoryMap, setCategoryMap] = useState<CategoryMap>(() => {
-    const saved = localStorage.getItem('control_gastos_catmap_v5');
+    const saved = localStorage.getItem('control_gastos_catmap_v6') || localStorage.getItem('control_gastos_catmap_v5');
     if (saved) {
       try {
         const parsed: CategoryMap = JSON.parse(saved);
-        // Ensure "Suscripciones y Plataformas" is established for all users and plans
-        if (!parsed['Suscripciones y Plataformas']) {
-          parsed['Suscripciones y Plataformas'] = parsed['Suscripciones'] || DEFAULT_CATEGORY_MAP['Suscripciones y Plataformas'] || [
-            "Netflix", "Spotify", "YouTube Premium", "Disney+ / Star+", "Amazon Prime Video",
-            "Max (HBO Max)", "Apple TV+ / iCloud", "ChatGPT Plus / OpenAI", "Paramount+",
-            "Crunchyroll", "Mercado Libre (Meli+)", "PlayStation Plus / Xbox Game Pass",
-            "Google One / Drive", "Otras plataformas digitales"
-          ];
+        // Ensure "Salud" and "Cuidado Personal" are independent
+        if (!parsed['Salud']) {
+          parsed['Salud'] = DEFAULT_CATEGORY_MAP['Salud'];
         }
-        if (parsed['Suscripciones']) {
-          delete parsed['Suscripciones'];
+        if (!parsed['Cuidado Personal']) {
+          parsed['Cuidado Personal'] = DEFAULT_CATEGORY_MAP['Cuidado Personal'];
+        }
+        if (parsed['Salud & Cuidado Personal']) {
+          delete parsed['Salud & Cuidado Personal'];
         }
 
-        // Add "Gimnasio, Club, Pádel & Deportes" to Salud & Cuidado Personal if missing
-        const saludKey = Object.keys(parsed).find(k => k.toLowerCase().includes('salud')) || 'Salud & Cuidado Personal';
-        if (!parsed[saludKey]) {
-          parsed[saludKey] = DEFAULT_CATEGORY_MAP['Salud & Cuidado Personal'];
-        } else if (!parsed[saludKey].includes('Gimnasio, Club, Pádel & Deportes')) {
-          parsed[saludKey].push('Gimnasio, Club, Pádel & Deportes');
+        // Ensure "Entretenimiento" is the standard category name
+        if (!parsed['Entretenimiento']) {
+          parsed['Entretenimiento'] = parsed['Entretenimiento, Ocio & Suscripciones'] || parsed['Entretenimiento & Ocio'] || parsed['Entretenimiento, Ocio & Salidas'] || DEFAULT_CATEGORY_MAP['Entretenimiento'];
         }
+        delete parsed['Entretenimiento, Ocio & Suscripciones'];
+        delete parsed['Entretenimiento & Ocio'];
+        delete parsed['Entretenimiento, Ocio & Salidas'];
 
-        // Remove Gimnasio and Streaming Video y Música from Entretenimiento
+        // Ensure ONLY "Suscripciones & Plataformas" is established (Deduplicate)
+        if (!parsed['Suscripciones & Plataformas']) {
+          parsed['Suscripciones & Plataformas'] = parsed['Suscripciones y Plataformas'] || parsed['Suscripciones'] || DEFAULT_CATEGORY_MAP['Suscripciones & Plataformas'];
+        }
+        delete parsed['Suscripciones y Plataformas'];
+        delete parsed['Suscripciones'];
+
+        // Ensure "Tecnología, Electrónica & Bazar" is established
+        if (!parsed['Tecnología, Electrónica & Bazar']) {
+          parsed['Tecnología, Electrónica & Bazar'] = parsed['Tecnología, Electro & Bazar'] || DEFAULT_CATEGORY_MAP['Tecnología, Electrónica & Bazar'];
+        }
+        delete parsed['Tecnología, Electro & Bazar'];
+
+        // Remove Gimnasio and Streaming from Entretenimiento
         Object.keys(parsed).forEach(cat => {
           if (cat.toLowerCase().includes('entretenimiento')) {
             parsed[cat] = parsed[cat].filter(sub => {
@@ -354,9 +401,6 @@ export default function App() {
                 return false;
               }
               if (s.includes('streaming') && (s.includes('video') || s.includes('musica') || s.includes('música'))) {
-                return false;
-              }
-              if (s === 'streaming video y musica' || s === 'streaming video & musica') {
                 return false;
               }
               return true;
@@ -371,17 +415,14 @@ export default function App() {
   });
 
   const [categoryColors, setCategoryColors] = useState<CategoryColors>(() => {
-    const saved = localStorage.getItem('control_gastos_colors_v5');
+    const saved = localStorage.getItem('control_gastos_colors_v6') || localStorage.getItem('control_gastos_colors_v5');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (!parsed['Suscripciones y Plataformas']) {
-          parsed['Suscripciones y Plataformas'] = parsed['Suscripciones'] || DEFAULT_CATEGORY_COLORS['Suscripciones y Plataformas'] || '#7928CA';
-        }
-        if (parsed['Suscripciones']) {
-          delete parsed['Suscripciones'];
-        }
-        return parsed;
+        return {
+          ...parsed,
+          ...DEFAULT_CATEGORY_COLORS,
+        };
       } catch {}
     }
     return DEFAULT_CATEGORY_COLORS;
@@ -394,11 +435,33 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (parsed.categories) {
-          if (!parsed.categories['Suscripciones y Plataformas']) {
-            parsed.categories['Suscripciones y Plataformas'] = parsed.categories['Suscripciones'] || 60000;
-          }
-          if (parsed.categories['Suscripciones']) {
+          // Deduplicate Suscripciones
+          if (parsed.categories['Suscripciones y Plataformas'] || parsed.categories['Suscripciones']) {
+            if (!parsed.categories['Suscripciones & Plataformas']) {
+              parsed.categories['Suscripciones & Plataformas'] = parsed.categories['Suscripciones y Plataformas'] || parsed.categories['Suscripciones'] || 60000;
+            }
+            delete parsed.categories['Suscripciones y Plataformas'];
             delete parsed.categories['Suscripciones'];
+          }
+          // Enforce Entretenimiento
+          if (parsed.categories['Entretenimiento, Ocio & Suscripciones'] || parsed.categories['Entretenimiento & Ocio'] || parsed.categories['Entretenimiento, Ocio & Salidas']) {
+            if (!parsed.categories['Entretenimiento']) {
+              parsed.categories['Entretenimiento'] = parsed.categories['Entretenimiento, Ocio & Suscripciones'] || parsed.categories['Entretenimiento & Ocio'] || parsed.categories['Entretenimiento, Ocio & Salidas'] || 55000;
+            }
+            delete parsed.categories['Entretenimiento, Ocio & Suscripciones'];
+            delete parsed.categories['Entretenimiento & Ocio'];
+            delete parsed.categories['Entretenimiento, Ocio & Salidas'];
+          }
+          // Enforce Tecnología
+          if (parsed.categories['Tecnología, Electro & Bazar']) {
+            if (!parsed.categories['Tecnología, Electrónica & Bazar']) {
+              parsed.categories['Tecnología, Electrónica & Bazar'] = parsed.categories['Tecnología, Electro & Bazar'];
+            }
+            delete parsed.categories['Tecnología, Electro & Bazar'];
+          }
+          // Remove obsolete Salud & Cuidado Personal
+          if (parsed.categories['Salud & Cuidado Personal']) {
+            delete parsed.categories['Salud & Cuidado Personal'];
           }
         }
         return parsed;
@@ -1947,29 +2010,6 @@ export default function App() {
         {/* Dashboard Main Container */}
         <main className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-6 flex-1 w-full space-y-6">
           
-          {/* Banner de Alerta de Vencimientos Locales (<48hs) */}
-          <VencimientoAlertBanner
-            urgentAlerts={urgentAlerts}
-            onMarkPaid={(id, source) => {
-              if (source === 'vencimiento') {
-                handleMarkVencimientoPaid(id);
-              } else {
-                try {
-                  const saved = localStorage.getItem('gastoar_vencimientos_alerts_v5');
-                  if (saved) {
-                    const list = JSON.parse(saved);
-                    const updated = list.map((it: any) => it.id === id ? { ...it, paidThisMonth: true, paidAt: Date.now() } : it);
-                    localStorage.setItem('gastoar_vencimientos_alerts_v5', JSON.stringify(updated));
-                  }
-                } catch {}
-                showToast('Vencimiento marcado como pagado ✓', 'success');
-                checkVencimientoNotifications(true);
-              }
-            }}
-            onNavigateToVencimientos={() => setActiveTab('card_alerts')}
-            onShowToast={showToast}
-          />
-          
           {/* TAB 1: DEDICATED INSTALLMENTS SECTION */}
           {activeTab === 'installments' && (
             <InstallmentsSection
@@ -2179,29 +2219,14 @@ export default function App() {
 
           {/* TAB: FLUJO DE CAJA (CASH FLOW PRO) */}
           {activeTab === 'cashflow' && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                    <span>🔮 Proyección de Flujo de Caja</span>
-                    <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 text-white text-[10px] font-black uppercase">
-                      Plan Pro
-                    </span>
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Proyección de saldo día a día a 30 días, días críticos y alerta de liquidez con pagos programados.
-                  </p>
-                </div>
-              </div>
-              <CashFlowSection
-                transactions={transactions}
-                currentBalance={appAvailableBalance}
-                scheduledPayments={appScheduledPayments}
-                isPro={currentPlanId === 'pro_ai' || isAdmin || isDemoMode}
-                onUpgradePro={() => setActiveTab('subscriptions')}
-                isDarkMode={isDarkMode}
-              />
-            </div>
+            <CashFlowSection
+              transactions={transactions}
+              currentBalance={appAvailableBalance}
+              scheduledPayments={appScheduledPayments}
+              isPro={currentPlanId === 'pro_ai' || isAdmin || isDemoMode}
+              onUpgradePro={() => setActiveTab('subscriptions')}
+              isDarkMode={isDarkMode}
+            />
           )}
 
           {/* TAB: COTIZACIONES MULTIMONEDA & CONVERSOR DÓLAR */}

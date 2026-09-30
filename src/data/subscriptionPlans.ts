@@ -20,7 +20,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       'Metas de ahorro personalizadas y alcancías virtuales',
       'Control de compras en cuotas y vencimiento de tarjetas',
       'Presupuestos mensuales y límites de gastos',
-      'Catálogo de categorías estándar predefinidas (incluye Suscripciones y Plataformas)',
+      'Catálogo de categorías estándar predefinidas (incluye Suscripciones & Plataformas)',
       'Exportación completa de reportes a CSV/Excel',
       'Soporte técnico por correo electrónico'
     ]

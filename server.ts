@@ -652,7 +652,8 @@ TAXONOMÍA Y PREFERENCIAS CLAVE DE VOZ EN ARGENTINA:
 - Personas: yo · mi pareja · mi marido · mi mujer · él · ella · [nombre del miembro] -> asignar pagadoPor
 - Categorías/comercios:
   * "el súper", "supermercado", "coto", "carrefour", "dia", "en dia", "día" -> Categoría: "Alimentación & Bebidas", Subcategoría: "Supermercado & Hipermercado"
-  * "farmacia", "farmacity" -> Categoría: "Salud & Cuidado Personal", Subcategoría: "Farmacia & Medicamentos"
+  * "farmacia", "farmacity", "remedios", "médico", "prepaga" -> Categoría: "Salud", Subcategoría: "Farmacia & Medicamentos"
+  * "peluquería", "barbería", "gimnasio", "estética", "pádel", "manicura", "spa" -> Categoría: "Cuidado Personal"
   * "nafta", "estación de servicio", "ypf", "shell", "axion" -> Categoría: "Transporte & Movilidad", Subcategoría: "Combustible (Nafta / GNC)"
   * "almacén", "kiosco" -> Categoría: "Alimentación & Bebidas", Subcategoría: "Kiosco & Almacén de barrio"
   * "verdulería", "frutería" -> Categoría: "Alimentación & Bebidas", Subcategoría: "Verdulería & Frutería"
@@ -668,8 +669,9 @@ TAXONOMÍA Y PREFERENCIAS CLAVE DE VOZ EN ARGENTINA:
 Ejemplos de frases:
 - "gasté 50000 en dia" / "gaste 50000 en dia" / "50000 en dia" -> tipoOperacion: "gasto", monto: 50000, concepto: "Supermercado Día", categoria: "Alimentación & Bebidas", subcategoria: "Supermercado & Hipermercado" (NUNCA asignar a Servicios!).
 - "gasté 50000 en coto" -> tipoOperacion: "gasto", monto: 50000, concepto: "Coto", categoria: "Alimentación & Bebidas", subcategoria: "Supermercado & Hipermercado"
-- "50000 en farmacia con la visa" -> tipoOperacion: "gasto", monto: 50000, metodoPago: "Crédito", tarjetaNombre: "Visa", categoria: "Salud & Cuidado Personal", subcategoria: "Farmacia & Medicamentos"
-- "50 en farmacia" -> tipoOperacion: "gasto", monto: 50000, concepto: "Farmacia", categoria: "Salud & Cuidado Personal", subcategoria: "Farmacia & Medicamentos"
+- "50000 en farmacia con la visa" -> tipoOperacion: "gasto", monto: 50000, metodoPago: "Crédito", tarjetaNombre: "Visa", categoria: "Salud", subcategoria: "Farmacia & Medicamentos"
+- "50 en farmacia" -> tipoOperacion: "gasto", monto: 50000, concepto: "Farmacia", categoria: "Salud", subcategoria: "Farmacia & Medicamentos"
+- "16000 en peluqueria" -> tipoOperacion: "gasto", monto: 16000, concepto: "Peluquería", categoria: "Cuidado Personal"
 - "la shell 25000" -> tipoOperacion: "gasto", monto: 25000, concepto: "Shell", categoria: "Transporte & Movilidad", subcategoria: "Combustible (Nafta / GNC)"
 - "compré 11000 en verdulería" -> tipoOperacion: "gasto", monto: 11000, concepto: "Verdulería", categoria: "Alimentación & Bebidas", subcategoria: "Verdulería & Frutería"
 - "11 en verdulería" -> tipoOperacion: "gasto", monto: 11000, concepto: "Verdulería", categoria: "Alimentación & Bebidas", subcategoria: "Verdulería & Frutería"
@@ -696,7 +698,8 @@ REGLAS ESTRICTAS DE CLASIFICACIÓN PARA ARGENTINA:
 - Si menciona YPF, Shell, Axion, Puma, combustible, nafta, GNC, estación de servicio -> Categoría: "Transporte & Movilidad", Subcategoría: "Combustible (Nafta / GNC)".
 - Si menciona SUBE, colectivo, subte, tren -> Categoría: "Transporte & Movilidad", Subcategoría: "Carga Tarjeta SUBE (Colectivo, Tren, Subte)".
 - Si menciona Uber, Cabify, Taxi, Didi -> Categoría: "Transporte & Movilidad", Subcategoría: "Taxi / Uber / Cabify / Didi".
-- Si menciona Farmacity, farmacia, remedios -> Categoría: "Salud & Cuidado Personal", Subcategoría: "Farmacia & Medicamentos".
+- Si menciona Farmacity, farmacia, remedios, médico, prepaga -> Categoría: "Salud", Subcategoría: "Farmacia & Medicamentos".
+- Si menciona peluquería, barbería, corte de pelo, estética, gimnasio, spa -> Categoría: "Cuidado Personal".
 - Si menciona alquiler -> Categoría: "Alquiler", Subcategoría: "Alquiler Mensual".
 - Si menciona expensas -> Categoría: "Expensas", Subcategoría: "Expensas Ordinarias".
 - Si menciona luz, Edenor, Edesur, gas, Metrogas, agua, AySA, internet, Fibertel, Personal, Claro, Movistar, celular -> Categoría: "Servicios".
@@ -1036,10 +1039,15 @@ Usuarios de la cuenta: ${JSON.stringify(userNames || ["Yo", "Mi Pareja"])}.`;
       hasExplicitCat = true;
       concepto = lower.includes("ypf") ? "YPF" : lower.includes("shell") ? "Shell" : "Combustible";
     } else if (tipoOperacion === 'gasto' && (lower.includes("farmacity") || lower.includes("farmacia") || lower.includes("remedio") || lower.includes("medicamento"))) {
-      categoria = "Salud & Cuidado Personal";
+      categoria = "Salud";
       subcategoria = "Farmacia & Medicamentos";
       hasExplicitCat = true;
       concepto = lower.includes("farmacity") ? "Farmacity" : "Farmacia";
+    } else if (tipoOperacion === 'gasto' && (lower.includes("peluqueria") || lower.includes("peluquería") || lower.includes("barberia") || lower.includes("barbería") || lower.includes("gimnasio") || lower.includes("estetica") || lower.includes("estética"))) {
+      categoria = "Cuidado Personal";
+      subcategoria = "Peluquería, Barbería & Estética";
+      hasExplicitCat = true;
+      concepto = lower.includes("gimnasio") ? "Gimnasio" : "Peluquería";
     } else if (tipoOperacion === 'gasto' && (lower.includes("verduleria") || lower.includes("verdulería") || lower.includes("fruteria") || lower.includes("verdura"))) {
       categoria = "Alimentación & Bebidas";
       subcategoria = "Verdulería & Frutería";

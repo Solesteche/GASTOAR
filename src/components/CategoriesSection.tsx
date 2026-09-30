@@ -240,7 +240,7 @@ export const CategoriesSection: React.FC<CategoriesSectionProps> = ({
                   </span>
                 </div>
                 <p className="text-xs text-amber-800/90 mt-0.5">
-                  Tenés acceso al catálogo oficial completo de categorías fijas (incluye <strong>Suscripciones y Plataformas</strong>). Para crear tus propias categorías y subcategorías personalizadas, pasate al Plan Parejas Dúo o Plan Pro.
+                  Tenés acceso al catálogo oficial completo de categorías fijas (incluye <strong>Suscripciones & Plataformas</strong>). Para crear tus propias categorías y subcategorías personalizadas, pasate al Plan Parejas Dúo o Plan Pro.
                 </p>
               </div>
             </div>
@@ -279,7 +279,7 @@ export const CategoriesSection: React.FC<CategoriesSectionProps> = ({
         {filteredCategories.map(cat => {
           const subs = categoryMap[cat] || [];
           const color = categoryColors[cat] || '#6F2EC5';
-          const isSubscriptions = cat === 'Suscripciones y Plataformas' || cat === 'Suscripciones' || cat.toLowerCase().includes('suscrip');
+          const isSubscriptions = cat === 'Suscripciones & Plataformas' || cat === 'Suscripciones y Plataformas' || cat === 'Suscripciones' || cat.toLowerCase().includes('suscrip');
 
           return (
             <div

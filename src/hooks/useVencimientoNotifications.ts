@@ -48,21 +48,14 @@ export function useVencimientoNotifications({
   const urgentCount = urgentAlerts.length;
   const criticalCount = analysis.criticalUnder24Hours.length;
 
-  // Run check and notification dispatch
+  // Run check and notification dispatch (dispatches system notifications outside the app, no in-app launch popup)
   const checkNotifications = useCallback(async (force = false) => {
     const result = await checkAndNotifyVencimientos(vencimientos, resolvedAlertItems, {
       force,
-      onInAppAlert: (alert) => {
-        if (onShowToast) {
-          onShowToast(
-            `⏰ Vencimiento en menos de 48 hs: "${alert.title}" (${alert.urgencyMessage}).`,
-            'info'
-          );
-        }
-      },
+      // No in-app alert when opening the app - native OS/browser notifications and calendar reminders handle alerts outside the app
     });
     return result;
-  }, [vencimientos, resolvedAlertItems, onShowToast]);
+  }, [vencimientos, resolvedAlertItems]);
 
   // Initial check on mount & whenever vencimientos change
   useEffect(() => {

@@ -76,13 +76,16 @@ export const IPC_CATEGORY_RATES: Record<string, number> = {
 
   // Salud — medicamentos suben mucho
   'Salud':                         0.058,
+  'Cuidado Personal':              0.042,
   'Salud & Cuidado Personal':      0.058,
   'Farmacia & Salud':              0.058,
 
   // Entretenimiento y ocio
   'Entretenimiento':               0.035,
+  'Entretenimiento & Ocio':        0.035,
   'Entretenimiento, Ocio & Salidas': 0.035,
   'Ocio & Suscripciones':          0.032,
+  'Suscripciones & Plataformas':   0.032,
   'Restaurantes & Bares':          0.048,
   'Restaurantes':                  0.048,
 
@@ -91,6 +94,7 @@ export const IPC_CATEGORY_RATES: Record<string, number> = {
   'Educación & Formación':         0.044,
 
   // Tecnología — dolarizado
+  'Tecnología, Electrónica & Bazar': 0.028,
   'Tecnología, Electro & Bazar':   0.028, // dolarizado, sube menos en % ARS
 
   // Mascotas
