@@ -25,6 +25,7 @@ import {
   ArrowLeftRight,
   ArrowUpRight,
   ArrowRight,
+  Sparkles,
 } from 'lucide-react';
 import {
   PieChart,
@@ -253,6 +254,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   }, [scoreHistory, todayStr]);
 
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
+  const [isProToolsModalOpen, setIsProToolsModalOpen] = useState(false);
 
   const handleFinalizeDay = () => {
     const updatedScore: DailyFinancialScore = { ...dailyScore, unlockedAt: Date.now() };
@@ -844,6 +846,38 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       };
     };
 
+    const getSemanticPill = (title: string, daysLeft: number) => {
+      const t = title.toLowerCase();
+      // Rojo para Tarjeta Visa (2 días) / <= 2 días
+      if (t.includes('visa') || t.includes('tarjeta') || daysLeft <= 2) {
+        return {
+          urgency: 'danger' as const,
+          semanticBadgeClass: 'bg-rose-50 text-rose-700 border border-rose-200/90 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800/80',
+          dotClass: 'bg-rose-500 animate-pulse',
+          relativeDaysLabel: daysLeft <= 0 ? 'Hoy' : daysLeft === 1 ? '1 día' : `${daysLeft} días`,
+          urgencyName: 'Urgente'
+        };
+      }
+      // Naranja para Expensas (7 días) / 3 a 7 días
+      if (t.includes('expen') || (daysLeft > 2 && daysLeft <= 7)) {
+        return {
+          urgency: 'warning' as const,
+          semanticBadgeClass: 'bg-amber-50 text-amber-800 border border-amber-200/90 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/80',
+          dotClass: 'bg-amber-500',
+          relativeDaysLabel: `${daysLeft} días`,
+          urgencyName: 'Próximo'
+        };
+      }
+      // Verde para Internet (15 días) / > 7 días
+      return {
+        urgency: 'normal' as const,
+        semanticBadgeClass: 'bg-emerald-50 text-emerald-800 border border-emerald-200/90 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/80',
+        dotClass: 'bg-emerald-500',
+        relativeDaysLabel: `${daysLeft} días`,
+        urgencyName: 'A tiempo'
+      };
+    };
+
     const realBills = (vencimientos || [])
       .filter(v => !v.isPaid)
       .map(v => {
@@ -853,6 +887,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         const daysLeft = Math.ceil((new Date(v.dueDate + 'T00:00:00').getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
         const isUnder48Hours = hoursLeft <= 48 && hoursLeft >= -24;
         const visuals = getBillVisuals(v.title, v.cat, v.icon);
+        const semantic = getSemanticPill(v.title || '', daysLeft);
 
         return {
           id: v.id,
@@ -865,34 +900,39 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           amount: v.amount || 0,
           daysLeft,
           hoursLeft,
-          isUnder48Hours
+          isUnder48Hours,
+          semanticBadgeClass: semantic.semanticBadgeClass,
+          dotClass: semantic.dotClass,
+          relativeDaysLabel: semantic.relativeDaysLabel,
+          urgencyName: semantic.urgencyName,
+          urgency: semantic.urgency
         };
       })
-      .sort((a, b) => a.hoursLeft - b.hoursLeft);
+      .sort((a, b) => a.daysLeft - b.daysLeft);
 
     if (realBills.length > 0) {
       return realBills.slice(0, 5);
     }
 
-    // Default mock list matching the user screenshot exactly:
-    // 1. Luz (Edenor) - $ 38.000 - 12 sep
-    // 2. Expensas (Consorcio) - $ 135.000 - 10 sep
-    // 3. Internet (Personal Flow) - $ 12.490 - 8 sep
-    // 4. Visa Santander (•••• 4821) - $ 215.450 - 5 oct
-    return [
+    // Default mock list with explicit semantic urgency:
+    // 1. Tarjeta Visa (2 días) - Rojo
+    // 2. Expensas (7 días) - Naranja
+    // 3. Internet (15 días) - Verde
+    // 4. Alquiler (22 días) - Verde
+    const fallbackList = [
       {
         id: '1',
-        icon: '💡',
-        title: 'Luz',
-        subtitle: 'Edenor',
-        cat: 'Servicios',
-        dueDateLabel: '12 sep',
-        amount: 38000,
-        daysLeft: 4,
-        hoursLeft: 96,
-        isUnder48Hours: false,
-        iconBg: 'bg-[#FEF9E7] dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/40',
-        iconColor: 'text-[#F59E0B]'
+        icon: '💳',
+        title: 'Tarjeta Visa',
+        subtitle: 'Santander Río',
+        cat: 'Tarjetas',
+        dueDateLabel: '2 días',
+        amount: 85000,
+        daysLeft: 2,
+        hoursLeft: 48,
+        isUnder48Hours: true,
+        iconBg: 'bg-[#FEF2F2] dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/40',
+        iconColor: 'text-[#EF4444]'
       },
       {
         id: '2',
@@ -900,10 +940,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         title: 'Expensas',
         subtitle: 'Consorcio',
         cat: 'Vivienda',
-        dueDateLabel: '10 sep',
+        dueDateLabel: '7 días',
         amount: 135000,
-        daysLeft: 2,
-        hoursLeft: 48,
+        daysLeft: 7,
+        hoursLeft: 168,
         isUnder48Hours: false,
         iconBg: 'bg-[#EFF6FF] dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40',
         iconColor: 'text-[#3B82F6]'
@@ -912,31 +952,43 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         id: '3',
         icon: '🌐',
         title: 'Internet',
-        subtitle: 'Personal Flow',
+        subtitle: 'Personal Flow Fibra',
         cat: 'Servicios',
-        dueDateLabel: '8 sep',
-        amount: 12490,
-        daysLeft: 1,
-        hoursLeft: 24,
+        dueDateLabel: '15 días',
+        amount: 12000,
+        daysLeft: 15,
+        hoursLeft: 360,
         isUnder48Hours: false,
         iconBg: 'bg-[#F5F3FF] dark:bg-purple-950/40 border border-purple-100 dark:border-purple-900/40',
         iconColor: 'text-[#8B5CF6]'
       },
       {
         id: '4',
-        icon: '💳',
-        title: 'Visa Santander',
-        subtitle: '•••• 4821',
-        cat: 'Tarjetas',
-        dueDateLabel: '5 oct',
-        amount: 215450,
-        daysLeft: 27,
-        hoursLeft: 648,
+        icon: '🏠',
+        title: 'Alquiler',
+        subtitle: 'Inmobiliaria',
+        cat: 'Vivienda',
+        dueDateLabel: '22 días',
+        amount: 650000,
+        daysLeft: 22,
+        hoursLeft: 528,
         isUnder48Hours: false,
-        iconBg: 'bg-[#FEF2F2] dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/40',
-        iconColor: 'text-[#EF4444]'
+        iconBg: 'bg-[#F5EEFF] dark:bg-purple-950/40 border border-purple-100 dark:border-purple-900/40',
+        iconColor: 'text-[#7C3AED]'
       }
     ];
+
+    return fallbackList.map(item => {
+      const semantic = getSemanticPill(item.title, item.daysLeft);
+      return {
+        ...item,
+        semanticBadgeClass: semantic.semanticBadgeClass,
+        dotClass: semantic.dotClass,
+        relativeDaysLabel: semantic.relativeDaysLabel,
+        urgencyName: semantic.urgencyName,
+        urgency: semantic.urgency
+      };
+    });
   }, [vencimientos]);
 
   // Distribución de gastos (Pie Data) con paleta y proporciones de la imagen
@@ -1115,8 +1167,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     ];
   }, [monthExpensesList, transactions]);
 
-  // Math para el Ring del Hero Card (Diámetro ~110px)
-  const ringRadius = 42;
+  // Math para el Ring del Hero Card (Diámetro 72px)
+  const ringRadius = 40;
   const ringCircumference = 2 * Math.PI * ringRadius;
   const ringDashOffset = ringCircumference - (budgetUsedPercent / 100) * ringCircumference;
 
@@ -1337,17 +1389,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════ */}
       <div
         style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
-        className="text-white rounded-3xl px-4 py-3.5 sm:px-6 sm:py-4 shadow-xl border border-purple-300/30 relative overflow-hidden"
+        className="text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-purple-300/30 relative overflow-hidden"
       >
         {/* Ambient glow in background */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col gap-2.5 sm:gap-3">
+        <div className="relative z-10 flex flex-col gap-5 sm:gap-6">
           {/* Top Row: Saldo on left & Porcentaje de Presupuesto circular ring on right */}
-          <div className="flex flex-row items-center justify-between gap-3 sm:gap-5">
-            {/* Left section: balance */}
+          <div className="flex flex-row items-center justify-between gap-4 sm:gap-6">
+            {/* Left section: balance (32px dominando el espacio) */}
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 mb-1.5">
                 <span className="text-xs sm:text-sm font-medium text-white/80 tracking-wide">Saldo disponible</span>
                 <button
                   type="button"
@@ -1359,18 +1411,18 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 </button>
               </div>
 
-              <div className="flex items-center gap-2 mt-1 mb-0.5">
-                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold font-outfit tracking-tight leading-none text-white truncate">
+              <div className="flex items-center gap-2">
+                <h2 className="text-[32px] font-black font-outfit tracking-tight leading-none text-white truncate">
                   {isBalanceHidden ? "$ ••••••" : `$ ${availableBalance.toLocaleString('es-AR')}`}
                 </h2>
               </div>
             </div>
 
-            {/* Right section: Circular Ring Gauge (Porcentaje del presupuesto utilizado) - CLICKABLE -> DISTRIBUCIÓN */}
+            {/* Right section: Circular Ring Gauge reducido a 72px con solo el porcentaje adentro - CLICKABLE -> DISTRIBUCIÓN */}
             <button
               type="button"
               onClick={() => setIsExpenseDistributionModalOpen(true)}
-              className="relative shrink-0 w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center cursor-pointer group transition-transform duration-200 hover:scale-105 active:scale-95 focus:outline-none rounded-full"
+              className="relative shrink-0 w-[72px] h-[72px] flex items-center justify-center cursor-pointer group transition-transform duration-200 hover:scale-105 active:scale-95 focus:outline-none rounded-full"
               title="Toca para ver la distribución de gastos"
               aria-label="Ver distribución de gastos del presupuesto"
             >
@@ -1381,7 +1433,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   r={ringRadius}
                   fill="none"
                   stroke="rgba(255, 255, 255, 0.15)"
-                  strokeWidth="9"
+                  strokeWidth="8"
                 />
                 <circle
                   cx="50"
@@ -1389,37 +1441,31 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   r={ringRadius}
                   fill="none"
                   stroke="#F95420"
-                  strokeWidth="9"
+                  strokeWidth="8"
                   strokeLinecap="round"
                   strokeDasharray={ringCircumference}
                   strokeDashoffset={ringDashOffset}
                   className="transition-all duration-1000 ease-out group-hover:stroke-[#ff6938]"
                 />
               </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center px-1 text-center pointer-events-none">
-                <span className="text-lg sm:text-xl lg:text-2xl font-black text-white leading-none tracking-tight group-hover:text-orange-200 transition-colors">
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span className="text-base sm:text-[17px] font-black text-white leading-none tracking-tight tabular-nums group-hover:text-orange-200 transition-colors">
                   {budgetUsedPercent}%
-                </span>
-                <span className="text-[8px] sm:text-[9px] text-purple-200/90 font-medium leading-tight mt-0.5 group-hover:text-white transition-colors">
-                  del presupuesto<br />utilizado
-                </span>
-                <span className="text-[7px] font-extrabold text-orange-300 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 leading-none">
-                  Ver distribución ↗
                 </span>
               </div>
             </button>
           </div>
 
-          {/* Bottom section: Progress bar & Presupuesto mensual */}
-          <div>
-            <div className="h-1.5 sm:h-2 rounded-full bg-white/20 overflow-hidden mb-1.5 sm:mb-2 w-full">
+          {/* Bottom section: Barra de progreso más fina y elegante & Presupuesto mensual */}
+          <div className="space-y-2">
+            <div className="h-1 rounded-full bg-white/20 overflow-hidden w-full">
               <div
                 className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#FFA234] via-[#F97316] to-[#F95420]"
                 style={{ width: `${Math.min(100, Math.max(5, budgetUsedPercent))}%` }}
               />
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/80 font-medium">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/85 font-medium pt-0.5">
               <div className="flex items-center gap-1.5">
                 <span className="font-normal text-white/80">Presupuesto mensual</span>
                 <span className="font-bold text-white">
@@ -1436,7 +1482,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   </button>
                 )}
               </div>
-              <span className="text-[11px] text-white/70 font-semibold">
+              <span className="text-[11px] text-white/75 font-semibold">
                 {budgetUsedPercent}% consumido
               </span>
             </div>
@@ -1477,7 +1523,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
           {/* Bottom section: Progress bar & % disponible */}
           <div>
-            <div className="h-2 sm:h-2.5 rounded-full bg-white/20 overflow-hidden mb-2 w-full">
+            <div className="h-1 rounded-full bg-white/20 overflow-hidden mb-2 w-full">
               <div
                 className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#00E676] to-[#10B981]"
                 style={{ width: `${Math.min(100, Math.max(5, dailyAvailablePercent))}%` }}
@@ -1526,7 +1572,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
             {/* Bottom section: Orange progress bar & detail */}
             <div>
-              <div className="h-2 sm:h-2.5 rounded-full bg-rose-100 dark:bg-rose-950/60 overflow-hidden mb-2 w-full">
+              <div className="h-1 rounded-full bg-rose-100 dark:bg-rose-950/60 overflow-hidden mb-2 w-full">
                 <div
                   className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#FF7A00] to-[#F95420]"
                   style={{
@@ -1586,7 +1632,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
             {/* Bottom section: Progress bar, % máx. consumido & Ver límites */}
             <div>
-              <div className="h-2 sm:h-2.5 rounded-full bg-white/20 overflow-hidden mb-2 w-full">
+              <div className="h-1 rounded-full bg-white/20 overflow-hidden mb-2 w-full">
                 <div
                   className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#00E676] to-[#10B981]"
                   style={{
@@ -1753,7 +1799,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           )}
         </div>
 
-        {/* Lista de vencimientos según el diseño exacto de la imagen */}
+        {/* Lista de vencimientos con color semántico según urgencia */}
         <div className="divide-y divide-slate-100/80">
           {upcomingBills.map(bill => (
             <div
@@ -1761,7 +1807,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               onClick={() => onNavigateTab ? onNavigateTab('card_alerts') : {}}
               className="py-3 px-1.5 sm:px-2 flex items-center justify-between gap-3 hover:bg-slate-50/70 rounded-2xl transition-colors cursor-pointer group"
             >
-              {/* Left: Ícono circular pastel + Título y Subtítulo */}
+              {/* Left: Ícono circular pastel + Título y Subtítulo con fecha */}
               <div className="flex items-center gap-3 min-w-0">
                 <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full ${bill.iconBg} flex items-center justify-center text-lg shrink-0 shadow-2xs group-hover:scale-105 transition-transform`}>
                   <span>{bill.icon}</span>
@@ -1771,18 +1817,22 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     {bill.title}
                   </p>
                   <p className="text-xs text-slate-400 font-normal truncate mt-0.5">
-                    {bill.subtitle}
+                    {bill.subtitle} • {bill.dueDateLabel}
                   </p>
                 </div>
               </div>
 
-              {/* Right: Monto + Píldora de fecha lila */}
-              <div className="flex items-center gap-3 sm:gap-6 shrink-0">
+              {/* Right: Monto + Píldora de color semántico (Rojo Tarjeta Visa, Naranja Expensas, Verde Internet) */}
+              <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
                 <span className="text-sm sm:text-base font-bold text-slate-900 tabular-nums">
                   $ {bill.amount.toLocaleString('es-AR')}
                 </span>
-                <span className="px-3.5 py-1 rounded-full bg-[#F5EEFF] text-[#7C3AED] text-xs font-semibold shrink-0 min-w-[66px] text-center shadow-2xs">
-                  {bill.dueDateLabel}
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-bold shrink-0 min-w-[76px] flex items-center justify-center gap-1.5 shadow-2xs transition-transform group-hover:scale-105 ${bill.semanticBadgeClass}`}
+                  title={`${bill.title}: ${bill.relativeDaysLabel} (${bill.urgencyName})`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${bill.dotClass}`} />
+                  <span>{bill.relativeDaysLabel}</span>
                 </span>
               </div>
             </div>
@@ -1804,19 +1854,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
           <button
             type="button"
-            onClick={() => {
-              if (onUpgradeToPro) onUpgradeToPro();
-              else setIsCashFlowModalOpen(true);
-            }}
+            onClick={() => setIsProToolsModalOpen(true)}
             className="text-[#6D3FEA] hover:text-[#5A2FD1] text-xs sm:text-sm font-bold flex items-center gap-1 transition-colors cursor-pointer group"
+            title="Ver todas las herramientas PRO disponibles"
           >
             <span>Ver más</span>
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
           </button>
         </div>
 
-        {/* Fila: Score financiero y Flujo de caja */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+        {/* Fila: Score financiero, Flujo de caja y Modo Inflación IPC (3 cajas con mismo diseño) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 transition-all">
           
           {/* Card 1: Score Financiero */}
           <div
@@ -1845,13 +1893,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               </svg>
             </div>
 
-            {/* Contenido central */}
+            {/* Contenido central: descripción recortada */}
             <div className="flex-1 min-w-0 pr-8">
               <h4 className="font-bold text-sm sm:text-base text-slate-900 group-hover:text-[#6D3FEA] transition-colors leading-tight">
                 Score financiero
               </h4>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed line-clamp-2 sm:line-clamp-none">
-                Conocé tu salud financiera, hábitos de gasto y recomendaciones.
+              <p className="text-xs text-slate-500 mt-1 font-medium leading-tight">
+                Conocé tu salud
               </p>
             </div>
 
@@ -1886,18 +1934,55 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               </div>
             </div>
 
-            {/* Contenido central */}
+            {/* Contenido central: descripción recortada */}
             <div className="flex-1 min-w-0 pr-8">
               <h4 className="font-bold text-sm sm:text-base text-slate-900 group-hover:text-[#6D3FEA] transition-colors leading-tight">
                 Flujo de caja
               </h4>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed line-clamp-2 sm:line-clamp-none">
-                Proyectá tus ingresos y gastos, anticipá tu saldo futuro y evitá sorpresas.
+              <p className="text-xs text-slate-500 mt-1 font-medium leading-tight">
+                Proyectá 30 días
               </p>
             </div>
 
             {/* Chevron Right */}
             <ChevronRight className={`w-4 h-4 text-purple-400 transition-transform duration-200 shrink-0 ${isCashFlowExpanded ? 'rotate-90 text-[#FF9500]' : 'group-hover:translate-x-0.5'}`} />
+          </div>
+
+          {/* Card 3: Modo Inflación IPC */}
+          <div
+            onClick={() => {
+              if (onNavigateTab) {
+                onNavigateTab('budgets');
+              }
+            }}
+            className="flex items-center gap-3.5 sm:gap-4 p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-[#F8F6FF] hover:bg-[#F2EEFF] border border-purple-100/80 cursor-pointer transition-all duration-200 group shadow-2xs hover:shadow-md relative select-none"
+            title="Ajustar presupuestos por Modo Inflación IPC"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onNavigateTab ? onNavigateTab('budgets') : {}; }}
+          >
+            {/* Pill PRO en esquina superior derecha */}
+            <span className="absolute top-3.5 sm:top-4 right-3.5 sm:right-4 px-2 py-0.5 rounded-full bg-[#6D3FEA] text-white text-[10px] font-black uppercase tracking-wider shadow-2xs">
+              PRO
+            </span>
+
+            {/* Ícono Modo Inflación IPC */}
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#E0F2FE] flex items-center justify-center shrink-0">
+              <span className="text-xl sm:text-2xl">📈</span>
+            </div>
+
+            {/* Contenido central: descripción recortada */}
+            <div className="flex-1 min-w-0 pr-8">
+              <h4 className="font-bold text-sm sm:text-base text-slate-900 group-hover:text-[#6D3FEA] transition-colors leading-tight">
+                Modo Inflación IPC
+              </h4>
+              <p className="text-xs text-slate-500 mt-1 font-medium leading-tight">
+                Ajustá por IPC
+              </p>
+            </div>
+
+            {/* Chevron Right */}
+            <ChevronRight className="w-4 h-4 text-purple-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
           </div>
 
         </div>
@@ -2388,6 +2473,186 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         currency={profile?.currency || 'ARS'}
         onNavigateTab={onNavigateTab}
       />
+
+      {/* Modal Completo de Herramientas PRO al hacer click en 'Ver más' */}
+      {isProToolsModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setIsProToolsModalOpen(false)}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-purple-100 p-5 sm:p-7 relative animate-in zoom-in-95 duration-200"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pro-tools-modal-title"
+          >
+            {/* Botón cerrar X */}
+            <button
+              type="button"
+              onClick={() => setIsProToolsModalOpen(false)}
+              className="absolute top-4 right-4 sm:top-6 sm:right-6 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+              aria-label="Cerrar modal"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-5 pr-8">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#6D3FEA] to-[#A855F7] flex items-center justify-center text-white shadow-md shrink-0">
+                <Sparkles className="w-6 h-6 stroke-[2.2]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 id="pro-tools-modal-title" className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                    Herramientas <span className="text-[#6D3FEA]">PRO</span>
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full bg-[#6D3FEA] text-white text-[10px] font-black uppercase tracking-wider">
+                    Activas
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                  Módulos avanzados para maximizar tu salud financiera y proyecciones
+                </p>
+              </div>
+            </div>
+
+            {/* Lista de herramientas PRO con diseño unificado */}
+            <div className="space-y-3">
+
+              {/* Tool 1: Score Financiero */}
+              <div 
+                onClick={() => {
+                  setIsProToolsModalOpen(false);
+                  setIsScoreModalOpen(true);
+                }}
+                className="p-4 rounded-2xl bg-[#F8F6FF] hover:bg-[#F2EEFF] border border-purple-100/90 transition-all cursor-pointer group flex items-center justify-between gap-3 shadow-2xs hover:shadow-xs"
+              >
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-11 h-11 rounded-2xl bg-white border border-purple-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                    <svg className="w-7 h-7 -rotate-90" viewBox="0 0 44 44">
+                      <circle cx="22" cy="22" r="16" fill="none" stroke="#E2D9FC" strokeWidth="5" />
+                      <circle cx="22" cy="22" r="16" fill="none" stroke="#6D3FEA" strokeWidth="5" strokeLinecap="round" strokeDasharray="100" strokeDashoffset="30" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-sm sm:text-base text-slate-900 group-hover:text-[#6D3FEA] transition-colors truncate">
+                        Score financiero
+                      </h4>
+                      <span className="px-1.5 py-0.5 rounded bg-purple-100 text-[#6D3FEA] text-[9px] font-bold">Salud 360°</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                      Conocé tu salud financiera, solvencia y hábitos diarios con puntaje inteligente.
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-purple-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+              </div>
+
+              {/* Tool 2: Flujo de caja */}
+              <div 
+                onClick={() => {
+                  setIsProToolsModalOpen(false);
+                  setIsCashFlowExpanded(true);
+                }}
+                className="p-4 rounded-2xl bg-[#FFF9F2] hover:bg-[#FFF3E5] border border-amber-200/70 transition-all cursor-pointer group flex items-center justify-between gap-3 shadow-2xs hover:shadow-xs"
+              >
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-11 h-11 rounded-2xl bg-[#FFEED4] flex items-center justify-center shrink-0 shadow-2xs">
+                    <div className="flex items-end gap-1 h-5">
+                      <span className="w-1.5 h-2.5 rounded-full bg-[#FF9500]" />
+                      <span className="w-1.5 h-3.5 rounded-full bg-[#FF9500]" />
+                      <span className="w-1.5 h-5 rounded-full bg-[#FF9500]" />
+                    </div>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-sm sm:text-base text-slate-900 group-hover:text-[#FF9500] transition-colors truncate">
+                        Flujo de caja
+                      </h4>
+                      <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-bold">15 - 30 días</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                      Proyectá 30 días de liquidez día por día anticipando cobros y vencimientos.
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-amber-500 group-hover:translate-x-0.5 transition-transform shrink-0" />
+              </div>
+
+              {/* Tool 3: Modo Inflación IPC */}
+              <div 
+                onClick={() => {
+                  setIsProToolsModalOpen(false);
+                  if (onNavigateTab) onNavigateTab('budgets');
+                }}
+                className="p-4 rounded-2xl bg-[#F0F9FF] hover:bg-[#E0F2FE] border border-sky-200/70 transition-all cursor-pointer group flex items-center justify-between gap-3 shadow-2xs hover:shadow-xs"
+              >
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-11 h-11 rounded-2xl bg-[#E0F2FE] flex items-center justify-center text-xl shrink-0 shadow-2xs">
+                    📈
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-sm sm:text-base text-slate-900 group-hover:text-sky-700 transition-colors truncate">
+                        Modo Inflación IPC
+                      </h4>
+                      <span className="px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 text-[9px] font-bold">INDEC</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                      Ajustá por IPC tus presupuestos para mantener constante tu poder adquisitivo real.
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-sky-500 group-hover:translate-x-0.5 transition-transform shrink-0" />
+              </div>
+
+              {/* Tool 4: Alertas de Tarjetas y Vencimientos */}
+              <div 
+                onClick={() => {
+                  setIsProToolsModalOpen(false);
+                  if (onNavigateTab) onNavigateTab('card_alerts');
+                }}
+                className="p-4 rounded-2xl bg-[#FAF5FF] hover:bg-[#F3E8FF] border border-purple-200/70 transition-all cursor-pointer group flex items-center justify-between gap-3 shadow-2xs hover:shadow-xs"
+              >
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-11 h-11 rounded-2xl bg-[#F3E8FF] flex items-center justify-center text-[#9333EA] shrink-0 shadow-2xs">
+                    <CreditCard className="w-5 h-5 stroke-[2.2]" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-sm sm:text-base text-slate-900 group-hover:text-[#9333EA] transition-colors truncate">
+                        Alertas y Cierres de Tarjetas
+                      </h4>
+                      <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 text-[9px] font-bold">Vencimientos</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                      Calendario de cierres bancarios y pagos para optimizar días de gracia.
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-purple-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-xs text-slate-400 font-medium">
+                Incluido con tu plan GastoAR PRO
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsProToolsModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

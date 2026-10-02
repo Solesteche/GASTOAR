@@ -17,7 +17,8 @@ import {
   ExternalLink,
   Crown,
   X,
-  Copy
+  Copy,
+  Calendar
 } from 'lucide-react';
 import { CoupleProfile, UserAccount, UserSubscription } from '../../types';
 
@@ -237,6 +238,31 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               </span>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-orange-500 transition-colors" />
+          </button>
+
+          {/* Sincronización de Calendarios */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onClose) onClose();
+              if (onNavigateToTab) onNavigateToTab('card_alerts');
+            }}
+            className="w-full p-3 rounded-2xl hover:bg-slate-50 flex items-center justify-between text-left transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Calendar className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-slate-800 block">
+                  Sincronización de Calendario
+                </span>
+                <span className="text-[10px] text-slate-400 block">
+                  Google Calendar & Apple Calendar (.ics)
+                </span>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
           </button>
 
           {/* 4. Cuenta Compartida */}

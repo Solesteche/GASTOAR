@@ -3,7 +3,7 @@ import {
   Bell, BellRing, Building2, Calendar, CalendarClock, CalendarPlus, Check,
   CheckCircle2, ChevronLeft, ChevronRight, Clock, Copy,
   CreditCard, Download, Droplets, Edit3, ExternalLink, FileText, Flame, HeartPulse, Home, Landmark,
-  MoreHorizontal, Plus, Search, Trash2, Tv, Wifi, X, Zap, Volume2, AlertTriangle, Sparkles
+  MoreHorizontal, Plus, Search, Trash2, Tv, Wifi, X, Zap, Volume2, AlertTriangle, Sparkles, Star
 } from 'lucide-react';
 import { CoupleProfile, Transaction } from '../types';
 import { formatCurrency } from '../utils/formatters';
@@ -48,12 +48,24 @@ interface AlertsSectionProps {
   isDemoMode?: boolean;
   isPro?: boolean;
   onShowToast: (msg: string, type: 'success' | 'error' | 'info') => void;
+  onSaveTransaction?: (txData: Partial<Transaction>) => void;
   onOpenTransactionModal?: () => void;
   onOpenCalendarModal?: () => void;
   onOpenCashFlow?: () => void;
 }
 
 const DEMO_ITEM_IDS = ['e1', 's1', 's3', 'a1', 's4', 's2', 'c1', 'c2'];
+
+const ALL_QUICK_TEMPLATES = [
+  { name: 'Alquiler', icon: Home, bg: 'bg-red-50 text-red-500', defaultAmount: 650000, category: 'alquiler' as AlertItemCategory, provider: 'Inmobiliaria / Dueño' },
+  { name: 'Expensas', icon: FileText, bg: 'bg-orange-50 text-orange-500', defaultAmount: 135000, category: 'expensas' as AlertItemCategory, provider: 'Consorcio' },
+  { name: 'Luz', icon: Zap, bg: 'bg-amber-50 text-amber-500', defaultAmount: 38000, category: 'servicio' as AlertItemCategory, provider: 'Edenor' },
+  { name: 'Agua', icon: Droplets, bg: 'bg-blue-50 text-blue-500', defaultAmount: 28500, category: 'servicio' as AlertItemCategory, provider: 'AySA' },
+  { name: 'Gas', icon: Flame, bg: 'bg-amber-50 text-amber-600', defaultAmount: 14620, category: 'servicio' as AlertItemCategory, provider: 'Metrogas' },
+  { name: 'Internet', icon: Wifi, bg: 'bg-sky-50 text-sky-500', defaultAmount: 12490, category: 'servicio' as AlertItemCategory, provider: 'Personal Flow' },
+  { name: 'Tarjeta', icon: CreditCard, bg: 'bg-purple-50 text-purple-600', defaultAmount: 215450, category: 'tarjeta' as AlertItemCategory, provider: 'Visa Santander / BBVA' },
+  { name: 'Streaming', icon: Tv, bg: 'bg-emerald-50 text-emerald-600', defaultAmount: 6500, category: 'suscripcion' as AlertItemCategory, provider: 'Netflix / Spotify' },
+];
 
 const DEFAULT_ALERT_ITEMS: DueAlertItem[] = [
   { id: 'e1', category: 'expensas', name: 'Expensas', provider: 'Consorcio', dueDay: 10, estimatedAmount: 135000, paymentCode: '04928103940129', autoDebit: false, reminderDaysBeforeDue: 2 },
@@ -83,6 +95,7 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   isDemoMode = false,
   isPro = false,
   onShowToast,
+  onSaveTransaction,
   onOpenTransactionModal,
   onOpenCalendarModal,
   onOpenCashFlow,
@@ -128,6 +141,23 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   const currentYear = now.getFullYear();
 
   const [activeView, setActiveView] = useState<'proximos' | 'mes' | 'pagados' | 'todos' | 'calendario'>('proximos');
+  const [urgencyFilter, setUrgencyFilter] = useState<'all' | 'week' | 'month' | 'next'>('all');
+  const [promptPayItem, setPromptPayItem] = useState<DueAlertItem | null>(null);
+  const [templateFrequency, setTemplateFrequency] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem('gastoar_vencimientos_tpl_freq');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [isCalendarSynced, setIsCalendarSynced] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('gastoar_calendar_synced') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'all' | AlertItemCategory>('all');

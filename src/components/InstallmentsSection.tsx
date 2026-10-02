@@ -367,25 +367,25 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
       {/* 2. Hero Balance Card (Estilo Resumen: Saldo por pagar & % Amortizado con linear-gradient) */}
       <div
         style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
-        className="text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-300/30"
+        className="text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-purple-300/30 relative overflow-hidden"
       >
-        <div className="flex items-start gap-3">
+        <div className="flex items-center justify-between gap-4 sm:gap-6">
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-purple-200/90 mb-1.5 tracking-wide">Saldo total por pagar</p>
-            <div className="flex items-center gap-2 mb-2">
-              <p className="text-2xl sm:text-3xl lg:text-4xl font-black font-outfit text-white tracking-tight leading-none">
+            <p className="text-xs sm:text-sm font-medium text-white/80 mb-1.5 tracking-wide">Saldo total por pagar</p>
+            <div className="flex items-center gap-2 mb-3">
+              <h2 className="text-[32px] font-black font-outfit text-white tracking-tight leading-none truncate">
                 {formatCurrency(metrics.totalPending, currency)}
-              </p>
+              </h2>
             </div>
-            <div className="h-2 rounded-full overflow-hidden mb-2 bg-white/20">
+            <div className="h-1 rounded-full overflow-hidden mb-2.5 bg-white/20">
               <div
-                className="h-full rounded-full transition-all duration-700 bg-[#F95420]"
+                className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#FFA234] via-[#F97316] to-[#F95420]"
                 style={{ 
                   width: `${Math.min(100, Math.max(5, metrics.percentPaid))}%`, 
                 }}
               />
             </div>
-            <div className="flex items-center gap-2 text-xs text-purple-200">
+            <div className="flex items-center gap-2 text-xs text-white/80">
               <span>Total financiado:{" "}
                 <span className="font-semibold text-white">{formatCurrency(metrics.totalCommitted, currency)}</span>
               </span>
@@ -396,21 +396,19 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
             </div>
           </div>
 
-          {/* Circular Progress Gauge */}
-          <div className="relative flex-shrink-0" style={{ width: 110, height: 110 }}>
-            <svg width="110" height="110" viewBox="0 0 100 100">
-              <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255, 255, 255, 0.15)" strokeWidth="7" />
+          {/* Circular Progress Gauge (72px, solo porcentaje adentro) */}
+          <div className="relative shrink-0 w-[72px] h-[72px] flex items-center justify-center">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+              <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255, 255, 255, 0.15)" strokeWidth="8" />
               <circle
                 cx={cx} cy={cy} r={r} fill="none"
-                stroke="#F95420" strokeWidth="7" strokeLinecap="round"
+                stroke="#F95420" strokeWidth="8" strokeLinecap="round"
                 strokeDasharray={`${dash} ${circ}`}
-                transform={`rotate(-90 ${cx} ${cy})`}
                 className="transition-all duration-1000 ease-out"
               />
             </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <p className="text-xl font-bold font-outfit leading-none text-white">{metrics.percentPaid}%</p>
-              <p className="text-[9px] text-purple-200 text-center mt-0.5 leading-tight">del total<br />amortizado</p>
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <p className="text-base sm:text-[17px] font-black font-outfit leading-none text-white tabular-nums">{metrics.percentPaid}%</p>
             </div>
           </div>
         </div>

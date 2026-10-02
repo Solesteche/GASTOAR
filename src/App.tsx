@@ -503,11 +503,6 @@ export default function App() {
 
   // ─── Vencimientos ─────────────────────────────────────────────────────────────
   const [vencimientos, setVencimientos] = useState<Vencimiento[]>(() => {
-    const saved = localStorage.getItem('gastoar_vencimientos_v1');
-    if (saved) {
-      try { return JSON.parse(saved); } catch {}
-    }
-    // Datos iniciales de ejemplo (se pueden borrar luego)
     const today = new Date();
     const pad = (n: number) => n.toString().padStart(2, '0');
     const addDays = (d: Date, days: number) => {
@@ -515,14 +510,15 @@ export default function App() {
       r.setDate(r.getDate() + days);
       return `${r.getFullYear()}-${pad(r.getMonth() + 1)}-${pad(r.getDate())}`;
     };
-    return [
+
+    const defaultItems: Vencimiento[] = [
       {
         id: 'v1',
         icon: '💳',
         title: 'Tarjeta Visa',
         cat: 'Tarjeta de crédito',
         amount: 85000,
-        dueDate: addDays(today, 3),
+        dueDate: addDays(today, 2), // Rojo semántico (2 días)
         isRecurring: true,
       },
       {
@@ -531,16 +527,7 @@ export default function App() {
         title: 'Expensas',
         cat: 'Hogar',
         amount: 135000,
-        dueDate: addDays(today, 5),
-        isRecurring: true,
-      },
-      {
-        id: 'v3',
-        icon: '💧',
-        title: 'AySA',
-        cat: 'Servicios',
-        amount: 28500,
-        dueDate: addDays(today, 8),
+        dueDate: addDays(today, 7), // Naranja semántico (7 días)
         isRecurring: true,
       },
       {
@@ -549,7 +536,16 @@ export default function App() {
         title: 'Internet',
         cat: 'Servicios',
         amount: 12000,
-        dueDate: addDays(today, 11),
+        dueDate: addDays(today, 15), // Verde semántico (15 días)
+        isRecurring: true,
+      },
+      {
+        id: 'v3',
+        icon: '💧',
+        title: 'AySA',
+        cat: 'Servicios',
+        amount: 28500,
+        dueDate: addDays(today, 18),
         isRecurring: true,
       },
       {
@@ -558,10 +554,34 @@ export default function App() {
         title: 'Alquiler',
         cat: 'Vivienda',
         amount: 650000,
-        dueDate: addDays(today, 14),
+        dueDate: addDays(today, 22),
         isRecurring: true,
       },
     ];
+
+    const saved = localStorage.getItem('gastoar_vencimientos_v1');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Asegurar que los 3 vencimientos clave mantengan la semántica requerida por el usuario
+          return parsed.map((item: Vencimiento) => {
+            const t = (item.title || '').toLowerCase();
+            if (t.includes('visa') || t.includes('tarjeta')) {
+              return { ...item, title: 'Tarjeta Visa', dueDate: addDays(today, 2) };
+            }
+            if (t.includes('expen')) {
+              return { ...item, title: 'Expensas', dueDate: addDays(today, 7) };
+            }
+            if (t.includes('internet')) {
+              return { ...item, title: 'Internet', dueDate: addDays(today, 15) };
+            }
+            return item;
+          });
+        }
+      } catch {}
+    }
+    return defaultItems;
   });
 
   // Persistir vencimientos
@@ -2036,6 +2056,7 @@ export default function App() {
               transactions={transactions}
               isDemoMode={isDemoMode}
               onShowToast={showToast}
+              onSaveTransaction={handleSaveTransaction}
               onOpenTransactionModal={() => {
                 setEditingTransaction(null);
                 setInitialIsCuotas(false);
