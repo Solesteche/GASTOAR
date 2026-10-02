@@ -319,7 +319,7 @@ export const BudgetInsightsSection: React.FC<BudgetInsightsSectionProps> = ({
           </div>
 
           {/* Bar track with markers at 90% and 100% */}
-          <div className="relative w-full h-4 rounded-full bg-slate-100 dark:bg-purple-950/80 overflow-visible">
+          <div className="relative w-full h-1 rounded-full bg-slate-100 dark:bg-purple-950/80 overflow-visible">
             {/* 90% Threshold marker line */}
             <div
               className="absolute top-0 bottom-0 w-0.5 bg-amber-500 z-10"
@@ -912,7 +912,7 @@ export const BudgetInsightsSection: React.FC<BudgetInsightsSectionProps> = ({
                             </div>
 
                             {/* Mini horizontal bar for subcategory */}
-                            <div className="h-1.5 rounded-full bg-slate-200 dark:bg-purple-950/60 overflow-hidden">
+                            <div className="h-1 rounded-full bg-slate-200 dark:bg-purple-950/60 overflow-hidden">
                               <div
                                 className={`h-full rounded-full transition-all duration-300 ${
                                   sub.isExceeded

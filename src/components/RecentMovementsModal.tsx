@@ -253,7 +253,7 @@ export const RecentMovementsModal: React.FC<RecentMovementsModalProps> = ({
               </div>
 
               {/* Mini progress bar */}
-              <div className="h-2 rounded-full bg-white/15 overflow-hidden mb-2.5 w-full">
+              <div className="h-1 rounded-full bg-white/15 overflow-hidden mb-2.5 w-full">
                 <div
                   className="h-full rounded-full transition-all duration-700 bg-[#F95420]"
                   style={{ width: `${Math.min(100, budgetUsedPercent)}%` }}

@@ -423,7 +423,7 @@ export const BudgetCriticalAlertsModal: React.FC<BudgetCriticalAlertsModalProps>
 
                         {/* Progress Bar */}
                         <div>
-                          <div className="h-1.5 sm:h-2 rounded-full bg-slate-100 dark:bg-purple-950/50 overflow-hidden w-full">
+                          <div className="h-1 rounded-full bg-slate-100 dark:bg-purple-950/50 overflow-hidden w-full">
                             <div
                               className={`h-full rounded-full transition-all duration-500 ${
                                 isExceeded ? 'bg-rose-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'
@@ -520,7 +520,7 @@ export const BudgetCriticalAlertsModal: React.FC<BudgetCriticalAlertsModalProps>
 
                         {/* Progress bar */}
                         <div>
-                          <div className="h-1.5 sm:h-2 rounded-full bg-slate-100 dark:bg-purple-950/50 overflow-hidden w-full">
+                          <div className="h-1 rounded-full bg-slate-100 dark:bg-purple-950/50 overflow-hidden w-full">
                             <div
                               className={`h-full rounded-full transition-all duration-500 ${
                                 isExceeded ? 'bg-rose-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'

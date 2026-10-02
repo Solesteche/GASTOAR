@@ -181,7 +181,7 @@ export const GoalsMovementsModal: React.FC<GoalsMovementsModalProps> = ({
               <span>Progreso general de ahorro</span>
               <span>{metrics.percent}% alcanzado</span>
             </div>
-            <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-purple-950/80 overflow-hidden">
+            <div className="w-full h-1 rounded-full bg-slate-200 dark:bg-purple-950/80 overflow-hidden">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 transition-all duration-500"
                 style={{ width: `${metrics.percent}%` }}
@@ -435,7 +435,7 @@ export const GoalsMovementsModal: React.FC<GoalsMovementsModalProps> = ({
                         <span>Fecha límite: {formatDateEs(goal.fechaObjetivo)}</span>
                       )}
                     </div>
-                    <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-purple-950/80 overflow-hidden">
+                    <div className="w-full h-1 rounded-full bg-slate-100 dark:bg-purple-950/80 overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{

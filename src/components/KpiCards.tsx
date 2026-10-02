@@ -226,7 +226,7 @@ export const KpiCards: React.FC<KpiCardsProps> = ({
 
         {/* Progress Bar */}
         <div className="mt-3 space-y-1.5">
-          <div className="w-full bg-purple-50 h-2 rounded-full overflow-hidden">
+          <div className="w-full bg-purple-50 h-1 rounded-full overflow-hidden">
             <div
               className={`h-full transition-all duration-500 ${
                 globalBudget.percentage >= 100 

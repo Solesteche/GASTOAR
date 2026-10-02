@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Sparkles, ArrowRight } from 'lucide-react';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { 
   Header 
@@ -2371,6 +2371,38 @@ export default function App() {
         hasDebt={debtInfo.debtAmount > 0}
         urgentVencimientosCount={urgentCount}
       />
+
+      {/* Floating Demo Mode Exit & Register Pill / Bar (Req: fácil salida y registro) */}
+      {isDemoMode && (
+        <aside
+          aria-label="Aviso de Modo Demostración"
+          className="fixed bottom-20 md:bottom-6 right-3 sm:right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300 max-w-[calc(100vw-24px)] pointer-events-auto"
+        >
+          <div className="flex items-center gap-2 sm:gap-3 bg-slate-900/95 backdrop-blur-md text-white p-2 pl-3.5 sm:pl-4 rounded-2xl shadow-2xl border border-purple-500/40 ring-2 ring-purple-400/20">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping shrink-0" />
+              <div className="text-left min-w-0">
+                <p className="text-[11px] sm:text-xs font-black text-amber-300 leading-tight">
+                  Modo Demo
+                </p>
+                <p className="text-[10px] text-slate-300 truncate hidden xs:block">
+                  ¿Querés guardar tus datos?
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleExitDemo}
+              className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-[#7928CA] to-[#F95420] hover:from-[#6A1FB8] hover:to-[#E04412] text-white text-xs sm:text-sm font-black shadow-lg flex items-center gap-1.5 shrink-0 cursor-pointer active:scale-95 transition-all"
+              title="Salir del modo demo y registrar tu cuenta real"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <span>Salir y Registrarme</span>
+              <ArrowRight className="w-3.5 h-3.5 shrink-0" />
+            </button>
+          </div>
+        </aside>
+      )}
 
       {/* MODALS */}
       <TransactionModal

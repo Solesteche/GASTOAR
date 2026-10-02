@@ -461,7 +461,7 @@ export const InstallmentsMovementsModal: React.FC<InstallmentsMovementsModalProp
                         <span>{item.progressPct}% pagado</span>
                       </div>
 
-                      <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-purple-950/80 overflow-hidden">
+                      <div className="w-full h-1 rounded-full bg-slate-100 dark:bg-purple-950/80 overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-500 ${
                             isEnding

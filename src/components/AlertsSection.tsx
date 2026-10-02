@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   Bell, BellRing, Building2, Calendar, CalendarClock, CalendarPlus, Check,
-  CheckCircle2, ChevronLeft, ChevronRight, Clock, Copy,
+  CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock, Copy,
   CreditCard, Download, Droplets, Edit3, ExternalLink, FileText, Flame, HeartPulse, Home, Landmark,
-  MoreHorizontal, Plus, Search, Trash2, Tv, Wifi, X, Zap, Volume2, AlertTriangle, Sparkles, Star
+  Layers, LayoutGrid, MoreHorizontal, Plus, Search, SlidersHorizontal, Trash2, Tv, Wifi, X, Zap, Volume2, AlertTriangle, Sparkles, Star
 } from 'lucide-react';
 import { CoupleProfile, Transaction } from '../types';
 import { formatCurrency } from '../utils/formatters';
@@ -78,15 +78,15 @@ const DEFAULT_ALERT_ITEMS: DueAlertItem[] = [
   { id: 'c2', category: 'tarjeta', name: 'Mastercard BBVA', provider: 'BBVA', closeDay: 25, dueDay: 14, lastDigits: '1904', estimatedAmount: 14940, autoDebit: false, reminderDaysBeforeDue: 2 }
 ];
 
-const CATEGORY_META: Record<AlertItemCategory, { label: string; Icon: React.ElementType; soft: string; text: string }> = {
-  tarjeta: { label: 'Tarjeta', Icon: CreditCard, soft: 'bg-[#FFF3EE]', text: 'text-[#F95420]' },
-  alquiler: { label: 'Alquiler', Icon: Home, soft: 'bg-[#FFF1F2]', text: 'text-[#E11D48]' },
-  expensas: { label: 'Expensas', Icon: Home, soft: 'bg-[#F4EEFF]', text: 'text-[#7C3AED]' },
-  servicio: { label: 'Servicio', Icon: Wifi, soft: 'bg-[#EBF4FF]', text: 'text-[#2563EB]' },
-  impuesto: { label: 'Impuesto', Icon: Landmark, soft: 'bg-rose-50', text: 'text-rose-600' },
-  suscripcion: { label: 'Suscripción', Icon: Tv, soft: 'bg-emerald-50', text: 'text-emerald-600' },
-  salud: { label: 'Salud', Icon: HeartPulse, soft: 'bg-teal-50', text: 'text-teal-600' },
-  otro: { label: 'Otro', Icon: MoreHorizontal, soft: 'bg-slate-100', text: 'text-slate-600' }
+const CATEGORY_META: Record<AlertItemCategory, { label: string; Icon: React.ElementType; soft: string; text: string; border: string }> = {
+  tarjeta: { label: 'Tarjeta', Icon: CreditCard, soft: 'bg-[#FFF3EE]', text: 'text-[#F95420]', border: 'border-orange-200' },
+  alquiler: { label: 'Alquiler', Icon: Home, soft: 'bg-[#FFF1F2]', text: 'text-[#E11D48]', border: 'border-rose-200' },
+  expensas: { label: 'Expensas', Icon: Home, soft: 'bg-[#F4EEFF]', text: 'text-[#7C3AED]', border: 'border-purple-200' },
+  servicio: { label: 'Servicio', Icon: Wifi, soft: 'bg-[#EBF4FF]', text: 'text-[#2563EB]', border: 'border-blue-200' },
+  impuesto: { label: 'Impuesto', Icon: Landmark, soft: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-200' },
+  suscripcion: { label: 'Suscripción', Icon: Tv, soft: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
+  salud: { label: 'Salud', Icon: HeartPulse, soft: 'bg-teal-50', text: 'text-teal-600', border: 'border-teal-200' },
+  otro: { label: 'Otro', Icon: MoreHorizontal, soft: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' }
 };
 
 export const AlertsSection: React.FC<AlertsSectionProps> = ({
@@ -161,6 +161,30 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'all' | AlertItemCategory>('all');
+  const [dateFilter, setDateFilter] = useState<'all' | 'week' | 'this_month' | 'next_month' | 'overdue'>('all');
+  const [modeFilter, setModeFilter] = useState<'all' | 'auto' | 'manual' | 'tarjeta'>('all');
+  const [activeCarouselPage, setActiveCarouselPage] = useState(0);
+  const carouselRef = useRef<HTMLDivElement>(null);
+
+  const handleCarouselScroll = () => {
+    if (carouselRef.current) {
+      const scrollLeft = carouselRef.current.scrollLeft;
+      const clientWidth = carouselRef.current.clientWidth;
+      const page = Math.round(scrollLeft / (clientWidth * 0.8));
+      setActiveCarouselPage(page);
+    }
+  };
+
+  const scrollToCarouselPage = (pageIdx: number) => {
+    if (carouselRef.current) {
+      const clientWidth = carouselRef.current.clientWidth;
+      carouselRef.current.scrollTo({
+        left: pageIdx * (clientWidth * 0.8),
+        behavior: 'smooth'
+      });
+      setActiveCarouselPage(pageIdx);
+    }
+  };
   const [sortBy, setSortBy] = useState<'day' | 'amount_desc' | 'name'>('day');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<DueAlertItem | null>(null);
@@ -375,15 +399,60 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
     };
   }, [items, currentDay]);
 
+  // Totales de gastos/compromisos por categoría para el carrusel
+  const categoryTotals = useMemo(() => {
+    const totals: Partial<Record<AlertItemCategory, number>> = {};
+    items.forEach(it => {
+      const cat = it.category || 'otro';
+      totals[cat] = (totals[cat] || 0) + (it.estimatedAmount || 0);
+    });
+    return totals;
+  }, [items]);
+
+  // Mostrar ÚNICAMENTE categorías que tengan gasto/monto > 0 o la categoría seleccionada (Req 3: cero ruido de categorías vacías)
+  const carouselCategories = useMemo<AlertItemCategory[]>(() => {
+    const activeWithSpending = (Object.keys(CATEGORY_META) as AlertItemCategory[])
+      .filter(cat => (categoryTotals[cat] || 0) > 0 || categoryFilter === cat)
+      .sort((a, b) => (categoryTotals[b] || 0) - (categoryTotals[a] || 0));
+
+    if (activeWithSpending.length === 0) {
+      const present = Array.from(new Set(items.map(i => i.category)));
+      return present.length > 0 ? present : (['servicio', 'tarjeta', 'expensas', 'alquiler'] as AlertItemCategory[]);
+    }
+    return activeWithSpending;
+  }, [categoryTotals, categoryFilter, items]);
+
   const filteredItems = useMemo(() => {
     let result = items.filter(i => {
+      // 1. Status view filter
       if (activeView === 'mes' && i.paidThisMonth) return false;
       if (activeView === 'pagados' && !i.paidThisMonth) return false;
       if (activeView === 'proximos' && i.paidThisMonth) return false;
+
+      // 2. Plazo / Fecha filter
+      if (dateFilter === 'overdue') {
+        if (i.paidThisMonth || i.dueDay >= currentDay) return false;
+      } else if (dateFilter === 'week') {
+        const diff = i.dueDay - currentDay;
+        if (diff < 0 || diff > 7) return false;
+      } else if (dateFilter === 'next_month') {
+        const diff = i.dueDay - currentDay;
+        if (diff <= 7) return false;
+      }
+
+      // 3. Modo de pago filter
+      if (modeFilter === 'auto' && !i.autoDebit) return false;
+      if (modeFilter === 'manual' && i.autoDebit) return false;
+      if (modeFilter === 'tarjeta' && i.category !== 'tarjeta') return false;
+
+      // 4. Categoría filter
       if (categoryFilter !== 'all' && i.category !== categoryFilter) return false;
+
+      // 5. Búsqueda con feedback
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
-        if (!`${i.name} ${i.provider} ${i.notes || ''}`.toLowerCase().includes(q)) return false;
+        const match = `${i.name} ${i.provider} ${i.notes || ''} ${i.paymentCode || ''} ${i.lastDigits || ''}`.toLowerCase().includes(q);
+        if (!match) return false;
       }
       return true;
     });
@@ -393,7 +462,125 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
       if (sortBy === 'name') return a.name.localeCompare(b.name);
       return a.dueDay - b.dueDay;
     });
-  }, [items, activeView, categoryFilter, searchTerm, sortBy]);
+  }, [items, activeView, dateFilter, modeFilter, categoryFilter, searchTerm, sortBy, currentDay]);
+
+  const totalFilteredAmount = useMemo(() => {
+    return filteredItems.reduce((acc, it) => acc + (it.estimatedAmount || 0), 0);
+  }, [filteredItems]);
+
+  const isSearchFiltered = searchTerm.trim().length > 0;
+  const isDateFiltered = dateFilter !== 'all';
+  const isModeFiltered = modeFilter !== 'all';
+  const isCategoryFiltered = categoryFilter !== 'all';
+
+  const activeFiltersCount = (isSearchFiltered ? 1 : 0) +
+    (isDateFiltered ? 1 : 0) +
+    (isModeFiltered ? 1 : 0) +
+    (isCategoryFiltered ? 1 : 0);
+
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setDateFilter('all');
+    setModeFilter('all');
+    setCategoryFilter('all');
+  };
+
+  const getDateFilterLabel = () => {
+    switch (dateFilter) {
+      case 'week': return 'Próximos 7 días';
+      case 'this_month': return 'Este mes';
+      case 'next_month': return 'Próximo mes';
+      case 'overdue': return 'Vencidos';
+      default: return 'Todos los plazos';
+    }
+  };
+
+  const getModeFilterLabel = () => {
+    switch (modeFilter) {
+      case 'auto': return 'Débito automático';
+      case 'manual': return 'Pago manual';
+      case 'tarjeta': return 'Tarjeta de crédito';
+      default: return 'Todos los modos';
+    }
+  };
+
+  const getCategoryFilterLabel = () => {
+    if (categoryFilter === 'all') return 'Todas';
+    return CATEGORY_META[categoryFilter]?.label || categoryFilter;
+  };
+
+  // ─── Agrupación de filas de vencimientos por fecha (Req 4) ──────────────────────
+  interface VencimientoDateGroup {
+    dateKey: string;
+    day: number;
+    displayDate: string;
+    isToday: boolean;
+    isTomorrow: boolean;
+    isPast: boolean;
+    hasUnpaid: boolean;
+    totalAmount: number;
+    items: DueAlertItem[];
+  }
+
+  const groupedVencimientos = useMemo<VencimientoDateGroup[]>(() => {
+    const groupsMap = new Map<number, DueAlertItem[]>();
+
+    filteredItems.forEach(it => {
+      const day = it.dueDay || 1;
+      const existing = groupsMap.get(day) || [];
+      existing.push(it);
+      groupsMap.set(day, existing);
+    });
+
+    const monthName = new Date(currentYear, currentMonth, 1)
+      .toLocaleDateString('es-AR', { month: 'long' });
+    const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
+    const sortedDays = Array.from(groupsMap.keys()).sort((a, b) => {
+      if (sortBy === 'amount_desc') {
+        const sumA = (groupsMap.get(a) || []).reduce((s, i) => s + (i.estimatedAmount || 0), 0);
+        const sumB = (groupsMap.get(b) || []).reduce((s, i) => s + (i.estimatedAmount || 0), 0);
+        return sumB - sumA;
+      }
+      return a - b;
+    });
+
+    const groups: VencimientoDateGroup[] = [];
+    sortedDays.forEach(day => {
+      const list = groupsMap.get(day) || [];
+      const isToday = day === currentDay;
+      const isTomorrow = day === currentDay + 1;
+      const isPast = day < currentDay;
+      const hasUnpaid = list.some(i => !i.paidThisMonth);
+      const totalAmount = list.reduce((sum, i) => sum + (i.estimatedAmount || 0), 0);
+
+      let displayDate = `Día ${day} de ${capitalizedMonth}`;
+      if (isToday) {
+        displayDate = `Hoy, ${day} de ${capitalizedMonth}`;
+      } else if (isTomorrow) {
+        displayDate = `Mañana, ${day} de ${capitalizedMonth}`;
+      } else if (isPast && hasUnpaid) {
+        const daysAgo = currentDay - day;
+        displayDate = `Día ${day} • Vencido hace ${daysAgo} ${daysAgo === 1 ? 'día' : 'días'}`;
+      } else if (isPast && !hasUnpaid) {
+        displayDate = `Día ${day} de ${capitalizedMonth} • Pagado ✓`;
+      }
+
+      groups.push({
+        dateKey: `day-${day}`,
+        day,
+        displayDate,
+        isToday,
+        isTomorrow,
+        isPast,
+        hasUnpaid,
+        totalAmount,
+        items: list,
+      });
+    });
+
+    return groups;
+  }, [filteredItems, currentDay, currentMonth, currentYear, sortBy]);
 
   const getItemIconConfig = (item: DueAlertItem) => {
     const nameLower = item.name.toLowerCase();
@@ -1103,24 +1290,346 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
             </div>
           </section>
 
-          {/* 5. Search Bar */}
-          <div className="relative w-full">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Buscar vencimiento..."
-              className="w-full pl-10 pr-9 py-3 rounded-2xl bg-[#F5F7FA] border border-slate-200/80 text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-purple-100 focus:border-purple-300 transition-all"
-            />
-            {searchTerm && (
+          {/* 5. SEARCH BAR & ACTIVE FILTERS (Req 1 & Req 2: feedback de resultados y filtros) */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  placeholder="Buscar vencimiento por nombre, proveedor o código..."
+                  className="w-full pl-10 pr-24 py-3 rounded-2xl bg-white border border-slate-200/90 text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-purple-200 focus:border-[#7928CA] transition-all shadow-2xs"
+                />
+                <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                  {isSearchFiltered && (
+                    <>
+                      <span className={`text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-full ${
+                        filteredItems.length > 0 
+                          ? 'bg-purple-100 text-[#7928CA]' 
+                          : 'bg-rose-100 text-rose-700'
+                      }`}>
+                        {filteredItems.length}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSearchTerm('')}
+                        className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                        title="Borrar búsqueda"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
               <button
                 type="button"
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                onClick={handleResetFilters}
+                className={`p-3 border rounded-2xl transition-all cursor-pointer shadow-2xs shrink-0 flex items-center gap-1.5 ${
+                  activeFiltersCount > 0 
+                    ? 'bg-purple-50 border-purple-300 text-[#7928CA]' 
+                    : 'bg-white hover:bg-purple-50 border-slate-200/90 hover:border-purple-200 text-slate-600 hover:text-[#7928CA]'
+                }`}
+                title="Restablecer filtros"
               >
-                <X className="w-4 h-4" />
+                <SlidersHorizontal className="w-4 h-4" />
+                {activeFiltersCount > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-[#7928CA] text-white text-[9px] font-black flex items-center justify-center">
+                    {activeFiltersCount}
+                  </span>
+                )}
               </button>
+            </div>
+
+            {/* Active search / filters feedback strip */}
+            {activeFiltersCount > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                {isSearchFiltered && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-[#7928CA] border border-purple-200 text-[11px] font-bold shadow-2xs">
+                    <span>Buscar: «{searchTerm}» ({filteredItems.length})</span>
+                    <button type="button" onClick={() => setSearchTerm('')} className="hover:text-purple-900 cursor-pointer ml-0.5">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {isDateFiltered && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-[#7928CA] border border-purple-200 text-[11px] font-bold shadow-2xs">
+                    <span>Plazo: {getDateFilterLabel()}</span>
+                    <button type="button" onClick={() => setDateFilter('all')} className="hover:text-purple-900 cursor-pointer ml-0.5">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {isModeFiltered && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-[#7928CA] border border-purple-200 text-[11px] font-bold shadow-2xs">
+                    <span>Modo: {getModeFilterLabel()}</span>
+                    <button type="button" onClick={() => setModeFilter('all')} className="hover:text-purple-900 cursor-pointer ml-0.5">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {isCategoryFiltered && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-[#7928CA] border border-purple-200 text-[11px] font-bold shadow-2xs">
+                    <span>Categoría: {getCategoryFilterLabel()}</span>
+                    <button type="button" onClick={() => setCategoryFilter('all')} className="hover:text-purple-900 cursor-pointer ml-0.5">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+              </div>
             )}
+
+            {/* 3 Dropdown Filter Pills (Responsive on mobile: grid-cols-1 sm:grid-cols-3) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              
+              {/* Pill 1: Plazo / Fecha */}
+              <div className="relative">
+                <div className={`w-full border rounded-2xl p-2.5 flex items-center justify-between gap-2.5 transition-all text-left cursor-pointer group shadow-2xs relative ${
+                  isDateFiltered 
+                    ? 'bg-purple-50/70 border-[#7928CA] ring-1 ring-purple-400/30' 
+                    : 'bg-white hover:bg-purple-50/50 border-slate-200/90 hover:border-purple-300'
+                }`}>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                      isDateFiltered ? 'bg-[#7928CA] text-white shadow-2xs' : 'bg-purple-100/70 text-[#7928CA]'
+                    }`}>
+                      <CalendarClock className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="block text-[10px] font-medium text-slate-400 leading-tight">
+                          Plazo
+                        </span>
+                        {isDateFiltered && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#7928CA]" />
+                        )}
+                      </div>
+                      <span className={`block text-xs font-bold leading-tight truncate transition-colors ${
+                        isDateFiltered ? 'text-[#7928CA]' : 'text-slate-800 group-hover:text-[#7928CA]'
+                      }`}>
+                        {getDateFilterLabel()}
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+
+                  {/* Invisible native select over pill */}
+                  <select
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value as any)}
+                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                    title="Filtrar por plazo o vencimiento"
+                  >
+                    <option value="all">Plazo: Todos los plazos</option>
+                    <option value="week">Plazo: Próximos 7 días (Urgente)</option>
+                    <option value="this_month">Plazo: Este mes</option>
+                    <option value="next_month">Plazo: Próximo mes</option>
+                    <option value="overdue">Plazo: Vencidos</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Pill 2: Modo de Pago */}
+              <div className="relative">
+                <div className={`w-full border rounded-2xl p-2.5 flex items-center justify-between gap-2.5 transition-all text-left cursor-pointer group shadow-2xs relative ${
+                  isModeFiltered 
+                    ? 'bg-purple-50/70 border-[#7928CA] ring-1 ring-purple-400/30' 
+                    : 'bg-white hover:bg-purple-50/50 border-slate-200/90 hover:border-purple-300'
+                }`}>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                      isModeFiltered ? 'bg-[#7928CA] text-white shadow-2xs' : 'bg-purple-100/70 text-[#7928CA]'
+                    }`}>
+                      <CreditCard className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="block text-[10px] font-medium text-slate-400 leading-tight">
+                          Modo
+                        </span>
+                        {isModeFiltered && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#7928CA]" />
+                        )}
+                      </div>
+                      <span className={`block text-xs font-bold leading-tight truncate transition-colors ${
+                        isModeFiltered ? 'text-[#7928CA]' : 'text-slate-800 group-hover:text-[#7928CA]'
+                      }`}>
+                        {getModeFilterLabel()}
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+
+                  {/* Invisible native select over pill */}
+                  <select
+                    value={modeFilter}
+                    onChange={(e) => setModeFilter(e.target.value as any)}
+                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                    title="Filtrar por modo de pago"
+                  >
+                    <option value="all">Modo: Todos los modos</option>
+                    <option value="auto">Modo: Débito automático</option>
+                    <option value="manual">Modo: Pago manual / Transferencia</option>
+                    <option value="tarjeta">Modo: Tarjeta de crédito</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Pill 3: Categoría */}
+              <div className="relative">
+                <div className={`w-full border rounded-2xl p-2.5 flex items-center justify-between gap-2.5 transition-all text-left cursor-pointer group shadow-2xs relative ${
+                  isCategoryFiltered 
+                    ? 'bg-purple-50/70 border-[#7928CA] ring-1 ring-purple-400/30' 
+                    : 'bg-white hover:bg-purple-50/50 border-slate-200/90 hover:border-purple-300'
+                }`}>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                      isCategoryFiltered ? 'bg-[#7928CA] text-white shadow-2xs' : 'bg-purple-100/70 text-[#7928CA]'
+                    }`}>
+                      <LayoutGrid className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="block text-[10px] font-medium text-slate-400 leading-tight">
+                          Categoría
+                        </span>
+                        {isCategoryFiltered && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#7928CA]" />
+                        )}
+                      </div>
+                      <span className={`block text-xs font-bold leading-tight truncate transition-colors ${
+                        isCategoryFiltered ? 'text-[#7928CA]' : 'text-slate-800 group-hover:text-[#7928CA]'
+                      }`}>
+                        {getCategoryFilterLabel()}
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+
+                  {/* Invisible native select over pill */}
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value as any)}
+                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                    title="Filtrar por categoría"
+                  >
+                    <option value="all">Todas las Categorías</option>
+                    {carouselCategories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {CATEGORY_META[cat]?.label} {categoryTotals[cat] ? `(${formatCurrency(categoryTotals[cat] || 0, profile.currency)})` : ''}
+                      </option>
+                    ))}
+                    {(Object.keys(CATEGORY_META) as AlertItemCategory[])
+                      .filter(c => !carouselCategories.includes(c))
+                      .map((cat) => (
+                        <option key={cat} value={cat}>{CATEGORY_META[cat]?.label}</option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* 6. CATEGORÍAS CAROUSEL (Req 3: sin ruido de $0, solo con montos activos) */}
+          <div className="space-y-3 pt-1">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                Categorías de vencimientos
+              </h3>
+              <button
+                type="button"
+                onClick={() => setCategoryFilter('all')}
+                className="text-xs sm:text-sm font-bold text-[#7928CA] hover:text-[#5B21B6] hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <span>Ver todas</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Category Cards Carousel (Sized to fit exactly 4 cards on mobile view) */}
+            <div 
+              ref={carouselRef}
+              onScroll={handleCarouselScroll}
+              className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-none px-0.5 sm:px-1 snap-x snap-mandatory scroll-smooth"
+            >
+              {/* 1. TODAS Card */}
+              <button
+                type="button"
+                onClick={() => setCategoryFilter('all')}
+                className={`flex flex-col items-center justify-center p-1.5 sm:p-3 rounded-2xl transition-all cursor-pointer shrink-0 snap-start w-[calc((100%-24px)/4)] min-w-[68px] sm:w-auto sm:min-w-[96px] border ${
+                  categoryFilter === 'all'
+                    ? 'bg-purple-50/80 border-[#7928CA] shadow-xs'
+                    : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/50 shadow-2xs'
+                }`}
+              >
+                <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center mb-1 sm:mb-1.5 transition-all shrink-0 ${
+                  categoryFilter === 'all'
+                    ? 'bg-[#7928CA] text-white shadow-xs'
+                    : 'bg-purple-100/70 text-[#7928CA]'
+                }`}>
+                  <Layers className="w-4 h-4 sm:w-6 sm:h-6" />
+                </div>
+                <span className={`text-[10px] sm:text-xs font-bold truncate w-full text-center tracking-tight ${categoryFilter === 'all' ? 'text-[#7928CA]' : 'text-slate-800'}`}>
+                  Todas
+                </span>
+                <span className={`text-[9px] sm:text-[11px] font-bold mt-0.5 truncate w-full text-center ${categoryFilter === 'all' ? 'text-[#7928CA]' : 'text-slate-500'}`}>
+                  {formatCurrency(totalFilteredAmount, profile.currency)}
+                </span>
+              </button>
+
+              {/* Dynamic Category Cards (Eliminando las que tengan $0) */}
+              {carouselCategories.map((catKey) => {
+                const meta = CATEGORY_META[catKey];
+                if (!meta) return null;
+                const Icon = meta.Icon;
+                const isSelected = categoryFilter === catKey;
+                const catAmount = categoryTotals[catKey] || 0;
+
+                return (
+                  <button
+                    key={catKey}
+                    type="button"
+                    onClick={() => setCategoryFilter(isSelected ? 'all' : catKey)}
+                    className={`flex flex-col items-center justify-center p-1.5 sm:p-3 rounded-2xl transition-all cursor-pointer shrink-0 snap-start w-[calc((100%-24px)/4)] min-w-[68px] sm:w-auto sm:min-w-[96px] border ${
+                      isSelected 
+                        ? 'bg-purple-50/80 border-[#7928CA] shadow-xs' 
+                        : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/50 shadow-2xs'
+                    }`}
+                  >
+                    <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center mb-1 sm:mb-1.5 transition-all border shrink-0 ${meta.soft} ${meta.text} ${meta.border} shadow-2xs`}>
+                      <Icon className="w-4 h-4 sm:w-6 sm:h-6" />
+                    </div>
+                    <span className={`text-[10px] sm:text-xs font-bold truncate w-full text-center tracking-tight ${isSelected ? 'text-[#7928CA]' : 'text-slate-800'}`}>
+                      {meta.label}
+                    </span>
+                    <span className={`text-[9px] sm:text-[11px] font-bold mt-0.5 truncate w-full text-center ${isSelected ? 'text-[#7928CA]' : 'text-slate-500'}`}>
+                      {formatCurrency(catAmount, profile.currency)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Carousel Slider Indicator (Matching TransactionsTable) */}
+            <div className="flex items-center justify-center gap-1.5 pt-1">
+              {Array.from({ length: Math.max(3, Math.ceil((1 + carouselCategories.length) / 4)) }).map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => scrollToCarouselPage(idx)}
+                  className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                    activeCarouselPage === idx 
+                      ? 'w-7 sm:w-8 bg-[#7928CA]' 
+                      : 'w-3.5 sm:w-5 bg-slate-200 hover:bg-slate-300'
+                  }`}
+                  aria-label={`Página ${idx + 1}`}
+                />
+              ))}
+            </div>
           </div>
 
           {/* Calendar Sync Banner */}
@@ -1179,13 +1688,18 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
             </div>
           )}
 
-          {/* 6. List of Items */}
-          <section className="space-y-2.5">
+          {/* 7. List of Items Grouped by Date (Req 4: agrupación por fecha) */}
+          <section className="space-y-4">
             {/* List Heading */}
-            <div className="flex items-center justify-between px-0.5">
-              <h2 className="text-sm sm:text-base font-black text-slate-900">
-                {activeView === 'pagados' ? 'Pagados este mes' : activeView === 'todos' ? 'Todos los vencimientos' : 'Próximos vencimientos'}
-              </h2>
+            <div className="flex items-center justify-between px-0.5 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm sm:text-base font-black text-slate-900">
+                  {activeView === 'pagados' ? 'Pagados este mes' : activeView === 'todos' ? 'Todos los vencimientos' : 'Próximos vencimientos'}
+                </h2>
+                <span className="text-[11px] font-extrabold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                  {filteredItems.length}
+                </span>
+              </div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {stats.pendingCount > 0 && (
                   <>
@@ -1195,16 +1709,7 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
                       className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-2xs"
                       title="Sincronizar pagos con Google Calendar"
                     >
-                      <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 40 40">
-                        <rect width="40" height="40" rx="8" fill="#FFFFFF"/>
-                        <path d="M28 8H12C9.79 8 8 9.79 8 12V28C8 30.21 9.79 32 12 32H28C30.21 32 32 30.21 32 28V12C32 9.79 30.21 8 28 8Z" fill="#FFFFFF"/>
-                        <path d="M28 8H12C9.79 8 8 9.79 8 12V15H32V12C32 9.79 30.21 8 28 8Z" fill="#1A73E8"/>
-                        <circle cx="13" cy="11.5" r="1.5" fill="#FFFFFF"/>
-                        <circle cx="27" cy="11.5" r="1.5" fill="#FFFFFF"/>
-                        <text x="20" y="26" fontSize="11" fontWeight="900" fill="#1A73E8" textAnchor="middle" fontFamily="sans-serif">
-                          31
-                        </text>
-                      </svg>
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600" />
                       <span className="hidden sm:inline">Google Cal</span>
                       <span className="sm:hidden">GCal</span>
                     </button>
@@ -1215,10 +1720,7 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
                       className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-2xs"
                       title="Añadir a Apple Calendar (iOS / iPhone / Mac)"
                     >
-                      <div className="w-3.5 h-3.5 rounded bg-white flex flex-col items-center justify-center overflow-hidden shrink-0 border border-slate-200">
-                        <div className="w-full bg-[#FF3B30] text-[4px] leading-none py-0.2" />
-                        <span className="text-[7px] font-black text-slate-900 leading-none">{new Date().getDate()}</span>
-                      </div>
+                      <Calendar className="w-3.5 h-3.5 text-rose-600" />
                       <span className="hidden sm:inline">Apple Cal</span>
                       <span className="sm:hidden">Apple</span>
                     </button>
@@ -1227,7 +1729,7 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
                       type="button"
                       onClick={() => setIsCalendarExportModalOpen(true)}
                       className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#F95420] border border-orange-200 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-2xs"
-                      title="Exportar pagos pendientes a un archivo .ics para Google Calendar o Apple Calendar"
+                      title="Exportar pagos pendientes a un archivo .ics"
                     >
                       <CalendarPlus className="w-3.5 h-3.5" />
                       <span className="hidden sm:inline">Exportar .ics</span>
@@ -1241,7 +1743,7 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveView('todos')}
-                  className="text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-0.5 cursor-pointer"
+                  className="text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-0.5 cursor-pointer ml-1"
                 >
                   <span>Ver todos</span>
                   <ChevronRight className="w-3.5 h-3.5" />
@@ -1249,34 +1751,92 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
               </div>
             </div>
 
-            {filteredItems.length ? (
-              filteredItems.map(renderCard)
-            ) : (
-              <div className="bg-white border border-dashed border-slate-200 rounded-3xl p-6 sm:p-8 text-center">
-                <div className="w-12 h-12 rounded-2xl bg-orange-50 text-[#F95420] mx-auto flex items-center justify-center">
-                  <CalendarClock className="w-6 h-6" />
+            {/* Grouped items by date */}
+            {groupedVencimientos.length > 0 ? (
+              groupedVencimientos.map((group) => (
+                <div key={group.dateKey} className="space-y-2">
+                  {/* Group Date Header with subtotal and indicator dot */}
+                  <div className="flex items-center justify-between px-2 pt-2 pb-1 border-b border-slate-100">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                        group.isToday 
+                          ? 'bg-[#7928CA] ring-4 ring-purple-100' 
+                          : group.isTomorrow 
+                          ? 'bg-amber-500 ring-4 ring-amber-100' 
+                          : group.isPast && group.hasUnpaid
+                          ? 'bg-rose-500 ring-4 ring-rose-100'
+                          : 'bg-slate-300'
+                      }`} />
+                      <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight truncate">
+                        {group.displayDate}
+                      </span>
+                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full shrink-0">
+                        {group.items.length} {group.items.length === 1 ? 'vencimiento' : 'vencimientos'}
+                      </span>
+                    </div>
+
+                    {/* Day subtotal */}
+                    <div className="text-right text-xs font-bold shrink-0 ml-2">
+                      <span className="text-slate-800 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200/80 shadow-2xs">
+                        {formatCurrency(group.totalAmount, profile.currency)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Cards for this date group */}
+                  <div className="space-y-2">
+                    {group.items.map(renderCard)}
+                  </div>
                 </div>
-                <h3 className="mt-3 text-sm font-black text-slate-800">No hay vencimientos registrados</h3>
-                <p className="mt-1 text-xs text-slate-500">Agregá tus servicios, tarjetas o alquileres para llevar el control.</p>
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              ))
+            ) : (
+              /* Empty state (feedback for active search or general empty) */
+              activeFiltersCount > 0 ? (
+                <div className="bg-white border border-dashed border-purple-200 rounded-3xl p-6 sm:p-8 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-50 text-[#7928CA] mx-auto flex items-center justify-center">
+                    <Search className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-sm font-black text-slate-800">
+                    No se encontraron vencimientos para los filtros aplicados
+                  </h3>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    {searchTerm.trim() ? `No hay coincidencias con «${searchTerm}».` : 'Probá cambiando el plazo, modo o categoría.'}
+                  </p>
                   <button
                     type="button"
-                    onClick={() => openCreate()}
-                    className="px-4 py-2.5 rounded-xl bg-[#F95420] text-white text-xs font-extrabold cursor-pointer active:scale-95 shadow-sm hover:bg-[#E04412]"
+                    onClick={handleResetFilters}
+                    className="px-4 py-2 rounded-xl bg-purple-100 hover:bg-purple-200 text-[#7928CA] text-xs font-black cursor-pointer transition-colors"
                   >
-                    + Agregar vencimiento
+                    Restablecer filtros y búsqueda
                   </button>
-                  {isDemoMode && (
+                </div>
+              ) : (
+                <div className="bg-white border border-dashed border-slate-200 rounded-3xl p-6 sm:p-8 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-orange-50 text-[#F95420] mx-auto flex items-center justify-center">
+                    <CalendarClock className="w-6 h-6" />
+                  </div>
+                  <h3 className="mt-3 text-sm font-black text-slate-800">No hay vencimientos registrados</h3>
+                  <p className="mt-1 text-xs text-slate-500">Agregá tus servicios, tarjetas o alquileres para llevar el control.</p>
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                     <button
                       type="button"
-                      onClick={() => saveItems(DEFAULT_ALERT_ITEMS)}
-                      className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
+                      onClick={() => openCreate()}
+                      className="px-4 py-2.5 rounded-xl bg-[#F95420] text-white text-xs font-extrabold cursor-pointer active:scale-95 shadow-sm hover:bg-[#E04412]"
                     >
-                      Cargar ejemplos de prueba
+                      + Agregar vencimiento
                     </button>
-                  )}
+                    {isDemoMode && (
+                      <button
+                        type="button"
+                        onClick={() => saveItems(DEFAULT_ALERT_ITEMS)}
+                        className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
+                      >
+                        Cargar ejemplos de prueba
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )
             )}
           </section>
         </>

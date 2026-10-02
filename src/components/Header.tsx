@@ -112,15 +112,17 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Demo Mode Badge with quick Exit button (Req 3) */}
         {isDemoMode && (
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 border border-amber-200/80 text-amber-800 text-xs shadow-2xs animate-pulse">
-            <span className="font-extrabold text-[11px] uppercase tracking-wider">Modo Demo</span>
+          <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 rounded-full bg-amber-50 border border-amber-200/80 text-amber-800 text-xs shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+            <span className="font-extrabold text-[10px] sm:text-[11px] uppercase tracking-wider">Demo</span>
             {onExitDemo && (
               <button
                 type="button"
                 onClick={onExitDemo}
-                className="px-2 py-0.5 rounded-md bg-amber-200/80 hover:bg-amber-300 text-amber-900 font-bold text-[10px] transition-colors cursor-pointer"
+                className="px-2 py-0.5 rounded-lg bg-amber-200 hover:bg-amber-300 text-amber-900 font-black text-[10px] sm:text-[11px] transition-colors cursor-pointer ml-0.5"
+                title="Salir del modo demostración y crear tu cuenta"
               >
-                Salir de la demo
+                Registrarme
               </button>
             )}
           </div>

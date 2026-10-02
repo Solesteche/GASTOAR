@@ -310,7 +310,7 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
               {globalProgress}%
             </span>
           </div>
-          <div className="w-full bg-purple-100/60 h-2.5 rounded-full overflow-hidden mt-1">
+          <div className="w-full bg-purple-100/60 h-1 rounded-full overflow-hidden mt-1">
             <div
               className="h-full bg-gradient-to-r from-[#7928CA] to-[#F95420] rounded-full transition-all duration-500"
               style={{ width: `${globalProgress}%` }}
@@ -608,7 +608,7 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
 
                     {/* Progress Bar with Milestone Markers Visualizer */}
                     <div className="pt-1 pb-0.5">
-                      <div className="w-full bg-purple-100/60 h-2.5 rounded-full overflow-hidden relative shadow-inner">
+                      <div className="w-full bg-purple-100/60 h-1 rounded-full overflow-hidden relative shadow-inner">
                         <div
                           className="h-full rounded-full transition-all duration-700"
                           style={{

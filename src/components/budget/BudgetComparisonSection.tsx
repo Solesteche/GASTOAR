@@ -425,7 +425,7 @@ export const BudgetComparisonSection: React.FC<BudgetComparisonSectionProps> = (
                           {item.percentage}%
                         </span>
                       </div>
-                      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all ${
                             isExceeded ? 'bg-rose-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'
@@ -677,7 +677,7 @@ export const BudgetComparisonSection: React.FC<BudgetComparisonSectionProps> = (
                                   {item.percentage}%
                                 </span>
                               </div>
-                              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
                                 <div
                                   className={`h-full rounded-full transition-all ${
                                     isExceeded ? 'bg-rose-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'
@@ -791,7 +791,7 @@ export const BudgetComparisonSection: React.FC<BudgetComparisonSectionProps> = (
                                   <span className={`text-[10px] font-bold ${subIsExceeded ? 'text-rose-600' : subIsWarning ? 'text-amber-600' : 'text-emerald-700'}`}>
                                     {sub.percentage}%
                                   </span>
-                                  <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
                                     <div
                                       className={`h-full rounded-full ${
                                         subIsExceeded ? 'bg-rose-500' : subIsWarning ? 'bg-amber-500' : 'bg-emerald-500'

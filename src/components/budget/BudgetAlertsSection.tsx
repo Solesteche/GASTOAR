@@ -399,7 +399,7 @@ export const BudgetAlertsSection: React.FC<BudgetAlertsSectionProps> = ({
 
                     {/* Progress Bar with Alert Threshold Line */}
                     <div className="space-y-1 pt-3">
-                      <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden relative">
+                      <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden relative">
                         {/* Threshold mark */}
                         <div
                           className="absolute top-0 bottom-0 w-0.5 bg-slate-400 z-10"

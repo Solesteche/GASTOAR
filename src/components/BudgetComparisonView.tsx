@@ -660,7 +660,7 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
               {summary.globalPct}%
             </span>
           </div>
-          <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+          <div className="w-full bg-slate-200 h-1 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
                 summary.globalPct > 100 
@@ -894,7 +894,7 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
                     </span>
                   </div>
 
-                  <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                  <div className="w-full bg-slate-200 h-1 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${
                         isOver ? 'bg-rose-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'
@@ -1051,7 +1051,7 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
                             >
                               {row.percentage}%
                             </span>
-                            <div className="w-16 bg-slate-200 h-1.5 rounded-full overflow-hidden hidden sm:block">
+                            <div className="w-16 bg-slate-200 h-1 rounded-full overflow-hidden hidden sm:block">
                               <div
                                 className={`h-full rounded-full ${
                                   isOver ? 'bg-rose-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'

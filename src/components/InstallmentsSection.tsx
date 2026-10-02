@@ -1029,7 +1029,7 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
                           <ChevronDown className={`w-3 h-3 transition-transform ${isScheduleOpen ? 'rotate-180' : ''}`} />
                         </button>
                       </div>
-                      <div className="w-full h-2 rounded-full overflow-hidden" style={{ backgroundColor: P_LIGHT }}>
+                      <div className="w-full h-1 rounded-full overflow-hidden" style={{ backgroundColor: P_LIGHT }}>
                         <div 
                           className={`h-full transition-all duration-300 ${
                             isCompleted ? 'bg-emerald-500' : 'rounded-full'

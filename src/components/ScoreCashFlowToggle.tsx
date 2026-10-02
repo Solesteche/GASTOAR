@@ -148,7 +148,7 @@ export default function ScoreCashFlowToggle({
             </div>
           </div>
 
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-purple-100">
+          <div className="mt-4 h-1 overflow-hidden rounded-full bg-purple-100">
             <div
               className="h-full rounded-full bg-[#9333EA] transition-all"
               style={{ width: `${Math.min(100, Math.max(0, score.score))}%` }}

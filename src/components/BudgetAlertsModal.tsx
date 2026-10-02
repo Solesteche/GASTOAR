@@ -446,7 +446,7 @@ export const BudgetAlertsModal: React.FC<BudgetAlertsModalProps> = ({
 
                     {/* Progress Bar with Alert Threshold Marker */}
                     <div className="mt-3 relative">
-                      <div className="h-2.5 sm:h-3 rounded-full bg-slate-200/80 dark:bg-white/10 overflow-hidden relative w-full">
+                      <div className="h-1 rounded-full bg-slate-200/80 dark:bg-white/10 overflow-hidden relative w-full">
                         <div
                           className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all duration-700`}
                           style={{ width: `${Math.min(100, item.pct)}%` }}
