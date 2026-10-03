@@ -306,26 +306,23 @@ export default function App() {
             setCurrentUserAccount(profileFromDb);
             localStorage.setItem('control_gastos_account_v1', JSON.stringify(profileFromDb));
           } else {
-            setCurrentUserAccount((prev) => {
-              const email = user.email || prev?.email || 'usuario@gastoar.com';
-              const name = user.displayName || prev?.name || email.split('@')[0];
-              const rawCode = prev?.accountCode;
-              const accountCode = rawCode 
-                ? rawCode.replace(/^(PAREJA|PAIR)-/, 'COMPARTIDA-')
-                : ('COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000));
-              const updated: UserAccount = {
-                id: user.uid,
-                email,
-                name,
-                accountType: prev?.accountType || 'pareja',
-                selectedPlanId: prev?.selectedPlanId || 'pareja',
-                accountCode,
-                currency: prev?.currency || 'ARS',
-                createdAt: prev?.createdAt || Date.now(),
-              };
-              localStorage.setItem('control_gastos_account_v1', JSON.stringify(updated));
-              return updated;
-            });
+            // IMPORTANT: never inherit account fields from the previous local
+            // session here. This callback can run while a brand-new Firebase
+            // account is still being registered.
+            const email = user.email || 'usuario@gastoar.com';
+            const name = user.displayName || email.split('@')[0];
+            const updated: UserAccount = {
+              id: user.uid,
+              email,
+              name,
+              accountType: 'individual',
+              selectedPlanId: 'individual',
+              accountCode: 'COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000),
+              currency: 'ARS',
+              createdAt: Date.now(),
+            };
+            setCurrentUserAccount(updated);
+            localStorage.setItem('control_gastos_account_v1', JSON.stringify(updated));
           }
         } catch (e) {
           console.warn('Error synchronizing Firebase user profile:', e);
@@ -336,6 +333,9 @@ export default function App() {
         if (!isDemo && !isAdminStorage) {
           setIsAuthenticated(false);
           setCurrentUserAccount(null);
+          // Do not leave the previous account cached in localStorage.
+          // Otherwise the next Firebase session can be initialized with the
+          // previous user's identity before the new profile is available.
           localStorage.removeItem('control_gastos_is_authenticated');
           localStorage.removeItem('control_gastos_account_v1');
         }
@@ -896,6 +896,10 @@ export default function App() {
       activeUserId,
       currentMonthKey,
       (remoteMonthTxs) => {
+        // Never merge month-level data into a session until the complete
+        // Firestore app-state snapshot for this UID has been accepted.
+        // Otherwise a demo/previous-account state can briefly reappear.
+        if (!isInitialCloudLoadDone.current) return;
         isRemoteUpdate.current = true;
         setTransactions(prev => {
           const map = new Map<string, Transaction>();
@@ -1639,7 +1643,7 @@ export default function App() {
             : readScopedStorage<Vencimiento[]>('gastoar_vencimientos_v1', firebaseUser.uid, []),
         );
 
-        isInitialCloudLoadDone.current = true;
+        isInitialCloudLoadDone.current = false;
         setCurrentUserAccount(acc);
         localStorage.setItem('control_gastos_account_v1', JSON.stringify(acc));
         setIsAdmin(false);
@@ -1693,13 +1697,16 @@ export default function App() {
           if (Array.isArray(data.goals)) setGoals(data.goals);
           if (Array.isArray(data.subscriptions) && data.subscriptions.length > 0) setSubscriptions(data.subscriptions);
         } else {
-          setProfile(prev => ({
-            ...prev,
+          // A successful login without payload must never display whatever was
+          // left by Demo mode or the previous account. Start empty instead.
+          clearPreviousSessionData();
+          setProfile({
+            ...DEFAULT_COUPLE_PROFILE,
             user1Name: acc.name,
-            user2Name: acc.partnerName || prev.user2Name,
-            currency: acc.currency || prev.currency,
-            accountCode: acc.accountCode || prev.accountCode,
-          }));
+            user2Name: acc.partnerName || 'Mi Pareja',
+            currency: acc.currency || 'ARS',
+            accountCode: acc.accountCode || DEFAULT_COUPLE_PROFILE.accountCode,
+          });
         }
 
         setIsAdmin(false);
@@ -1737,8 +1744,11 @@ export default function App() {
                 return { success: false, error: 'Contraseña incorrecta. Por favor verificala.' };
               }
               setCurrentUserAccount(savedAccount);
+              clearPreviousSessionData();
+              setIsDemoMode(false);
               setIsAuthenticated(true);
               localStorage.setItem('control_gastos_is_authenticated', 'true');
+              localStorage.setItem('control_gastos_is_demo', 'false');
               showToast('¡Sesión iniciada con tu cuenta guardada localmente!', 'success');
               return { success: true };
             }
@@ -1761,8 +1771,11 @@ export default function App() {
               return { success: false, error: 'Contraseña incorrecta. Por favor verificala.' };
             }
             setCurrentUserAccount(savedAccount);
+            clearPreviousSessionData();
+            setIsDemoMode(false);
             setIsAuthenticated(true);
             localStorage.setItem('control_gastos_is_authenticated', 'true');
+            localStorage.setItem('control_gastos_is_demo', 'false');
             showToast('¡Sesión iniciada en modo local!', 'success');
             return { success: true };
           }
@@ -1777,6 +1790,56 @@ export default function App() {
       console.error('Error logging in:', err);
       return { success: false, error: 'No se pudo conectar al servidor. Podés ingresar en Modo Demo.' };
     }
+  };
+
+  /**
+   * Put the client in a guaranteed clean state before entering a real account.
+   * This is intentionally separate from Demo mode: a real account must never
+   * reuse the demo/unscoped localStorage keys.
+   */
+  const clearPreviousSessionData = () => {
+    setTransactions([]);
+    setGoals([]);
+    setSettlementHistory([]);
+    setVencimientos([]);
+    setBudgets({ categories: {}, subcategories: {} });
+    setCategoryMap(DEFAULT_CATEGORY_MAP);
+    setCategoryColors(DEFAULT_CATEGORY_COLORS);
+    setProfile(DEFAULT_COUPLE_PROFILE);
+    setSubscriptions([]);
+
+    const emptyValues: Record<string, unknown> = {
+      'control_gastos_tx_v5': [],
+      'control_gastos_budgets_v5': { categories: {}, subcategories: {} },
+      'control_gastos_goals_v1': [],
+      'control_gastos_settlements_v3': [],
+      'control_gastos_card_alerts_v2': [],
+      'gastoar_vencimientos_alerts_v5': [],
+      'gastoar_vencimientos_alerts_v4': [],
+      'gastoar_vencimientos_alerts_v3': [],
+    };
+
+    Object.entries(emptyValues).forEach(([key, value]) => {
+      try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+    });
+
+    // Remove disposable demo-only global data so it cannot be mistaken for
+    // real account data during a session transition. A later explicit Demo
+    // entry recreates these values through handleGuestDemo().
+    [
+      'control_gastos_tx_v5',
+      'control_gastos_budgets_v5',
+      'control_gastos_goals_v1',
+      'control_gastos_settlements_v3',
+      'gastoar_vencimientos_v1',
+      'control_gastos_profile_v3',
+      'control_gastos_subscriptions_v1',
+    ].forEach((key) => {
+      try { localStorage.removeItem(key); } catch {}
+    });
+
+    localStorage.setItem('control_gastos_is_demo', 'false');
+    localStorage.setItem('control_gastos_is_admin', 'false');
   };
 
   const handleRegister = async (data: {
@@ -1906,26 +1969,11 @@ export default function App() {
         localStorage.setItem('control_gastos_known_accounts_v1', JSON.stringify(known));
       } catch {}
 
-      // Reset application state to clean initial registration state
-      setTransactions([]);
-      setGoals([]);
-      setSettlementHistory([]);
-      setVencimientos([]);
-      setBudgets({ categories: {}, subcategories: {} });
-      setCategoryMap(DEFAULT_CATEGORY_MAP);
-      setCategoryColors(DEFAULT_CATEGORY_COLORS);
+      // IMPORTANT: discard any demo/previous-account state before enabling
+      // the real session. The new account is hydrated only from its own UID.
+      clearPreviousSessionData();
       setProfile(cleanProfile);
       setSubscriptions([initialSub]);
-
-      // Clear all demo/previous local storage keys for clean slate
-      localStorage.setItem('control_gastos_tx_v5', JSON.stringify([]));
-      localStorage.setItem('control_gastos_budgets_v5', JSON.stringify({ categories: {}, subcategories: {} }));
-      localStorage.setItem('control_gastos_goals_v1', JSON.stringify([]));
-      localStorage.setItem('control_gastos_settlements_v3', JSON.stringify([]));
-      localStorage.setItem('gastoar_vencimientos_alerts_v5', JSON.stringify([]));
-      localStorage.setItem('gastoar_vencimientos_alerts_v4', JSON.stringify([]));
-      localStorage.setItem('gastoar_vencimientos_alerts_v3', JSON.stringify([]));
-      localStorage.setItem('gastoar_card_alerts_v2', JSON.stringify([]));
 
       setIsAdmin(false);
       setIsDemoMode(false);
@@ -1934,8 +1982,10 @@ export default function App() {
 
       setIsAuthenticated(true);
       localStorage.setItem('control_gastos_is_authenticated', 'true');
-      setCloudSyncStatus('synced');
-      isInitialCloudLoadDone.current = true;
+      setCloudSyncStatus('syncing');
+      // The Firestore listener must be the first authoritative read for the
+      // new UID. Do not allow the auto-sync effect to upload stale/demo data.
+      isInitialCloudLoadDone.current = false;
       setActiveTab('dashboard');
 
       // Sync profile to Firestore
@@ -2004,20 +2054,11 @@ export default function App() {
       setCurrentUserAccount(acc);
       localStorage.setItem('control_gastos_account_v1', JSON.stringify(acc));
 
-      // Reset state for new session
-      setTransactions([]);
-      setGoals([]);
-      setSettlementHistory([]);
-      setVencimientos([]);
-      setBudgets({ categories: {}, subcategories: {} });
-      localStorage.setItem('control_gastos_tx_v5', JSON.stringify([]));
-      localStorage.setItem('control_gastos_budgets_v5', JSON.stringify({ categories: {}, subcategories: {} }));
-      localStorage.setItem('control_gastos_goals_v1', JSON.stringify([]));
-      localStorage.setItem('control_gastos_settlements_v3', JSON.stringify([]));
-      localStorage.setItem('gastoar_vencimientos_alerts_v5', JSON.stringify([]));
-      localStorage.setItem('gastoar_vencimientos_alerts_v4', JSON.stringify([]));
-      localStorage.setItem('gastoar_vencimientos_alerts_v3', JSON.stringify([]));
-      localStorage.setItem('gastoar_card_alerts_v2', JSON.stringify([]));
+      // Reset state for the new Google session; never reuse Demo data.
+      clearPreviousSessionData();
+      setCategoryMap(DEFAULT_CATEGORY_MAP);
+      setCategoryColors(DEFAULT_CATEGORY_COLORS);
+      setProfile({ ...DEFAULT_COUPLE_PROFILE, user1Name: acc.name, accountCode: acc.accountCode });
 
       setIsAdmin(false);
       setIsDemoMode(false);
@@ -2026,8 +2067,10 @@ export default function App() {
 
       setIsAuthenticated(true);
       localStorage.setItem('control_gastos_is_authenticated', 'true');
-      setCloudSyncStatus('synced');
-      isInitialCloudLoadDone.current = true;
+      setCloudSyncStatus('syncing');
+      // The Firestore listener must be the first authoritative read for the
+      // new UID. Do not allow the auto-sync effect to upload stale/demo data.
+      isInitialCloudLoadDone.current = false;
       setActiveTab('dashboard');
 
       // Sync profile to Firestore
