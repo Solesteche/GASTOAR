@@ -3,7 +3,8 @@ import {
   AlertTriangle, BarChart3, BellRing, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight,
   Edit3, Lightbulb, Plus, Settings2, ShieldCheck, Target, TrendingDown, TrendingUp,
   WalletCards, X, Sparkles, HelpCircle, Flame, Crown, RotateCcw, CheckSquare, Square,
-  Info, ArrowUpRight, Zap, Search, Filter, LayoutGrid, List, ArrowUpDown, SlidersHorizontal
+  Info, ArrowUpRight, Zap, Search, Filter, LayoutGrid, List, ArrowUpDown, SlidersHorizontal,
+  FileText, Eye
 } from 'lucide-react';
 import { Budgets, CategoryColors, CategoryMap, Transaction } from '../types';
 import { formatCurrency } from '../utils/formatters';
@@ -27,7 +28,7 @@ interface BudgetSectionProps {
   currency: string;
   isPro?: boolean;
   onOpenBudgetModal: () => void;
-  onCreateBudget?: () => void;
+  onCreateBudget?: (mode?: 'empty' | 'copy' | 'real') => void;
   onUpdateBudgets?: (newBudgets: Budgets) => void;
   onSelectCategory?: (category: string) => void;
   onUpgradeToPro?: () => void;
@@ -68,24 +69,8 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
   const [selectedIpcCategories, setSelectedIpcCategories] = useState<string[]>([]);
   const [previousBudgetsBackup, setPreviousBudgetsBackup] = useState<Budgets | null>(null);
   const [ipcNotice, setIpcNotice] = useState<string | null>(null);
-  const [showOptionsDropdown, setShowOptionsDropdown] = useState(false);
-  const optionsDropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (optionsDropdownRef.current && !optionsDropdownRef.current.contains(event.target as Node)) {
-        setShowOptionsDropdown(false);
-      }
-    };
-    if (showOptionsDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
-    };
-  }, [showOptionsDropdown]);
+  const [selectedStartMode, setSelectedStartMode] = useState<'empty' | 'copy' | 'real'>('empty');
+  const [previewMode, setPreviewMode] = useState<'auto' | 'empty' | 'active'>('auto');
 
   const now = new Date();
   const year = now.getFullYear();
@@ -95,6 +80,8 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
   const daysRemaining = Math.max(1, daysInMonth - day);
   const monthLabel = now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }).replace(/^./, c => c.toUpperCase());
   const monthIso = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const prevMonthDate = new Date(year, month - 1, 1);
+  const previousMonthLabel = prevMonthDate.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 
   const expenses = useMemo(() => transactions.filter(tx => tx && tx.tipoTransaccion !== 'ingreso' && tx.fecha?.startsWith(monthIso)), [transactions, monthIso]);
   const effectiveExpenses = expenses.length ? expenses : transactions.filter(tx => tx && tx.tipoTransaccion !== 'ingreso');
@@ -142,6 +129,12 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
       pct: totalBudget ? Math.round((totalSpent / totalBudget) * 100) : 0
     };
   }, [rows]);
+
+  const hasActiveBudget = useMemo(() => {
+    return rows.some(r => r.limit > 0);
+  }, [rows]);
+
+  const isBudgetEmpty = previewMode === 'empty' ? true : previewMode === 'active' ? false : !hasActiveBudget;
 
   const sortedAndFilteredRows = useMemo(() => {
     const list = rows.filter(r => {
@@ -285,14 +278,28 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
             ))}
           </div>
 
-          {/* Botones de acción DEBAJO del título y FUERA de la caja del título */}
+          {/* Botón de acción DEBAJO del título y FUERA de la caja del título */}
           <div className="flex items-center gap-2 shrink-0 py-1.5">
+            {/* Si ya hay presupuesto, botón para alternar y previsualizar la versión sin presupuesto */}
+            {hasActiveBudget && (
+              <button
+                type="button"
+                onClick={() => setPreviewMode(p => p === 'empty' ? 'active' : 'empty')}
+                className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 border border-purple-200/80 dark:border-purple-800 text-[#7928CA] dark:text-purple-300 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                title={isBudgetEmpty ? "Volver a la vista con presupuesto" : "Previsualizar versión sin presupuesto"}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">{isBudgetEmpty ? 'Ver con presupuesto' : 'Ver sin presupuesto'}</span>
+                <span className="inline md:hidden">{isBudgetEmpty ? 'Con pres.' : 'Sin pres.'}</span>
+              </button>
+            )}
+
             {/* Botón Crear presupuesto VISIBLE y DIRECTO */}
             <button
               type="button"
               onClick={() => {
                 if (typeof onCreateBudget === 'function') {
-                  onCreateBudget();
+                  onCreateBudget(isBudgetEmpty ? selectedStartMode : 'empty');
                 } else if (typeof onOpenBudgetModal === 'function') {
                   onOpenBudgetModal();
                 }
@@ -303,82 +310,256 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>Crear presupuesto</span>
             </button>
-
-            {/* Menú desplegable Opciones */}
-            <div className="relative shrink-0" ref={optionsDropdownRef}>
-              <button
-                type="button"
-                onClick={() => setShowOptionsDropdown(prev => !prev)}
-                className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-purple-100/70 hover:bg-purple-200/80 dark:bg-purple-950/80 dark:hover:bg-purple-900/80 border border-purple-200 dark:border-purple-800 text-[#7928CA] dark:text-purple-300 font-bold text-xs transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
-                aria-expanded={showOptionsDropdown}
-                aria-haspopup="true"
-                title="Más opciones de presupuesto"
-              >
-                <Settings2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Opciones</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showOptionsDropdown ? 'rotate-180' : ''}`} />
-              </button>
-
-              {showOptionsDropdown && (
-                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-[#1A0B2E] rounded-2xl shadow-2xl border border-purple-100 dark:border-purple-800/80 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="px-3.5 py-1.5 border-b border-purple-50 dark:border-purple-900/40 text-[10px] font-black uppercase tracking-wider text-purple-900/60 dark:text-purple-300/60 flex items-center justify-between">
-                    <span>Acciones de Presupuesto</span>
-                    <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500">{monthLabel}</span>
-                  </div>
-
-                  {/* Opción 1: Crear presupuesto */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowOptionsDropdown(false);
-                      if (typeof onCreateBudget === 'function') {
-                        onCreateBudget();
-                      } else if (typeof onOpenBudgetModal === 'function') {
-                        onOpenBudgetModal();
-                      }
-                    }}
-                    className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-[#7928CA] hover:bg-purple-50/80 dark:hover:bg-purple-900/30 flex items-center gap-3 transition-colors cursor-pointer group"
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-purple-100 text-[#7928CA] dark:bg-purple-900/50 dark:text-purple-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-xs">
-                      <Plus className="w-4 h-4 stroke-[2.5]" />
-                    </div>
-                    <div>
-                      <div className="leading-tight font-black text-slate-800 dark:text-white group-hover:text-[#7928CA] dark:group-hover:text-purple-300">Crear presupuesto</div>
-                      <div className="text-[10px] font-normal text-slate-400 dark:text-slate-400 mt-0.5">Asignar montos para nuevas categorías</div>
-                    </div>
-                  </button>
-
-                  {/* Opción 2: Configuración */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowOptionsDropdown(false);
-                      if (typeof onOpenBudgetModal === 'function') {
-                        onOpenBudgetModal();
-                      }
-                    }}
-                    className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-[#7928CA] hover:bg-purple-50/80 dark:hover:bg-purple-900/30 flex items-center gap-3 transition-colors cursor-pointer group"
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-xs">
-                      <Settings2 className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="leading-tight font-black text-slate-800 dark:text-white group-hover:text-[#7928CA] dark:group-hover:text-purple-300">Configuración</div>
-                      <div className="text-[10px] font-normal text-slate-400 dark:text-slate-400 mt-0.5">Ajustar límites, alertas y parámetros</div>
-                    </div>
-                  </button>
-                </div>
-              )}
-            </div>
           </div>
         </div>
 
         {/* ─── VISTA 1: PRESUPUESTO PRINCIPAL ─────────────────────────────── */}
         {view === 'budget' && (
           <div className="p-4 sm:p-6 space-y-6">
-            
+            {isBudgetEmpty ? (
+              /* ─── VERSIÓN 1: SIN PRESUPUESTO CREADO (DISEÑO EXACTO SOLICITADO) ─── */
+              <div className="space-y-6 animate-in fade-in duration-200">
+                {hasActiveBudget && previewMode === 'empty' && (
+                  <div className="p-3 rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-xs text-[#7928CA] dark:text-purple-300 flex items-center justify-between gap-3">
+                    <span>Estás previsualizando la <strong>Versión 1 (Sin presupuesto creado)</strong>. Tus datos de presupuesto siguen guardados.</span>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewMode('active')}
+                      className="px-3 py-1 bg-white dark:bg-[#1A0B2E] border border-purple-200 rounded-xl text-xs font-black cursor-pointer hover:bg-purple-100"
+                    >
+                      Volver
+                    </button>
+                  </div>
+                )}
+
+                {/* 1. Hero Card: Creá tu primer presupuesto */}
+                <div className="rounded-[28px] border border-purple-100/90 dark:border-purple-900/40 bg-[#F8F7FF] dark:bg-[#1A0B2E] p-6 sm:p-10 text-center shadow-xs">
+                  <h2 className="text-2xl sm:text-3xl font-black text-[#1E0836] dark:text-white tracking-tight">
+                    Creá tu primer presupuesto
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-purple-200/70 mt-2 max-w-lg mx-auto leading-relaxed">
+                    Definí cuánto querés gastar en cada categoría este mes y GastoAR te avisará cuando estés cerca del límite.
+                  </p>
+
+                  {/* Botones de acción principales */}
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-6">
+                    {/* Botón Naranja: Crear presupuesto */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (typeof onCreateBudget === 'function') {
+                          onCreateBudget(selectedStartMode);
+                        } else if (typeof onOpenBudgetModal === 'function') {
+                          onOpenBudgetModal();
+                        }
+                      }}
+                      className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-[#F95420] hover:bg-[#EA4A18] text-white font-black text-xs sm:text-sm shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                    >
+                      <Plus className="w-4 h-4 stroke-[3]" />
+                      <span>Crear presupuesto</span>
+                    </button>
+
+                    {/* Botón Blanco con borde violeta: Usar gastos reales como base */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (typeof onCreateBudget === 'function') {
+                          onCreateBudget('real');
+                        } else if (typeof onOpenBudgetModal === 'function') {
+                          onOpenBudgetModal();
+                        }
+                      }}
+                      className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-white dark:bg-[#140728] border-2 border-[#7928CA]/70 hover:border-[#7928CA] text-[#4C1D95] dark:text-purple-300 hover:bg-purple-50/60 dark:hover:bg-purple-950/40 font-black text-xs sm:text-sm shadow-2xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                    >
+                      <FileText className="w-4 h-4 text-[#7928CA]" />
+                      <span>Usar gastos reales como base</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Sección: ¿Cómo querés empezar? */}
+                <div className="space-y-3">
+                  <h3 className="font-black text-base sm:text-lg text-[#1E0836] dark:text-white">
+                    ¿Cómo querés empezar?
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                    {/* Opción 1: Desde cero */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStartMode('empty')}
+                      className={`text-left p-5 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between ${
+                        selectedStartMode === 'empty'
+                          ? 'border-2 border-[#7928CA] bg-white dark:bg-[#1A0B2E] ring-4 ring-purple-500/10 shadow-xs'
+                          : 'border border-slate-200/90 dark:border-purple-900/50 bg-white dark:bg-[#140728] hover:border-purple-300 dark:hover:border-purple-800'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <h4 className="font-black text-sm text-[#1E0836] dark:text-white">
+                          Desde cero
+                        </h4>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                          selectedStartMode === 'empty'
+                            ? 'border-[#7928CA]'
+                            : 'border-slate-300 dark:border-purple-800'
+                        }`}>
+                          {selectedStartMode === 'empty' && (
+                            <div className="w-2.5 h-2.5 rounded-full bg-[#7928CA]" />
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                        Definí el límite de cada categoría manualmente.
+                      </p>
+                    </button>
+
+                    {/* Opción 2: Usar mes anterior */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStartMode('copy')}
+                      className={`text-left p-5 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between ${
+                        selectedStartMode === 'copy'
+                          ? 'border-2 border-[#7928CA] bg-white dark:bg-[#1A0B2E] ring-4 ring-purple-500/10 shadow-xs'
+                          : 'border border-slate-200/90 dark:border-purple-900/50 bg-white dark:bg-[#140728] hover:border-purple-300 dark:hover:border-purple-800'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <h4 className="font-black text-sm text-[#1E0836] dark:text-white">
+                          Usar mes anterior
+                        </h4>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                          selectedStartMode === 'copy'
+                            ? 'border-[#7928CA]'
+                            : 'border-slate-300 dark:border-purple-800'
+                        }`}>
+                          {selectedStartMode === 'copy' && (
+                            <div className="w-2.5 h-2.5 rounded-full bg-[#7928CA]" />
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                        Copiá los límites que usaste en {previousMonthLabel}.
+                      </p>
+                    </button>
+
+                    {/* Opción 3: Usar mis gastos reales */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStartMode('real')}
+                      className={`text-left p-5 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between ${
+                        selectedStartMode === 'real'
+                          ? 'border-2 border-[#7928CA] bg-white dark:bg-[#1A0B2E] ring-4 ring-purple-500/10 shadow-xs'
+                          : 'border border-slate-200/90 dark:border-purple-900/50 bg-white dark:bg-[#140728] hover:border-purple-300 dark:hover:border-purple-800'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <h4 className="font-black text-sm text-[#1E0836] dark:text-white">
+                          Usar mis gastos reales
+                        </h4>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                          selectedStartMode === 'real'
+                            ? 'border-[#7928CA]'
+                            : 'border-slate-300 dark:border-purple-800'
+                        }`}>
+                          {selectedStartMode === 'real' && (
+                            <div className="w-2.5 h-2.5 rounded-full bg-[#7928CA]" />
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                        La IA sugiere límites según tu historial de los últimos 3 meses.
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Sección: Así se verá cuando lo configures */}
+                <div className="space-y-3">
+                  <h3 className="font-black text-base sm:text-lg text-[#1E0836] dark:text-white">
+                    Así se verá cuando lo configures
+                  </h3>
+
+                  <div className="rounded-2xl border border-slate-200/90 dark:border-purple-900/50 bg-white dark:bg-[#16072b] p-5 sm:p-6 shadow-xs space-y-4">
+                    {/* Fila 1: Alimentación */}
+                    <div className="flex items-center justify-between gap-3 sm:gap-4 flex-wrap sm:flex-nowrap">
+                      <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-slate-200 w-24 sm:w-32 shrink-0">
+                        Alimentación
+                      </span>
+                      <div className="flex-1 min-w-[120px]">
+                        <div className="h-[3px] rounded-full bg-slate-100 dark:bg-purple-950/60 overflow-hidden">
+                          <div className="h-full rounded-full bg-[#7928CA] w-[60%]" />
+                        </div>
+                      </div>
+                      <span className="text-xs font-black text-[#7928CA] w-12 text-right shrink-0">
+                        60%
+                      </span>
+                      <div className="px-3 py-1.5 rounded-xl bg-purple-50/60 dark:bg-purple-950/40 text-xs font-bold text-slate-700 dark:text-slate-200 shrink-0">
+                        $ 180.000 / $ 300.000
+                      </div>
+                    </div>
+
+                    {/* Fila 2: Alquiler */}
+                    <div className="flex items-center justify-between gap-3 sm:gap-4 flex-wrap sm:flex-nowrap">
+                      <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-slate-200 w-24 sm:w-32 shrink-0">
+                        Alquiler
+                      </span>
+                      <div className="flex-1 min-w-[120px]">
+                        <div className="h-[3px] rounded-full bg-slate-100 dark:bg-purple-950/60 overflow-hidden">
+                          <div className="h-full rounded-full bg-rose-500 w-[100%]" />
+                        </div>
+                      </div>
+                      <span className="text-xs font-black text-rose-500 w-12 text-right shrink-0">
+                        125%
+                      </span>
+                      <div className="px-3 py-1.5 rounded-xl bg-purple-50/60 dark:bg-purple-950/40 text-xs font-bold text-slate-700 dark:text-slate-200 shrink-0">
+                        $ 812.000 / $ 650.000
+                      </div>
+                    </div>
+
+                    {/* Fila 3: Transporte */}
+                    <div className="flex items-center justify-between gap-3 sm:gap-4 flex-wrap sm:flex-nowrap">
+                      <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-slate-200 w-24 sm:w-32 shrink-0">
+                        Transporte
+                      </span>
+                      <div className="flex-1 min-w-[120px]">
+                        <div className="h-[3px] rounded-full bg-slate-100 dark:bg-purple-950/60 overflow-hidden">
+                          <div className="h-full rounded-full bg-[#7928CA] w-[45%]" />
+                        </div>
+                      </div>
+                      <span className="text-xs font-black text-[#7928CA] w-12 text-right shrink-0">
+                        45%
+                      </span>
+                      <div className="px-3 py-1.5 rounded-xl bg-purple-50/60 dark:bg-purple-950/40 text-xs font-bold text-slate-700 dark:text-slate-200 shrink-0">
+                        $ 54.000 / $ 120.000
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Sección: Tu presupuesto, más simple */}
+                <div className="rounded-2xl border border-amber-200/80 dark:border-amber-900/40 bg-[#FFFDF7] dark:bg-[#1C1427] p-4 sm:p-5">
+                  <h4 className="font-black text-sm text-[#1E0836] dark:text-white mb-3">
+                    Tu presupuesto, más simple
+                  </h4>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-emerald-600 shrink-0 stroke-[2.5]" />
+                      <span>Controlá tus gastos por categoría</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-emerald-600 shrink-0 stroke-[2.5]" />
+                      <span>Recibí alertas cuando te acerques al límite</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-emerald-600 shrink-0 stroke-[2.5]" />
+                      <span>Visualizá tu evolución mes a mes</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* ─── VERSIÓN 2: CON PRESUPUESTO ACTIVO ─── */
+              <div className="space-y-6">
             {/* 1. HERO BALANCE Y RESUMEN EJECUTIVO LIGERO */}
             <div className="rounded-3xl border border-slate-200/80 dark:border-purple-900/50 bg-gradient-to-b from-white to-purple-50/20 dark:from-[#17082e] dark:to-[#120524] p-5 sm:p-6 shadow-xs space-y-5">
               
@@ -807,6 +988,8 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
             </div>
           </div>
         )}
+      </div>
+    )}
 
         {/* ─── VISTA 2: INSIGHTS INTELIGENTES ─────────────────────────────── */}
         {view === 'insights' && (

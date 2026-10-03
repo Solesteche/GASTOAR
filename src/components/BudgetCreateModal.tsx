@@ -28,6 +28,7 @@ interface BudgetCreateModalProps {
   transactions?: Transaction[];
   currency?: string;
   onCreate: (newBudgets: Budgets) => void;
+  initialStartMode?: StartMode;
 }
 
 type StartMode = 'empty' | 'copy' | 'real';
@@ -41,9 +42,10 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
   transactions = [],
   currency = 'ARS',
   onCreate,
+  initialStartMode,
 }) => {
   const [step, setStep] = useState(1);
-  const [startMode, setStartMode] = useState<StartMode>('copy');
+  const [startMode, setStartMode] = useState<StartMode>(initialStartMode || 'copy');
   const [name, setName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -120,7 +122,7 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
       const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       setStep(1);
       const hasCategories = Object.keys(budgets?.categories || {}).length > 0;
-      setStartMode(hasCategories ? 'copy' : 'empty');
+      setStartMode(initialStartMode || (hasCategories ? 'copy' : 'empty'));
       setName(first.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }).replace(/^./, (c) => c.toUpperCase()));
       setStartDate(iso(first));
       setEndDate(iso(last));

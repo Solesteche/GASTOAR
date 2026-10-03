@@ -632,6 +632,7 @@ export default function App() {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [isBudgetCreateModalOpen, setIsBudgetCreateModalOpen] = useState(false);
+  const [budgetCreateStartMode, setBudgetCreateStartMode] = useState<'empty' | 'copy' | 'real'>('copy');
   const [isCoupleModalOpen, setIsCoupleModalOpen] = useState(false);
   const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -2099,7 +2100,10 @@ export default function App() {
                 currency={profile.currency}
                 isPro={currentPlanId === 'pro_ai' || isAdmin || isDemoMode}
                 onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
-                onCreateBudget={() => setIsBudgetCreateModalOpen(true)}
+                onCreateBudget={(mode) => {
+                  if (mode) setBudgetCreateStartMode(mode);
+                  setIsBudgetCreateModalOpen(true);
+                }}
                 onUpdateBudgets={(newBudgets) => {
                   setBudgets(newBudgets);
                   showToast('Límites de presupuesto actualizados con éxito', 'success');
@@ -2462,6 +2466,7 @@ export default function App() {
       <BudgetCreateModal
         isOpen={isBudgetCreateModalOpen}
         onClose={() => setIsBudgetCreateModalOpen(false)}
+        initialStartMode={budgetCreateStartMode}
         budgets={budgets}
         categoryMap={categoryMap}
         categoryColors={categoryColors}
