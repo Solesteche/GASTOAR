@@ -1,11 +1,41 @@
 // scoreEngine.ts — Sistema de score financiero multidimensional GastoAR
 // Reemplazar el archivo completo
 
-import { Transaction, Budgets, DailyFinancialScore, ScoreDimension, ScoreTier } from '../types';
+import { Transaction, Budgets } from '../types';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-export type { ScoreDimension, ScoreTier, DailyFinancialScore };
+export interface ScoreDimension {
+  key: string;
+  label: string;
+  emoji: string;
+  points: number;      // puntos obtenidos
+  maxPoints: number;   // puntos máximos
+  pct: number;         // 0–100
+  feedback: string;    // mensaje específico
+  tip: string;         // acción concreta para mejorar
+}
+
+export interface DailyFinancialScore {
+  date: string;
+  total: number;           // 0–100
+  score?: number;          // alias de compatibilidad
+  tier: ScoreTier;
+  rating?: string;         // alias de compatibilidad
+  ratingEmoji?: string;    // alias de compatibilidad
+  color?: string;          // alias de compatibilidad
+  dimensions: ScoreDimension[];
+  unlockedAt?: number;     // timestamp
+  streak: number;          // días consecutivos con score >= 60
+  streakDays?: number;     // alias de compatibilidad
+}
+
+export type ScoreTier =
+  | 'excelente'   // 90–100
+  | 'muy_bien'    // 75–89
+  | 'bien'        // 60–74
+  | 'regular'     // 40–59
+  | 'critico';    // 0–39
 
 export interface ScoreHistory {
   [dateKey: string]: DailyFinancialScore;
@@ -281,57 +311,22 @@ export const computeDailyFinancialScore = (
     dimensions.reduce((s, d) => s + d.points, 0)
   );
 
-  const tier = getTier(total);
-  const cfg = TIER_CONFIG[tier];
-  const catBudgets = Object.values(budgets?.categories || {}).reduce<number>((acc, v) => acc + (Number(v) || 0), 0);
-  const generalBudget = catBudgets > 0 ? catBudgets : (totalIncome > 0 ? totalIncome : 200000);
+  const boundedTotal = Math.min(100, Math.max(0, total));
+  const tier = getTier(boundedTotal);
+  const tierConfig = TIER_CONFIG[tier];
 
   return {
     date: today,
-    total: Math.min(100, Math.max(0, total)),
-    score: Math.min(100, Math.max(0, total)), // compatibility alias
+    total: boundedTotal,
+    score: boundedTotal,
     tier,
-    rating: cfg.label,                       // compatibility alias
-    ratingEmoji: cfg.emoji,                   // compatibility alias
-    color: cfg.color,                         // compatibility alias
+    rating: tierConfig?.label || 'Bien',
+    ratingEmoji: tierConfig?.emoji || '💪',
+    color: tierConfig?.color || '#2563EB',
     dimensions,
     streak,
-    streakDays: streak,                       // compatibility alias
+    streakDays: streak,
     unlockedAt: history[today]?.unlockedAt,
-    tip: dimensions.find(d => d.points < d.maxPoints)?.tip || dimensions[0]?.tip || '¡Excelente trabajo financiero!',
-    dailySpent: totalExpenses,
-    dailyLimit: Math.round(generalBudget / 30),
-    isWithinLimit: totalExpenses <= Math.round(generalBudget / 30),
-    breakdown: {
-      limit: {
-        score: dimensions[0]?.points || 0,
-        maxScore: dimensions[0]?.maxPoints || 30,
-        label: dimensions[0]?.label || 'Presupuesto',
-        description: dimensions[0]?.feedback || '',
-        status: (dimensions[0]?.pct >= 80 ? 'perfect' : dimensions[0]?.pct >= 50 ? 'good' : 'warning'),
-      },
-      logging: {
-        score: dimensions[1]?.points || 0,
-        maxScore: dimensions[1]?.maxPoints || 20,
-        label: dimensions[1]?.label || 'Consistencia',
-        description: dimensions[1]?.feedback || '',
-        status: (dimensions[1]?.pct >= 80 ? 'perfect' : dimensions[1]?.pct >= 50 ? 'good' : 'warning'),
-      },
-      budgetPacing: {
-        score: dimensions[2]?.points || 0,
-        maxScore: dimensions[2]?.maxPoints || 20,
-        label: dimensions[2]?.label || 'Ahorro neto',
-        description: dimensions[2]?.feedback || '',
-        status: (dimensions[2]?.pct >= 80 ? 'perfect' : dimensions[2]?.pct >= 50 ? 'good' : 'warning'),
-      },
-      streak: {
-        score: Math.min(10, streak * 2),
-        maxScore: 10,
-        label: 'Racha',
-        description: `${streak} días consecutivos`,
-        status: streak >= 3 ? 'perfect' : 'good',
-      }
-    }
   };
 };
 

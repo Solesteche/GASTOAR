@@ -14,9 +14,17 @@ import {
   Check, 
   Smartphone,
   Trash2,
-  FileDown
+  FileDown,
+  Sparkles
 } from 'lucide-react';
 import { CoupleProfile, UserAccount } from '../../types';
+import {
+  getNotificationPermission,
+  requestNotificationPermission,
+  playNotificationSound,
+  getNotificationSettings,
+  saveNotificationSettings,
+} from '../../services/localNotificationService';
 
 interface SettingsScreenProps {
   onBack?: () => void;
@@ -28,6 +36,7 @@ interface SettingsScreenProps {
   onExportData?: () => void;
   onLogout: () => void;
   onShowToast?: (msg: string, type: 'success' | 'error' | 'info') => void;
+  onOpenOnboarding?: () => void;
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
@@ -39,9 +48,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onUpdateProfile,
   onExportData,
   onLogout,
-  onShowToast
+  onShowToast,
+  onOpenOnboarding
 }) => {
-  const [notificationsDue, setNotificationsDue] = useState(true);
+  const [notificationsDue, setNotificationsDue] = useState(() => getNotificationSettings().enabled);
   const [notificationsBudget, setNotificationsBudget] = useState(true);
   const [selectedCurrency, setSelectedCurrency] = useState(profile.currency || 'ARS');
   const [biometricLock, setBiometricLock] = useState(false);
@@ -79,7 +89,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </h2>
 
           <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-100">
-            Pantalla 7
+            Ajustes
           </span>
         </div>
 
@@ -120,9 +130,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <input
                 type="checkbox"
                 checked={notificationsDue}
-                onChange={() => {
-                  setNotificationsDue(!notificationsDue);
-                  if (onShowToast) onShowToast('Preferencia de notificación actualizada', 'info');
+                onChange={async () => {
+                  const nextState = !notificationsDue;
+                  if (nextState) {
+                    const perm = await requestNotificationPermission();
+                    if (perm === 'granted') {
+                      playNotificationSound();
+                      setNotificationsDue(true);
+                      saveNotificationSettings({ enabled: true });
+                      if (onShowToast) onShowToast('Avisos de vencimientos a 48 hs activados', 'success');
+                    } else {
+                      setNotificationsDue(false);
+                      saveNotificationSettings({ enabled: false });
+                      if (onShowToast) onShowToast('Permiso de notificaciones no concedido', 'info');
+                    }
+                  } else {
+                    setNotificationsDue(false);
+                    saveNotificationSettings({ enabled: false });
+                    if (onShowToast) onShowToast('Avisos de vencimientos pausados', 'info');
+                  }
                 }}
                 className="sr-only peer"
               />
@@ -252,6 +278,26 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </div>
             <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600" />
           </button>
+
+          {/* Tutorial / Onboarding */}
+          {onOpenOnboarding && (
+            <button
+              type="button"
+              onClick={onOpenOnboarding}
+              className="w-full p-3 rounded-2xl hover:bg-slate-50 flex items-center justify-between text-left transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                  <Sparkles className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">Guía de Inicio & Tutorial</span>
+                  <span className="text-[10px] text-slate-400 font-medium">Repasar las 4 funciones esenciales</span>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-purple-600" />
+            </button>
+          )}
 
           {/* About Us */}
           <button

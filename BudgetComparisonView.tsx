@@ -205,6 +205,7 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
 
       return {
         category: cat,
+        name: cat,
         budget,
         spent,
         count,
@@ -274,22 +275,24 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
         return true;
       })
       .sort((a, b) => {
-        let valA: any = a[sortField];
-        let valB: any = b[sortField];
+        let valA: any = sortField === 'name' ? (a.name || a.category || '') : a[sortField];
+        let valB: any = sortField === 'name' ? (b.name || b.category || '') : b[sortField];
 
         if (sortField === 'difference') {
           // When sorting by difference, exceeded categories should appear first if desc
-          valA = a.difference;
-          valB = b.difference;
+          valA = a.difference ?? 0;
+          valB = b.difference ?? 0;
         }
 
-        if (typeof valA === 'string') {
+        if (typeof valA === 'string' || typeof valB === 'string') {
+          const strA = String(valA || '');
+          const strB = String(valB || '');
           return sortDirection === 'asc' 
-            ? valA.localeCompare(valB) 
-            : valB.localeCompare(valA);
+            ? strA.localeCompare(strB) 
+            : strB.localeCompare(strA);
         }
 
-        return sortDirection === 'asc' ? valA - valB : valB - valA;
+        return sortDirection === 'asc' ? (Number(valA) || 0) - (Number(valB) || 0) : (Number(valB) || 0) - (Number(valA) || 0);
       });
   }, [comparisonData, searchTerm, statusFilter, sortField, sortDirection]);
 

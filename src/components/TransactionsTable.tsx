@@ -216,6 +216,42 @@ const formatFriendlyDate = (dateStr?: string, timeStr?: string) => {
   return `${pad(d)}/${pad(m)}/${y}${timeSuffix}`;
 };
 
+// Friendly date group header formatting (e.g. "Hoy", "Ayer", "Lunes, 28 Sep")
+const formatDateGroupHeader = (dateStr?: string) => {
+  if (!dateStr || dateStr === 'Sin fecha') return { title: 'Sin fecha asignada', isToday: false, isYesterday: false };
+  const today = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = `${yesterday.getFullYear()}-${pad(yesterday.getMonth() + 1)}-${pad(yesterday.getDate())}`;
+
+  if (dateStr === todayStr) {
+    return { title: 'Hoy', isToday: true, isYesterday: false };
+  }
+  if (dateStr === yesterdayStr) {
+    return { title: 'Ayer', isToday: false, isYesterday: true };
+  }
+
+  try {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const d = parseInt(parts[2], 10);
+      const dateObj = new Date(y, m - 1, d);
+      const daysOfWeek = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      const dayName = daysOfWeek[dateObj.getDay()];
+      const monthName = months[m - 1];
+      const yearSuffix = y !== today.getFullYear() ? ` ${y}` : '';
+      return { title: `${dayName}, ${d} ${monthName}${yearSuffix}`, isToday: false, isYesterday: false };
+    }
+  } catch {}
+  return { title: dateStr, isToday: false, isYesterday: false };
+};
+
 export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   transactions = [],
   filteredTransactions,
@@ -272,9 +308,8 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   // Sorting state
   const [sortBy, setSortBy] = useState<'recent' | 'oldest' | 'highest' | 'lowest'>('recent');
 
-  // Pagination state (8 to 10 items per page)
+  // Pagination state
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const itemsPerPage = 8;
 
   // Close date menu on outside click
   useEffect(() => {
@@ -367,25 +402,43 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
     setIsDateMenuOpen(false);
   };
 
-  // Category totals for horizontal carousel
+  // Active filter indicators
+  const isDateFiltered = Boolean(
+    (activeFilters.dateRange && activeFilters.dateRange !== 'all') ||
+    activeFilters.startDate ||
+    activeFilters.endDate ||
+    activeFilters.selectedMonth
+  );
+  const isModeFiltered = Boolean(activeFilters.mode && activeFilters.mode !== 'all');
+  const isCategoryFiltered = Boolean(activeFilters.categoria && activeFilters.categoria !== 'ALL');
+  const isSearchFiltered = Boolean(activeFilters.search && activeFilters.search.trim() !== '');
+
+  const activeFiltersCount = (isDateFiltered ? 1 : 0) + (isModeFiltered ? 1 : 0) + (isCategoryFiltered ? 1 : 0) + (isSearchFiltered ? 1 : 0);
+
+  // Category totals for horizontal carousel: compute spending per category across transactions
   const categoryTotals = useMemo(() => {
     const totals: Record<string, number> = {};
-    effectiveFiltered.forEach(t => {
+    (effectiveTransactions || []).forEach(t => {
+      if (!t || t.tipoTransaccion === 'ingreso') return;
       const cat = t.categoria || 'Otros';
-      totals[cat] = (totals[cat] || 0) + (t.monto || 0);
+      totals[cat] = (totals[cat] || 0) + Math.abs(t.monto || 0);
     });
     return totals;
-  }, [effectiveFiltered]);
+  }, [effectiveTransactions]);
 
-  // Priority categories for carousel matching design:
-  // Todas, Alimentos, Transporte, Servicios, Hogar, Salud, Entretenimiento, plus others
+  // Only show categories that have actual expenses (> 0), or the currently selected category
   const carouselCategories = useMemo(() => {
-    const primaryCats = ['Alimentos', 'Transporte', 'Servicios', 'Hogar', 'Salud', 'Entretenimiento'];
-    const allKnownCats = Object.keys(categoryMap);
-    const existingInTransactions = Object.keys(categoryTotals);
-    const combined = Array.from(new Set([...primaryCats, ...allKnownCats, ...existingInTransactions]));
-    return combined;
-  }, [categoryMap, categoryTotals]);
+    const activeWithSpending = Object.entries(categoryTotals)
+      .filter(([catName, amount]) => Number(amount) > 0 || activeFilters.categoria === catName)
+      .sort((a, b) => Number(b[1]) - Number(a[1])) // highest expense first
+      .map(([catName]) => catName);
+
+    // If no category has spending > 0, fallback to known categories with transactions
+    if (activeWithSpending.length === 0) {
+      return Object.keys(categoryMap).slice(0, 6);
+    }
+    return activeWithSpending;
+  }, [categoryTotals, activeFilters.categoria, categoryMap]);
 
   // Sort transactions
   const sortedTransactions = useMemo(() => {
@@ -410,18 +463,67 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
     });
   }, [effectiveFiltered, sortBy]);
 
-  // Paginate transactions
+  // Pagination state (12 items per page for balanced date grouping)
+  const itemsPerPage = 12;
   const totalPages = Math.max(1, Math.ceil(sortedTransactions.length / itemsPerPage));
   const paginatedTransactions = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
     return sortedTransactions.slice(start, start + itemsPerPage);
   }, [sortedTransactions, currentPage, itemsPerPage]);
 
+  // Group paginated transactions by date
+  interface DateGroup {
+    dateKey: string;
+    displayDate: string;
+    isToday: boolean;
+    isYesterday: boolean;
+    totalExpense: number;
+    totalIncome: number;
+    transactions: Transaction[];
+  }
+
+  const groupedTransactions = useMemo<DateGroup[]>(() => {
+    const groupsMap = new Map<string, Transaction[]>();
+
+    paginatedTransactions.forEach(tx => {
+      const key = tx.fecha || 'Sin fecha';
+      const existing = groupsMap.get(key) || [];
+      existing.push(tx);
+      groupsMap.set(key, existing);
+    });
+
+    const groups: DateGroup[] = [];
+    groupsMap.forEach((txList, dateKey) => {
+      const headerInfo = formatDateGroupHeader(dateKey);
+      const totalExpense = txList
+        .filter(t => t.tipoTransaccion !== 'ingreso')
+        .reduce((sum, t) => sum + Math.abs(t.monto || 0), 0);
+      const totalIncome = txList
+        .filter(t => t.tipoTransaccion === 'ingreso')
+        .reduce((sum, t) => sum + Math.abs(t.monto || 0), 0);
+
+      groups.push({
+        dateKey,
+        displayDate: headerInfo.title,
+        isToday: headerInfo.isToday,
+        isYesterday: headerInfo.isYesterday,
+        totalExpense,
+        totalIncome,
+        transactions: txList,
+      });
+    });
+
+    return groups;
+  }, [paginatedTransactions, profile.currency]);
+
   return (
     <div className="space-y-4 max-w-7xl mx-auto font-sans pb-16">
 
-      {/* ROW 1: HERO MOVIMIENTOS CARD (Full Width with Purple Gradient matching Resumen) */}
-      <div className="w-full bg-gradient-to-br from-[#2E0854] via-[#45108A] to-[#6F2EC5] rounded-3xl p-5 sm:p-6 text-white shadow-lg shadow-purple-950/20 border border-purple-400/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* ROW 1: HERO MOVIMIENTOS CARD */}
+      <div
+        style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
+        className="w-full rounded-3xl p-5 sm:p-6 text-white shadow-xl border border-purple-400/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+      >
         
         {/* Left: Icon + Title + Subtitle */}
         <div className="flex items-center gap-3.5 sm:gap-4">
@@ -452,7 +554,36 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
       {/* ROW 2: SEARCH INPUT & 3 FILTER PILLS */}
       <div className="bg-white rounded-3xl border border-slate-200/90 p-3.5 sm:p-4 shadow-xs space-y-3 relative">
         
-        {/* Search input with filter/reset button */}
+        {/* Top Header of Filter Container: Label, Count Badge & Reset */}
+        <div className="flex items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+              Filtros
+            </span>
+            {activeFiltersCount > 0 ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-[#6F2EC5] text-white shadow-2xs">
+                <span>{activeFiltersCount} activo{activeFiltersCount > 1 ? 's' : ''}</span>
+              </span>
+            ) : (
+              <span className="text-[11px] font-semibold text-slate-400">
+                Ninguno activo
+              </span>
+            )}
+          </div>
+
+          {activeFiltersCount > 0 && (
+            <button
+              type="button"
+              onClick={onResetFilters}
+              className="text-xs font-bold text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1 transition-colors cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Limpiar filtros</span>
+            </button>
+          )}
+        </div>
+
+        {/* Search input with live counter & clear button */}
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -461,21 +592,90 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
               value={activeFilters.search ?? ''}
               onChange={(e) => onFilterChange({ search: e.target.value })}
               placeholder="Buscar por concepto..."
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 focus:bg-white transition-all font-medium"
+              className="w-full pl-10 pr-24 py-2.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 focus:bg-white transition-all font-medium"
             />
+            {/* Live counter and clear button inside search */}
+            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+              {isSearchFiltered && (
+                <>
+                  <span className={`text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-full ${
+                    effectiveFiltered.length > 0 
+                      ? 'bg-purple-100 text-[#6F2EC5]' 
+                      : 'bg-rose-100 text-rose-700'
+                  }`}>
+                    {effectiveFiltered.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onFilterChange({ search: '' })}
+                    className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                    title="Borrar búsqueda"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           <button
             type="button"
             onClick={onResetFilters}
-            className="p-2.5 bg-slate-50 hover:bg-purple-50 border border-slate-200/80 hover:border-purple-200 rounded-2xl text-slate-600 hover:text-[#6F2EC5] transition-all cursor-pointer shadow-2xs shrink-0"
+            className={`p-2.5 border rounded-2xl transition-all cursor-pointer shadow-2xs shrink-0 flex items-center gap-1.5 ${
+              activeFiltersCount > 0 
+                ? 'bg-purple-50 border-purple-300 text-[#6F2EC5]' 
+                : 'bg-slate-50 hover:bg-purple-50 border-slate-200/80 hover:border-purple-200 text-slate-600 hover:text-[#6F2EC5]'
+            }`}
             title="Restablecer filtros"
           >
             <SlidersHorizontal className="w-4 h-4" />
+            {activeFiltersCount > 0 && (
+              <span className="w-4 h-4 rounded-full bg-[#6F2EC5] text-white text-[9px] font-black flex items-center justify-center">
+                {activeFiltersCount}
+              </span>
+            )}
           </button>
         </div>
 
-        {/* 3 Dropdown Filter Pills (2-Tier Text Design as in Mockup) */}
+        {/* Active search / filters feedback strip */}
+        {activeFiltersCount > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            {isSearchFiltered && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-[#6F2EC5] border border-purple-200 text-[11px] font-bold shadow-2xs">
+                <span>Buscar: «{activeFilters.search}» ({effectiveFiltered.length})</span>
+                <button type="button" onClick={() => onFilterChange({ search: '' })} className="hover:text-purple-900 cursor-pointer ml-0.5">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {isDateFiltered && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-[#6F2EC5] border border-purple-200 text-[11px] font-bold shadow-2xs">
+                <span>Fecha: {getDateRangeTitle()}</span>
+                <button type="button" onClick={() => handleSelectPreset('all')} className="hover:text-purple-900 cursor-pointer ml-0.5">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {isModeFiltered && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-[#6F2EC5] border border-purple-200 text-[11px] font-bold shadow-2xs">
+                <span>Modo: {activeFilters.mode === 'pareja' ? 'Compartido' : 'Personal'}</span>
+                <button type="button" onClick={() => onFilterChange({ mode: 'all' })} className="hover:text-purple-900 cursor-pointer ml-0.5">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {isCategoryFiltered && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-[#6F2EC5] border border-purple-200 text-[11px] font-bold shadow-2xs">
+                <span>Categoría: {activeFilters.categoria}</span>
+                <button type="button" onClick={() => onFilterChange({ categoria: 'ALL', subcategoria: 'ALL' })} className="hover:text-purple-900 cursor-pointer ml-0.5">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* 3 Dropdown Filter Pills (Responsive on mobile, Active visual indicators) */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           
           {/* Pill 1: Fecha */}
@@ -483,17 +683,30 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
             <button
               type="button"
               onClick={() => setIsDateMenuOpen(prev => !prev)}
-              className="w-full bg-slate-50 hover:bg-purple-50/50 border border-slate-200/80 hover:border-purple-300 rounded-2xl p-2.5 flex items-center justify-between gap-2.5 transition-all text-left cursor-pointer group shadow-2xs"
+              className={`w-full border rounded-2xl p-2.5 flex items-center justify-between gap-2.5 transition-all text-left cursor-pointer group shadow-2xs ${
+                isDateFiltered 
+                  ? 'bg-purple-50/70 border-[#6F2EC5] ring-1 ring-purple-400/30' 
+                  : 'bg-slate-50 hover:bg-purple-50/50 border-slate-200/80 hover:border-purple-300'
+              }`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-purple-100/70 text-[#6F2EC5] flex items-center justify-center shrink-0">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                  isDateFiltered ? 'bg-[#6F2EC5] text-white shadow-2xs' : 'bg-purple-100/70 text-[#6F2EC5]'
+                }`}>
                   <Calendar className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <span className="block text-[10px] font-medium text-slate-400 leading-tight">
-                    Fecha
-                  </span>
-                  <span className="block text-xs font-bold text-slate-800 leading-tight truncate group-hover:text-[#6F2EC5] transition-colors">
+                  <div className="flex items-center gap-1.5">
+                    <span className="block text-[10px] font-medium text-slate-400 leading-tight">
+                      Fecha
+                    </span>
+                    {isDateFiltered && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#6F2EC5]" />
+                    )}
+                  </div>
+                  <span className={`block text-xs font-bold leading-tight truncate transition-colors ${
+                    isDateFiltered ? 'text-[#6F2EC5]' : 'text-slate-800 group-hover:text-[#6F2EC5]'
+                  }`}>
                     {getDateRangeTitle()}
                   </span>
                 </div>
@@ -543,16 +756,29 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
 
           {/* Pill 2: Modo */}
           <div className="relative">
-            <div className="w-full bg-slate-50 hover:bg-purple-50/50 border border-slate-200/80 hover:border-purple-300 rounded-2xl p-2.5 flex items-center justify-between gap-2.5 transition-all text-left cursor-pointer group shadow-2xs relative">
+            <div className={`w-full border rounded-2xl p-2.5 flex items-center justify-between gap-2.5 transition-all text-left cursor-pointer group shadow-2xs relative ${
+              isModeFiltered 
+                ? 'bg-purple-50/70 border-[#6F2EC5] ring-1 ring-purple-400/30' 
+                : 'bg-slate-50 hover:bg-purple-50/50 border-slate-200/80 hover:border-purple-300'
+            }`}>
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-purple-100/70 text-[#6F2EC5] flex items-center justify-center shrink-0">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                  isModeFiltered ? 'bg-[#6F2EC5] text-white shadow-2xs' : 'bg-purple-100/70 text-[#6F2EC5]'
+                }`}>
                   <Users className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <span className="block text-[10px] font-medium text-slate-400 leading-tight">
-                    Modo
-                  </span>
-                  <span className="block text-xs font-bold text-slate-800 leading-tight truncate group-hover:text-[#6F2EC5] transition-colors">
+                  <div className="flex items-center gap-1.5">
+                    <span className="block text-[10px] font-medium text-slate-400 leading-tight">
+                      Modo
+                    </span>
+                    {isModeFiltered && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#6F2EC5]" />
+                    )}
+                  </div>
+                  <span className={`block text-xs font-bold leading-tight truncate transition-colors ${
+                    isModeFiltered ? 'text-[#6F2EC5]' : 'text-slate-800 group-hover:text-[#6F2EC5]'
+                  }`}>
                     {activeFilters.mode === 'pareja' ? 'Compartido' : activeFilters.mode === 'individual' ? 'Personal' : 'Todos'}
                   </span>
                 </div>
@@ -575,16 +801,29 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
 
           {/* Pill 3: Categorías */}
           <div className="relative">
-            <div className="w-full bg-slate-50 hover:bg-purple-50/50 border border-slate-200/80 hover:border-purple-300 rounded-2xl p-2.5 flex items-center justify-between gap-2.5 transition-all text-left cursor-pointer group shadow-2xs relative">
+            <div className={`w-full border rounded-2xl p-2.5 flex items-center justify-between gap-2.5 transition-all text-left cursor-pointer group shadow-2xs relative ${
+              isCategoryFiltered 
+                ? 'bg-purple-50/70 border-[#6F2EC5] ring-1 ring-purple-400/30' 
+                : 'bg-slate-50 hover:bg-purple-50/50 border-slate-200/80 hover:border-purple-300'
+            }`}>
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-purple-100/70 text-[#6F2EC5] flex items-center justify-center shrink-0">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                  isCategoryFiltered ? 'bg-[#6F2EC5] text-white shadow-2xs' : 'bg-purple-100/70 text-[#6F2EC5]'
+                }`}>
                   <LayoutGrid className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <span className="block text-[10px] font-medium text-slate-400 leading-tight">
-                    Categorías
-                  </span>
-                  <span className="block text-xs font-bold text-slate-800 leading-tight truncate group-hover:text-[#6F2EC5] transition-colors">
+                  <div className="flex items-center gap-1.5">
+                    <span className="block text-[10px] font-medium text-slate-400 leading-tight">
+                      Categoría
+                    </span>
+                    {isCategoryFiltered && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#6F2EC5]" />
+                    )}
+                  </div>
+                  <span className={`block text-xs font-bold leading-tight truncate transition-colors ${
+                    isCategoryFiltered ? 'text-[#6F2EC5]' : 'text-slate-800 group-hover:text-[#6F2EC5]'
+                  }`}>
                     {activeFilters.categoria === 'ALL' ? 'Todas' : activeFilters.categoria}
                   </span>
                 </div>
@@ -600,8 +839,15 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
               >
                 <option value="ALL">Todas las Categorías</option>
                 {carouselCategories.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
+                  <option key={cat} value={cat}>
+                    {cat} {categoryTotals[cat] ? `(${formatCurrency(categoryTotals[cat], profile.currency)})` : ''}
+                  </option>
                 ))}
+                {Object.keys(categoryMap)
+                  .filter(c => !carouselCategories.includes(c))
+                  .map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
               </select>
             </div>
           </div>
@@ -764,147 +1010,224 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
         </div>
       </div>
 
-      {/* ROW 5: TRANSACTIONS LIST CARDS (Exact Match to Mockup Image) */}
-      <div className="space-y-2.5">
-        {paginatedTransactions.length > 0 ? (
-          paginatedTransactions.map((tx) => {
-            const visuals = getCategoryVisuals(tx.categoria, tx.tipoTransaccion);
-            const Icon = visuals.icon;
-            const isExpense = tx.tipoTransaccion !== 'ingreso';
-            const payerName = tx.pagadoPor === 'user1' ? user1Name : user2Name;
-            const payerInitial = (payerName || 'U').charAt(0).toUpperCase();
-            const isPayerUser1 = tx.pagadoPor === 'user1';
-            const friendlyDate = formatFriendlyDate(tx.fecha, tx.hora);
-            const isInstallment = Boolean(tx.esCuotas || (tx.cuotasTotal && tx.cuotasTotal > 1));
-
-            return (
-              <div
-                key={tx.id}
-                onClick={() => handleEdit(tx)}
-                className="bg-white rounded-2xl border border-slate-200/80 hover:border-purple-300 p-3.5 sm:p-4 transition-all shadow-2xs hover:shadow-xs flex items-center justify-between gap-3 group cursor-pointer"
-              >
-                
-                {/* LEFT: Category Icon + (Concept + Category Badge + Date • Payer) */}
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border ${visuals.bg} ${visuals.text} ${visuals.border} shadow-2xs`}>
-                    <Icon className="w-6 h-6" />
-                  </div>
-
-                  <div className="min-w-0 space-y-0.5">
-                    {/* Concept */}
-                    <h4 className="font-bold text-slate-900 text-sm sm:text-base leading-snug truncate group-hover:text-[#6F2EC5] transition-colors">
-                      {tx.concepto || 'Sin concepto'}
-                    </h4>
-
-                    {/* Category Pill Badge */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className={`inline-block px-2 py-0.5 rounded-md text-[11px] font-semibold border ${visuals.badgeBg}`}>
-                        {tx.categoria || 'General'}
-                      </span>
-
-                      {isInstallment && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                          <CreditCard className="w-2.5 h-2.5" />
-                          <span>Cuota {tx.cuotaActual || 1}/{tx.cuotasTotal || 1}</span>
-                        </span>
-                      )}
-
-                      {tx.inputMethod === 'audio' && (
-                        <span 
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200"
-                          title={tx.audioTranscription ? `Audio: "${tx.audioTranscription}"` : 'Cargado por voz'}
-                        >
-                          <Mic className="w-2.5 h-2.5 text-purple-600" />
-                          <span>Voz</span>
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Date and Payer separated by bullet (Visible on mobile and desktop) */}
-                    <p className="text-xs text-slate-400 font-medium pt-0.5 flex items-center gap-1.5">
-                      <span>{friendlyDate}</span>
-                      <span className="text-slate-300">•</span>
-                      <span className="text-slate-500 font-semibold">{payerName}</span>
-                    </p>
-                  </div>
+      {/* ROW 5: TRANSACTIONS LIST CARDS GROUPED BY DATE */}
+      <div className="space-y-4">
+        {groupedTransactions.length > 0 ? (
+          groupedTransactions.map((group) => (
+            <div key={group.dateKey} className="space-y-2">
+              
+              {/* Group Date Header with subtotal */}
+              <div className="flex items-center justify-between px-2 pt-2 pb-1 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2.5 h-2.5 rounded-full ${
+                    group.isToday 
+                      ? 'bg-[#6F2EC5] ring-4 ring-purple-100' 
+                      : group.isYesterday 
+                      ? 'bg-amber-500 ring-4 ring-amber-100' 
+                      : 'bg-slate-300'
+                  }`} />
+                  <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight">
+                    {group.displayDate}
+                  </span>
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                    {group.transactions.length} {group.transactions.length === 1 ? 'movimiento' : 'movimientos'}
+                  </span>
                 </div>
 
-                {/* RIGHT: Amount/Method + Payer Avatar Circle + Chevron */}
-                <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
-                  
-                  {/* Amount & Payment Method */}
-                  <div className="text-right">
-                    <p className={`font-black text-sm sm:text-base tracking-tight ${
-                      isExpense ? 'text-rose-600' : 'text-emerald-600'
-                    }`}>
-                      {isExpense 
-                        ? `- $ ${Math.abs(tx.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}` 
-                        : `+$ ${Math.abs(tx.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`}
-                    </p>
-                    <p className="text-[11px] font-medium text-slate-400 truncate max-w-[95px] sm:max-w-[130px]">
-                      {tx.metodoPago || 'Tarjeta'}
-                    </p>
-                  </div>
-
-                  {/* Payer Avatar Circle ("S" purple, "L" orange) */}
-                  <div
-                    className={`w-7 h-7 rounded-full text-white font-black text-xs flex items-center justify-center shrink-0 shadow-2xs ${
-                      isPayerUser1 ? 'bg-[#6F2EC5]' : 'bg-[#F95420]'
-                    }`}
-                    title={`Pagado por: ${payerName}`}
-                  >
-                    {payerInitial}
-                  </div>
-
-                  {/* Direct Action buttons: Edit & Delete */}
-                  <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEdit(tx);
-                      }}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-[#6F2EC5] hover:bg-purple-50 transition-colors cursor-pointer"
-                      title="Editar movimiento"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm(`¿Estás seguro de que querés borrar el movimiento "${tx.concepto}" por $${Math.abs(tx.monto).toLocaleString('es-AR')}?`)) {
-                          handleDelete(tx.id);
-                        }
-                      }}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                      title="Borrar movimiento"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Chevron Right */}
-                  <div className="text-slate-300 group-hover:text-[#6F2EC5] transition-colors hidden sm:block">
-                    <ChevronRight className="w-4 h-4" />
-                  </div>
-
+                {/* Day subtotals */}
+                <div className="text-right text-xs font-bold flex items-center gap-1.5 sm:gap-2">
+                  {group.totalExpense > 0 && (
+                    <span className="text-rose-600 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100 shadow-2xs">
+                      - {formatCurrency(group.totalExpense, profile.currency)}
+                    </span>
+                  )}
+                  {group.totalIncome > 0 && (
+                    <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 shadow-2xs">
+                      + {formatCurrency(group.totalIncome, profile.currency)}
+                    </span>
+                  )}
                 </div>
-
               </div>
-            );
-          })
+
+              {/* Transactions in this group */}
+              <div className="space-y-2">
+                {group.transactions.map((tx) => {
+                  const visuals = getCategoryVisuals(tx.categoria, tx.tipoTransaccion);
+                  const Icon = visuals.icon;
+                  const isExpense = tx.tipoTransaccion !== 'ingreso';
+                  const payerName = tx.pagadoPor === 'user1' ? user1Name : user2Name;
+                  const payerInitial = (payerName || 'U').charAt(0).toUpperCase();
+                  const isPayerUser1 = tx.pagadoPor === 'user1';
+                  const friendlyDate = formatFriendlyDate(tx.fecha, tx.hora);
+                  const isInstallment = Boolean(tx.esCuotas || (tx.cuotasTotal && tx.cuotasTotal > 1));
+
+                  return (
+                    <div
+                      key={tx.id}
+                      onClick={() => handleEdit(tx)}
+                      className="bg-white rounded-2xl border border-slate-200/80 hover:border-purple-300 p-3.5 sm:p-4 transition-all shadow-2xs hover:shadow-xs flex items-center justify-between gap-3 group cursor-pointer"
+                    >
+                      {/* LEFT: Category Icon + (Concept + Category Badge + Time • Payer) */}
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border ${visuals.bg} ${visuals.text} ${visuals.border} shadow-2xs`}>
+                          <Icon className="w-6 h-6" />
+                        </div>
+
+                        <div className="min-w-0 space-y-0.5">
+                          {/* Concept */}
+                          <h4 className="font-bold text-slate-900 text-sm sm:text-base leading-snug truncate group-hover:text-[#6F2EC5] transition-colors">
+                            {tx.concepto || 'Sin concepto'}
+                          </h4>
+
+                          {/* Category Pill Badge */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`inline-block px-2 py-0.5 rounded-md text-[11px] font-semibold border ${visuals.badgeBg}`}>
+                              {tx.categoria || 'General'}
+                            </span>
+
+                            {isInstallment && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                <CreditCard className="w-2.5 h-2.5" />
+                                <span>Cuota {tx.cuotaActual || 1}/{tx.cuotasTotal || 1}</span>
+                              </span>
+                            )}
+
+                            {tx.inputMethod === 'audio' && (
+                              <span 
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200"
+                                title={tx.audioTranscription ? `Audio: "${tx.audioTranscription}"` : 'Cargado por voz'}
+                              >
+                                <Mic className="w-2.5 h-2.5 text-purple-600" />
+                                <span>Voz</span>
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Time and Payer */}
+                          <p className="text-xs text-slate-400 font-medium pt-0.5 flex items-center gap-1.5">
+                            <span>{(tx as any).hora ? `${(tx as any).hora}` : friendlyDate}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="text-slate-500 font-semibold">{payerName}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* RIGHT: Amount/Method + Payer Avatar Circle + Chevron */}
+                      <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
+                        {/* Amount & Payment Method */}
+                        <div className="text-right">
+                          <p className={`font-black text-sm sm:text-base tracking-tight ${
+                            isExpense ? 'text-rose-600' : 'text-emerald-600'
+                          }`}>
+                            {isExpense 
+                              ? `- $ ${Math.abs(tx.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}` 
+                              : `+$ ${Math.abs(tx.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`}
+                          </p>
+                          <p className="text-[11px] font-medium text-slate-400 truncate max-w-[95px] sm:max-w-[130px]">
+                            {tx.metodoPago || 'Tarjeta'}
+                          </p>
+                        </div>
+
+                        {/* Payer Avatar Circle ("S" purple, "L" orange) */}
+                        <div
+                          className={`w-7 h-7 rounded-full text-white font-black text-xs flex items-center justify-center shrink-0 shadow-2xs ${
+                            isPayerUser1 ? 'bg-[#6F2EC5]' : 'bg-[#F95420]'
+                          }`}
+                          title={`Pagado por: ${payerName}`}
+                        >
+                          {payerInitial}
+                        </div>
+
+                        {/* Direct Action buttons: Edit & Delete */}
+                        <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEdit(tx);
+                            }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-[#6F2EC5] hover:bg-purple-50 transition-colors cursor-pointer"
+                            title="Editar movimiento"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`¿Estás seguro de que querés borrar el movimiento "${tx.concepto}" por $${Math.abs(tx.monto).toLocaleString('es-AR')}?`)) {
+                                handleDelete(tx.id);
+                              }
+                            }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Borrar movimiento"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Chevron Right */}
+                        <div className="text-slate-300 group-hover:text-[#6F2EC5] transition-colors hidden sm:block">
+                          <ChevronRight className="w-4 h-4" />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+            </div>
+          ))
+        ) : isSearchFiltered ? (
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-8 sm:p-12 text-center space-y-3">
+            <div className="w-14 h-14 rounded-2xl bg-purple-50 text-[#6F2EC5] flex items-center justify-center mx-auto shadow-2xs">
+              <Search className="w-7 h-7" />
+            </div>
+            <h3 className="text-base sm:text-lg font-black text-slate-800 tracking-tight">
+              No encontramos movimientos para "{activeFilters.search}"
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
+              Probá con otra palabra clave o limpiá la búsqueda para ver todas las transacciones.
+            </p>
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => onFilterChange({ search: '' })}
+                className="px-4 py-2 bg-[#6F2EC5] hover:bg-[#5B21B6] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
+              >
+                Borrar búsqueda
+              </button>
+              {activeFiltersCount > 1 && (
+                <button
+                  type="button"
+                  onClick={onResetFilters}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                >
+                  Restablecer todos los filtros
+                </button>
+              )}
+            </div>
+          </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-dashed border-slate-200 py-12 text-center text-slate-400 space-y-2">
-            <Receipt className="w-8 h-8 text-slate-300 mx-auto" />
-            <p className="text-sm font-semibold">No se encontraron transacciones con los filtros seleccionados</p>
-            <button
-              type="button"
-              onClick={onResetFilters}
-              className="px-4 py-1.5 bg-purple-50 text-[#6F2EC5] text-xs font-bold rounded-xl hover:bg-purple-100 transition-colors"
-            >
-              Restablecer Filtros
-            </button>
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-8 sm:p-12 text-center space-y-3">
+            <div className="w-14 h-14 rounded-2xl bg-purple-50 text-[#6F2EC5] flex items-center justify-center mx-auto shadow-2xs">
+              <Receipt className="w-7 h-7 text-[#6F2EC5]" />
+            </div>
+            <h3 className="text-base sm:text-lg font-black text-slate-800 tracking-tight">
+              No se encontraron transacciones con los filtros seleccionados
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
+              Ajustá el período de fechas o cambiá la categoría para ver movimientos registrados.
+            </p>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={onResetFilters}
+                className="px-4 py-2 bg-[#6F2EC5] hover:bg-[#5B21B6] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
+              >
+                Restablecer Filtros
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -977,14 +1300,17 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
               type="button"
               onClick={() => {
                 if (currentPage < totalPages) {
-                  setCurrentPage(p => p + 1);
-                } else {
+                  setCurrentPage(p => Math.min(totalPages, p + 1));
+                  window.scrollTo({ top: 250, behavior: 'smooth' });
+                } else if (onFilterChange) {
                   onFilterChange({ dateRange: 'all', search: '', categoria: 'ALL' });
+                  setCurrentPage(1);
                 }
               }}
               className="text-xs sm:text-sm font-bold text-[#6F2EC5] hover:text-[#5B21B6] hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+              title={currentPage < totalPages ? `Ver página ${currentPage + 1} de ${totalPages}` : "Ver todos los movimientos sin filtros"}
             >
-              <span>Ver más movimientos</span>
+              <span>{currentPage < totalPages ? 'Ver más movimientos' : 'Ver todos los movimientos'}</span>
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>

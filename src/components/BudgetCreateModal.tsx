@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -28,6 +28,7 @@ interface BudgetCreateModalProps {
   transactions?: Transaction[];
   currency?: string;
   onCreate: (newBudgets: Budgets) => void;
+  initialStartMode?: StartMode;
 }
 
 type StartMode = 'empty' | 'copy' | 'real';
@@ -41,9 +42,10 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
   transactions = [],
   currency = 'ARS',
   onCreate,
+  initialStartMode,
 }) => {
   const [step, setStep] = useState(1);
-  const [startMode, setStartMode] = useState<StartMode>('copy');
+  const [startMode, setStartMode] = useState<StartMode>(initialStartMode || 'copy');
   const [name, setName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -94,26 +96,44 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
 
   const suggestedCopy = useMemo(() => ({ ...(budgets?.categories || {}) }), [budgets]);
 
+  const getSubcategoryTotal = (cat: string) =>
+    (categoryMap[cat] || []).reduce((sum, sub) => sum + Number(subcategories[sub] || 0), 0);
+
+  const subcategoryErrors = useMemo(() => categoryList.filter((cat) => {
+    const limit = Number(categories[cat] || 0);
+    const subTotal = (categoryMap[cat] || []).reduce((sum, sub) => sum + Number(subcategories[sub] || 0), 0);
+    return subTotal > 0 && limit > 0 && subTotal > limit;
+  }), [categoryList, categories, subcategories, categoryMap]);
+
+  const prevIsOpenRef = useRef(false);
+
   useEffect(() => {
-    if (!isOpen) return;
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = today.getMonth();
-    const first = new Date(y, m, 1);
-    const last = new Date(y, m + 1, 0);
-    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    setStep(1);
-    setStartMode(Object.keys(budgets?.categories || {}).length ? 'copy' : 'empty');
-    setName(first.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }).replace(/^./, (c) => c.toUpperCase()));
-    setStartDate(iso(first));
-    setEndDate(iso(last));
-    setIncome('');
-    setCategories({ ...(budgets?.categories || {}) });
-    setSubcategories({ ...(budgets?.subcategories || {}) });
-    setExpandedCategories({});
-    setAlertThreshold(budgets?.alertThresholdPercent || 80);
-    setCreated(false);
-    setRecentManualEdit(null);
+    if (!isOpen) {
+      prevIsOpenRef.current = false;
+      return;
+    }
+    if (!prevIsOpenRef.current) {
+      prevIsOpenRef.current = true;
+      const today = new Date();
+      const y = today.getFullYear();
+      const m = today.getMonth();
+      const first = new Date(y, m, 1);
+      const last = new Date(y, m + 1, 0);
+      const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      setStep(1);
+      const hasCategories = Object.keys(budgets?.categories || {}).length > 0;
+      setStartMode(initialStartMode || (hasCategories ? 'copy' : 'empty'));
+      setName(first.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }).replace(/^./, (c) => c.toUpperCase()));
+      setStartDate(iso(first));
+      setEndDate(iso(last));
+      setIncome('');
+      setCategories({ ...(budgets?.categories || {}) });
+      setSubcategories({ ...(budgets?.subcategories || {}) });
+      setExpandedCategories({});
+      setAlertThreshold(budgets?.alertThresholdPercent || 80);
+      setCreated(false);
+      setRecentManualEdit(null);
+    }
   }, [isOpen, budgets]);
 
   useEffect(() => {
@@ -129,9 +149,7 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
       }));
       setSubcategories(realSubs);
     }
-  }, [startMode, isOpen, suggestedCopy, suggestedByReal, budgets, categoryList, categoryMap, transactions]);
-
-  if (!isOpen) return null;
+  }, [startMode]);
 
   const handleSubcategoryChange = (cat: string, sub: string, value: string) => {
     const numeric = value === '' ? 0 : Math.max(0, Math.round(Number(value) || 0));
@@ -142,9 +160,6 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
   const toggleCategory = (cat: string) => {
     setExpandedCategories((prev) => ({ ...prev, [cat]: !prev[cat] }));
   };
-
-  const getSubcategoryTotal = (cat: string) =>
-    (categoryMap[cat] || []).reduce((sum, sub) => sum + Number(subcategories[sub] || 0), 0);
 
   const distributeCategoryAutomatically = (cat: string) => {
     const limit = Number(categories[cat] || 0);
@@ -228,30 +243,36 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
     setCategories((prev) => ({ ...prev, [cat]: numeric }));
   };
 
-  const subcategoryErrors = useMemo(() => categoryList.filter((cat) => {
-    const limit = Number(categories[cat] || 0);
-    const subTotal = getSubcategoryTotal(cat);
-    return subTotal > 0 && limit > 0 && subTotal > limit;
-  }), [categoryList, categories, subcategories, categoryMap]);
-
   const handleCreate = () => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = today.getMonth();
+    const defaultStart = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+    const defaultEnd = `${y}-${String(m + 1).padStart(2, '0')}-${new Date(y, m + 1, 0).getDate()}`;
+
     const newBudgets: Budgets = {
       ...budgets,
       name: name.trim() || 'Presupuesto mensual',
-      startDate,
-      endDate,
+      startDate: startDate || defaultStart,
+      endDate: endDate || defaultEnd,
       income: Number(income) || 0,
       categories,
       subcategories,
-      alertThresholdPercent: alertThreshold,
+      alertThresholdPercent: alertThreshold || 80,
       projectionGrowthPercent: budgets?.projectionGrowthPercent || 15,
       createdAt: new Date().toISOString(),
     };
     onCreate(newBudgets);
-    setCreated(true);
+    onClose();
   };
 
-  const canContinue = step === 1 ? Boolean(name.trim() && startDate && endDate) : step === 2 ? totalAssigned > 0 && subcategoryErrors.length === 0 : totalAssigned > 0;
+  const canContinue = step === 1 
+    ? Boolean((name || '').trim()) 
+    : step === 2 
+      ? subcategoryErrors.length === 0 
+      : subcategoryErrors.length === 0;
+
+  if (!isOpen) return null;
 
   return (
     <div className="budget-create-modal fixed inset-0 z-[70] bg-slate-950/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
@@ -444,11 +465,11 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
 
         {!created && (
           <div className="px-5 sm:px-7 py-4 border-t border-slate-100 dark:border-purple-900/40 flex items-center justify-between gap-3 shrink-0 bg-white/95 dark:bg-[#140728]/95">
-            <button type="button" onClick={() => step === 1 ? onClose() : setStep((s) => s - 1)} className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-purple-950/40 flex items-center gap-1.5"><ArrowLeft className="w-4 h-4" />{step === 1 ? 'Cancelar' : 'Atrás'}</button>
+            <button type="button" onClick={() => step === 1 ? onClose() : setStep((s) => s - 1)} className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-purple-950/40 flex items-center gap-1.5 cursor-pointer"><ArrowLeft className="w-4 h-4" />{step === 1 ? 'Cancelar' : 'Atrás'}</button>
             {step < 3 ? (
-              <button type="button" disabled={!canContinue} onClick={() => setStep((s) => s + 1)} className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#2E0854] to-[#7928CA] text-white text-xs font-black shadow-md disabled:opacity-40 flex items-center gap-1.5">Continuar<ArrowRight className="w-4 h-4" /></button>
+              <button type="button" disabled={!canContinue} onClick={() => setStep((s) => s + 1)} className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#2E0854] to-[#7928CA] text-white text-xs font-black shadow-md disabled:opacity-40 flex items-center gap-1.5 cursor-pointer active:scale-95">Continuar<ArrowRight className="w-4 h-4" /></button>
             ) : (
-              <button type="button" disabled={!canContinue} onClick={handleCreate} className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#F95420] to-[#FF6B3D] text-white text-xs font-black shadow-md disabled:opacity-40 flex items-center gap-1.5"><Check className="w-4 h-4" />Crear presupuesto</button>
+              <button type="button" disabled={!canContinue} onClick={handleCreate} className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#F95420] to-[#FF6B3D] text-white text-xs font-black shadow-md disabled:opacity-40 flex items-center gap-1.5 cursor-pointer active:scale-95"><Check className="w-4 h-4" />Crear presupuesto</button>
             )}
           </div>
         )}

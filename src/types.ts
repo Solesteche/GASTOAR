@@ -303,3 +303,21 @@ export interface Vencimiento {
   notes?: string;         // nota opcional
 }
 
+// ─── Modo Inflación IPC (Plan Pro) ────────────────────────────────────────────
+export type {
+  IPCData,
+  InflationSettings,
+  BudgetProjection,
+  InflationReport,
+} from './InflationModeEngine';
+
+// ─── Flujo de Caja (Plan Pro) ────────────────────────────────────────────────
+export type {
+  RecurringPattern,
+  ScheduledPayment,
+  DayProjection,
+  CashFlowProjection,
+  CashFlowAlert,
+} from './CashFlowEngine';
+
+

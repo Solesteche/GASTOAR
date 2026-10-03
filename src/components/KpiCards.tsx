@@ -34,9 +34,9 @@ interface KpiCardsProps {
     totalSpent: number;
     percentage: number;
   };
-  topCategory: {
-    name: string;
-    amount: number;
+  topCategory?: {
+    name?: string;
+    amount?: number;
   };
   onOpenSettlementModal: () => void;
 }
@@ -47,9 +47,13 @@ export const KpiCards: React.FC<KpiCardsProps> = ({
   activeMode,
   debtInfo,
   globalBudget,
-  topCategory,
+  topCategory = { name: 'Sin gastos', amount: 0 },
   onOpenSettlementModal,
 }) => {
+  const safeTopCategory = {
+    name: topCategory?.name || 'Sin gastos',
+    amount: Number(topCategory?.amount) || 0,
+  };
   const isUser1 = profile.currentUser === 'user1';
   const currentUserName = isUser1 ? profile.user1Name : profile.user2Name;
   const partnerName = isUser1 ? profile.user2Name : profile.user1Name;
@@ -173,11 +177,11 @@ export const KpiCards: React.FC<KpiCardsProps> = ({
           <div className="min-w-0 pr-2">
             <div className="h-1.5 w-12 bg-purple-200/80 rounded-full mb-1.5" />
             <p className="text-[11px] font-bold uppercase tracking-wider text-purple-900/50">Mayor Gasto</p>
-            <h3 className="text-base sm:text-lg font-bold text-[#2E0854] mt-1 truncate" title={topCategory.name}>
-              {topCategory.name || 'Sin gastos'}
+            <h3 className="text-base sm:text-lg font-bold text-[#2E0854] mt-1 truncate" title={safeTopCategory.name}>
+              {safeTopCategory.name || 'Sin gastos'}
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              {formatCurrency(topCategory.amount, profile.currency)}
+              {formatCurrency(safeTopCategory.amount, profile.currency)}
             </p>
           </div>
           <div className="w-10 h-10 bg-purple-50 border border-purple-200/70 text-[#7928CA] rounded-xl flex items-center justify-center shrink-0">
@@ -187,7 +191,7 @@ export const KpiCards: React.FC<KpiCardsProps> = ({
         <div className="mt-4 pt-3 border-t border-purple-50 flex items-center justify-between text-xs text-slate-500 font-medium">
           <span>Participación</span>
           <span className="font-bold text-slate-800">
-            {totalSpent > 0 ? ((topCategory.amount / totalSpent) * 100).toFixed(1) : 0}% del total
+            {totalSpent > 0 ? ((safeTopCategory.amount / totalSpent) * 100).toFixed(1) : 0}% del total
           </span>
         </div>
       </div>
@@ -222,7 +226,7 @@ export const KpiCards: React.FC<KpiCardsProps> = ({
 
         {/* Progress Bar */}
         <div className="mt-3 space-y-1.5">
-          <div className="w-full bg-purple-50 h-2 rounded-full overflow-hidden">
+          <div className="w-full bg-purple-50 h-1 rounded-full overflow-hidden">
             <div
               className={`h-full transition-all duration-500 ${
                 globalBudget.percentage >= 100 

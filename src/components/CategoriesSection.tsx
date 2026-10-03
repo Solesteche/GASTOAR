@@ -30,7 +30,7 @@ interface CategoriesSectionProps {
   onShowToast?: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
-const P = "#6F2EC5";
+const P = "#6D3FEA";
 
 const COLOR_PALETTE = [
   '#2563eb', // Blue
@@ -165,25 +165,27 @@ export const CategoriesSection: React.FC<CategoriesSectionProps> = ({
   return (
     <div className="space-y-6">
       {/* 1. TOP HEADER */}
-      <section className="bg-white rounded-3xl p-5 sm:p-6 shadow-xs border border-slate-200/80 space-y-5">
+      <section
+        style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
+        className="text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-400/20 space-y-5"
+      >
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div 
-              className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0"
-              style={{ backgroundColor: P }}
+              className="w-11 h-11 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0 bg-white/15 border border-white/20 backdrop-blur-xs"
             >
               <FolderPlus className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl font-black text-slate-900 tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                   Categorías y Subcategorias
                 </h1>
-                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-50 text-[#6F2EC5] border border-purple-200">
+                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-white/15 text-white border border-white/20">
                   {categories.length} categorías • {totalSubcategories} subcategorías
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-xs sm:text-sm text-purple-200 font-medium">
                 Estructura contable para clasificar con precisión tus gastos personales y de pareja.
               </p>
             </div>
@@ -194,17 +196,16 @@ export const CategoriesSection: React.FC<CategoriesSectionProps> = ({
               <button
                 type="button"
                 onClick={() => handleOpenAddSubcat()}
-                className="px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white border border-white/20 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer backdrop-blur-xs active:scale-95"
               >
-                <Plus className="w-4 h-4 text-slate-500" />
+                <Plus className="w-4 h-4 text-purple-200" />
                 <span>+ Nueva Subcategoría</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleOpenAddCategory}
-                className="px-4 py-2.5 rounded-2xl text-white font-bold text-xs shadow-xs hover:opacity-95 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
-                style={{ backgroundColor: P }}
+                className="px-4 py-2.5 rounded-2xl bg-[#F95420] hover:bg-[#E04412] text-white font-bold text-xs shadow-lg active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
               >
                 <Plus className="w-4 h-4 stroke-[2.5]" />
                 <span>+ Nueva Categoría</span>
@@ -214,9 +215,9 @@ export const CategoriesSection: React.FC<CategoriesSectionProps> = ({
             <button
               type="button"
               onClick={onUpgradePlan}
-              className="px-4 py-2.5 rounded-2xl bg-purple-50 hover:bg-purple-100 text-[#6F2EC5] border border-purple-200 font-bold text-xs transition-all flex items-center gap-2 cursor-pointer shrink-0"
+              className="px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white border border-white/20 font-bold text-xs transition-all flex items-center gap-2 cursor-pointer shrink-0 backdrop-blur-xs"
             >
-              <Sparkles className="w-4 h-4 text-[#6F2EC5]" />
+              <Sparkles className="w-4 h-4 text-amber-300" />
               <span>Personalizar Categorías (Ver Planes)</span>
             </button>
           ) : null}
@@ -239,7 +240,7 @@ export const CategoriesSection: React.FC<CategoriesSectionProps> = ({
                   </span>
                 </div>
                 <p className="text-xs text-amber-800/90 mt-0.5">
-                  Tenés acceso al catálogo oficial completo de categorías fijas (incluye <strong>Suscripciones y Plataformas</strong>). Para crear tus propias categorías y subcategorías personalizadas, pasate al Plan Parejas Dúo o Plan Pro.
+                  Tenés acceso al catálogo oficial completo de categorías fijas (incluye <strong>Suscripciones & Plataformas</strong>). Para crear tus propias categorías y subcategorías personalizadas, pasate al Plan Parejas Dúo o Plan Pro.
                 </p>
               </div>
             </div>
@@ -278,7 +279,7 @@ export const CategoriesSection: React.FC<CategoriesSectionProps> = ({
         {filteredCategories.map(cat => {
           const subs = categoryMap[cat] || [];
           const color = categoryColors[cat] || '#6F2EC5';
-          const isSubscriptions = cat === 'Suscripciones y Plataformas' || cat === 'Suscripciones' || cat.toLowerCase().includes('suscrip');
+          const isSubscriptions = cat === 'Suscripciones & Plataformas' || cat === 'Suscripciones y Plataformas' || cat === 'Suscripciones' || cat.toLowerCase().includes('suscrip');
 
           return (
             <div

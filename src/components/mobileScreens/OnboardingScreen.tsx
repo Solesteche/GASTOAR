@@ -152,7 +152,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
         )}
 
         <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-100">
-          Pantalla 4 · Onboarding
+          Guía Rápida GastoAR
         </span>
 
         <button

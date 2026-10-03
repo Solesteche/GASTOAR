@@ -19,7 +19,9 @@ import {
   Sparkles,
   Search,
   Pin,
-  Check
+  Check,
+  LayoutGrid,
+  Table as TableIcon
 } from 'lucide-react';
 import { Budgets, CategoryColors, CategoryMap, DateRangePreset, ExpenseMode, Transaction } from '../types';
 import { formatCurrency, formatDateEs, isDateInRange } from '../utils/formatters';
@@ -54,6 +56,7 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
   const [sortField, setSortField] = useState<SortField>('difference');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [statusFilter, setStatusFilter] = useState<'all' | 'exceeded' | 'warning' | 'ok' | 'no_budget'>('all');
+  const [viewMode, setViewMode] = useState<'both' | 'cards' | 'table'>('both');
 
   // Pinned date range state for Budget View
   const [isRangePinned, setIsRangePinned] = useState<boolean>(() => {
@@ -205,6 +208,7 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
 
       return {
         category: cat,
+        name: cat,
         budget,
         spent,
         count,
@@ -274,22 +278,24 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
         return true;
       })
       .sort((a, b) => {
-        let valA: any = a[sortField];
-        let valB: any = b[sortField];
+        let valA: any = sortField === 'name' ? (a.name || a.category || '') : a[sortField];
+        let valB: any = sortField === 'name' ? (b.name || b.category || '') : b[sortField];
 
         if (sortField === 'difference') {
           // When sorting by difference, exceeded categories should appear first if desc
-          valA = a.difference;
-          valB = b.difference;
+          valA = a.difference ?? 0;
+          valB = b.difference ?? 0;
         }
 
-        if (typeof valA === 'string') {
+        if (typeof valA === 'string' || typeof valB === 'string') {
+          const strA = String(valA || '');
+          const strB = String(valB || '');
           return sortDirection === 'asc' 
-            ? valA.localeCompare(valB) 
-            : valB.localeCompare(valA);
+            ? strA.localeCompare(strB) 
+            : strB.localeCompare(strA);
         }
 
-        return sortDirection === 'asc' ? valA - valB : valB - valA;
+        return sortDirection === 'asc' ? (Number(valA) || 0) - (Number(valB) || 0) : (Number(valB) || 0) - (Number(valA) || 0);
       });
   }, [comparisonData, searchTerm, statusFilter, sortField, sortDirection]);
 
@@ -654,7 +660,7 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
               {summary.globalPct}%
             </span>
           </div>
-          <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+          <div className="w-full bg-slate-200 h-1 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
                 summary.globalPct > 100 
@@ -724,7 +730,74 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
         </div>
       </div>
 
+      {/* View Mode Switcher (Cards vs Full Breakdown Table) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs">
+          <button
+            type="button"
+            onClick={() => setViewMode('both')}
+            className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              viewMode === 'both'
+                ? 'bg-white text-slate-900 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5 text-slate-500" />
+            <span className="hidden sm:inline">Ver Ambos</span>
+            <span className="sm:hidden">Ambos</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('cards')}
+            className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              viewMode === 'cards'
+                ? 'bg-white text-slate-900 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5 text-slate-500" />
+            <span>Tarjetas</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('table')}
+            className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              viewMode === 'table'
+                ? 'bg-amber-500 text-white shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <TableIcon className="w-3.5 h-3.5" />
+            <span>Ver Desglose Completo</span>
+          </button>
+        </div>
+
+        {viewMode !== 'table' ? (
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode('table');
+              setTimeout(() => {
+                document.getElementById('comparison-table-section')?.scrollIntoView({ behavior: 'smooth' });
+              }, 50);
+            }}
+            className="text-xs font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1 cursor-pointer"
+          >
+            <span>Ver desglose completo (Tabla) →</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setViewMode('cards')}
+            className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1 cursor-pointer"
+          >
+            <span>← Ver vista con tarjetas</span>
+          </button>
+        )}
+      </div>
+
       {/* 5. Visual Comparison Bars & Cards Grid */}
+      {(viewMode === 'both' || viewMode === 'cards') && (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {displayedRows.map((row) => {
           const isOver = row.status === 'exceeded';
@@ -821,7 +894,7 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
                     </span>
                   </div>
 
-                  <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                  <div className="w-full bg-slate-200 h-1 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${
                         isOver ? 'bg-rose-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'
@@ -847,18 +920,20 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
           );
         })}
       </div>
+      )}
 
       {/* 6. Comprehensive Comparison Table */}
-      <div className="space-y-3 pt-4 border-t border-slate-100">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-1.5">
-            <Layers className="w-4 h-4 text-amber-500" />
-            <span>Tabla de Desglose Comparativo</span>
-          </h4>
-          <span className="text-xs text-slate-400 font-medium">
-            Clic en las cabeceras para ordenar
-          </span>
-        </div>
+      {(viewMode === 'both' || viewMode === 'table') && (
+        <div id="comparison-table-section" className="space-y-3 pt-4 border-t border-slate-100">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-amber-500" />
+              <span>Tabla de Desglose Comparativo</span>
+            </h4>
+            <span className="text-xs text-slate-400 font-medium">
+              Clic en las cabeceras para ordenar
+            </span>
+          </div>
 
         <div className="overflow-x-auto border border-slate-200 rounded-2xl bg-white shadow-2xs">
           <table className="w-full text-left text-xs text-slate-600">
@@ -976,7 +1051,7 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
                             >
                               {row.percentage}%
                             </span>
-                            <div className="w-16 bg-slate-200 h-1.5 rounded-full overflow-hidden hidden sm:block">
+                            <div className="w-16 bg-slate-200 h-1 rounded-full overflow-hidden hidden sm:block">
                               <div
                                 className={`h-full rounded-full ${
                                   isOver ? 'bg-rose-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'
@@ -1018,6 +1093,7 @@ export const BudgetComparisonView: React.FC<BudgetComparisonViewProps> = ({
           </table>
         </div>
       </div>
+      )}
 
     </div>
   );

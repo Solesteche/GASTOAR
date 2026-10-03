@@ -113,7 +113,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                     <span>Categorías estándar fijas (Plan Básico)</span>
                   </h4>
                   <p className="text-xs text-amber-800 leading-relaxed">
-                    Tu plan incluye todas las categorías base necesarias para registrar tus consumos (incluye <strong>Suscripciones y Plataformas</strong>). Para <strong>crear tus propias categorías, personalizar colores y añadir subcategorías ilimitadas</strong>, podés pasarte al Plan Parejas Dúo o Plan Pro.
+                    Tu plan incluye todas las categorías base necesarias para registrar tus consumos (incluye <strong>Suscripciones & Plataformas</strong>). Para <strong>crear tus propias categorías, personalizar colores y añadir subcategorías ilimitadas</strong>, podés pasarte al Plan Parejas Dúo o Plan Pro.
                   </p>
                 </div>
               </div>

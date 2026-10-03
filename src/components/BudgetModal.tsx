@@ -16,10 +16,13 @@ import {
   Calculator,
   Undo2,
   CheckCircle2,
-  Info
+  Info,
+  Flame,
+  Crown
 } from 'lucide-react';
 import { Budgets, CategoryMap, CoupleProfile, Transaction } from '../types';
 import { formatCurrency } from '../utils/formatters';
+import { InflationModeEngine } from '../InflationModeEngine';
 
 interface BudgetModalProps {
   isOpen: boolean;
@@ -213,6 +216,29 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
 
     setProjectionAppliedNotice(
       `¡Proyección aplicada con éxito! +${projectionPercent}% para el próximo mes en ${categoriesCount} categorías.`
+    );
+  };
+
+  const handleApplyIpcEngine = () => {
+    setPreviousBudgetsBackup({
+      categories: { ...(localBudgets.categories || {}) },
+      subcategories: { ...(localBudgets.subcategories || {}) },
+      alertThresholdPercent: alertThreshold,
+      projectionGrowthPercent: projectionPercent,
+    });
+
+    const settings = InflationModeEngine.defaultSettings();
+    const report = InflationModeEngine.calculateProjections(localBudgets, settings, 1);
+    const updated = InflationModeEngine.applyAdjustment(localBudgets, report);
+
+    setLocalBudgets(prev => ({
+      ...prev,
+      categories: updated.categories,
+      lastProjectedDate: updated.lastProjectedDate,
+    }));
+
+    setProjectionAppliedNotice(
+      `¡Modo Inflación IPC (Pro) aplicado! Se ajustaron ${report.projections.length} categorías según tasas INDEC por rubro.`
     );
   };
 
@@ -510,27 +536,37 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
                     <span>Redondear montos a múltiplos de $1.000 para números limpios</span>
                   </label>
 
-                  <div className="flex items-center gap-2">
-                    {previousBudgetsBackup && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {previousBudgetsBackup && (
+                        <button
+                          type="button"
+                          onClick={handleUndoProjection}
+                          className="px-3 py-2 rounded-xl border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 text-xs font-bold hover:bg-purple-50 dark:hover:bg-purple-900/30 flex items-center gap-1 transition-all cursor-pointer"
+                        >
+                          <Undo2 className="w-3.5 h-3.5" />
+                          <span>Deshacer</span>
+                        </button>
+                      )}
+
                       <button
                         type="button"
-                        onClick={handleUndoProjection}
-                        className="px-3 py-2 rounded-xl border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 text-xs font-bold hover:bg-purple-50 dark:hover:bg-purple-900/30 flex items-center gap-1 transition-all cursor-pointer"
+                        onClick={handleApplyIpcEngine}
+                        className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs shadow-md shadow-orange-900/20 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                        title="Ajuste inteligente por rubro según INDEC (Alimentos +5.2%, Salud +5.8%, etc.)"
                       >
-                        <Undo2 className="w-3.5 h-3.5" />
-                        <span>Deshacer</span>
+                        <Flame className="w-4 h-4 text-amber-200" />
+                        <span>Modo IPC INDEC (Pro)</span>
                       </button>
-                    )}
 
-                    <button
-                      type="button"
-                      onClick={handleApplyProjection}
-                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#2E0854] via-[#4A0E78] to-[#7928CA] hover:from-[#1F0538] hover:to-[#6820B0] text-white font-black text-xs shadow-md shadow-purple-900/20 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
-                    >
-                      <Calculator className="w-4 h-4 text-amber-300" />
-                      <span>Calcular y Aplicar (+{projectionPercent}%)</span>
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={handleApplyProjection}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#2E0854] via-[#4A0E78] to-[#7928CA] hover:from-[#1F0538] hover:to-[#6820B0] text-white font-black text-xs shadow-md shadow-purple-900/20 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                      >
+                        <Calculator className="w-4 h-4 text-amber-300" />
+                        <span>Calcular y Aplicar (+{projectionPercent}%)</span>
+                      </button>
+                    </div>
                 </div>
 
               </div>

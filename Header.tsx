@@ -7,8 +7,7 @@ import {
   ArrowUpRight, 
   LogOut,
   HelpCircle,
-  Mic,
-  Download
+  Mic
 } from 'lucide-react';
 import { CoupleProfile, ExpenseMode } from '../types';
 import { GastoArBrand } from './GastoArLogo';
@@ -28,6 +27,7 @@ interface HeaderProps {
   onExitDemo?: () => void;
   cloudSyncStatus?: 'synced' | 'syncing' | 'offline' | 'error';
   onOpenCloudSync?: () => void;
+  isDarkMode?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -44,9 +44,9 @@ export const Header: React.FC<HeaderProps> = ({
   onExitDemo,
   cloudSyncStatus = 'synced',
   onOpenCloudSync,
+  isDarkMode = false,
 }) => {
   const [showAddMenu, setShowAddMenu] = useState(false);
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
 
   const isUser1 = profile?.currentUser === 'user1';
@@ -62,22 +62,6 @@ export const Header: React.FC<HeaderProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  useEffect(() => {
-    const captureInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      setInstallPrompt(event);
-    };
-    window.addEventListener('beforeinstallprompt', captureInstallPrompt);
-    return () => window.removeEventListener('beforeinstallprompt', captureInstallPrompt);
-  }, []);
-
-  const handleInstallApp = async () => {
-    if (!installPrompt) return;
-    await installPrompt.prompt();
-    await installPrompt.userChoice;
-    setInstallPrompt(null);
-  };
 
   const handleOpenGasto = () => {
     setShowAddMenu(false);
@@ -105,7 +89,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="bg-white/95 backdrop-blur-xl text-slate-800 sticky top-0 z-30 border-b border-purple-100 shadow-xs">
+    <header className="bg-white/95 dark:bg-[#0d041a]/95 backdrop-blur-xl text-slate-800 dark:text-white sticky top-0 z-30 border-b border-purple-100 dark:border-purple-900/40 shadow-xs">
       <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
         
         {/* Left Side: Clickable Brand Logo (Opens menu on mobile, navigates home on desktop) */}
@@ -119,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <GastoArBrand 
               size="sm" 
-              variant="light" 
+              variant={isDarkMode ? 'dark' : 'light'} 
               showTagline={false} 
               showAccentBar={false} 
             />
@@ -188,29 +172,17 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Side: Quick Action Buttons & Profile Initial */}
         <div className="flex items-center gap-2 sm:gap-3">
-
-          {installPrompt && (
-            <button
-              type="button"
-              onClick={handleInstallApp}
-              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#2E0854] font-bold text-xs transition-all flex items-center gap-1.5 border border-purple-200/80 cursor-pointer shadow-2xs"
-              title="Instalar GastoAR en este dispositivo"
-            >
-              <Download className="w-3.5 h-3.5 text-[#7928CA]" />
-              <span className="hidden sm:inline">Instalar</span>
-            </button>
-          )}
           
-          {/* Voice Expense Button with Smart AI Categorization */}
+          {/* Voice Expense Button with Smart AI Categorization (Icon only on mobile & PC) */}
           {onOpenAiModal && (
             <button
               type="button"
               onClick={onOpenAiModal}
-              title="Registrar gastos por voz o audios con IA"
-              className="hidden md:flex px-2.5 sm:px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#2E0854] font-bold text-xs transition-all items-center gap-1.5 border border-purple-200/80 cursor-pointer shadow-2xs"
+              title="Gasto por voz con IA"
+              aria-label="Gasto por voz con IA"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#7928CA] transition-all flex items-center justify-center border border-purple-200/80 cursor-pointer shadow-2xs active:scale-95 group"
             >
-              <Mic className="w-3.5 h-3.5 text-[#7928CA]" />
-              <span className="hidden sm:inline">Gasto por Voz</span>
+              <Mic className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#7928CA] group-hover:scale-110 transition-transform" />
             </button>
           )}
 

@@ -2,7 +2,6 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { 
   LayoutDashboard, 
-  User, 
   Users, 
   FolderPlus, 
   Sliders, 
@@ -16,6 +15,7 @@ import {
   Coins,
   CreditCard,
   TrendingUp,
+  Activity,
   LogOut,
   Target,
   ShieldCheck,
@@ -25,8 +25,7 @@ import {
   Bell,
   ArrowUpRight,
   CalendarClock,
-  Mic,
-  Smartphone
+  Mic
 } from 'lucide-react';
 import { CoupleProfile, ExpenseMode } from '../types';
 import { GastoArBrand, GastoArIcon } from './GastoArLogo';
@@ -48,7 +47,6 @@ interface SidebarProps {
   onOpenBudgetModal: () => void;
   onOpenAiModal: () => void;
   onOpenCardAlerts?: () => void;
-  onOpenMobileScreens?: () => void;
   onOpenSettlementModal: () => void;
   onOpenLogoDownload?: () => void;
   debtInfo: { debtAmount: number; whoOwesWhom: string };
@@ -57,6 +55,7 @@ interface SidebarProps {
   isDemoMode?: boolean;
   onExitDemo?: () => void;
   isDarkMode?: boolean;
+  urgentVencimientosCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -76,7 +75,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenBudgetModal,
   onOpenAiModal,
   onOpenCardAlerts,
-  onOpenMobileScreens,
   onOpenSettlementModal,
   onOpenLogoDownload,
   debtInfo,
@@ -85,6 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isDemoMode = false,
   onExitDemo,
   isDarkMode = false,
+  urgentVencimientosCount = 0,
 }) => {
   const isUser1 = profile.currentUser === 'user1';
   const currentUserName = isUser1 ? profile.user1Name : profile.user2Name;
@@ -93,7 +92,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'dashboard', label: 'Resumen', icon: LayoutDashboard, badge: null },
     { id: 'transactions', label: 'Movimientos', icon: Receipt, badge: null },
     { id: 'installments', label: 'Gastos en Cuotas', icon: CreditCard, badge: null },
-    { id: 'card_alerts', label: 'Vencimientos', icon: CalendarClock, badge: null },
+    { 
+      id: 'card_alerts', 
+      label: 'Vencimientos', 
+      icon: CalendarClock, 
+      badge: urgentVencimientosCount > 0 ? `${urgentVencimientosCount} próx` : null,
+      isUrgent: urgentVencimientosCount > 0 
+    },
     { 
       id: 'couple_balance', 
       label: 'Cuenta Compartida', 
@@ -101,11 +106,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: null 
     },
     { id: 'budgets', label: 'Presupuestos', icon: Sliders, badge: null },
+    { id: 'cashflow', label: 'Flujo de Caja', icon: Activity, badge: 'PRO' },
+    { id: 'currency', label: 'Dólar & Divisas', icon: Coins, badge: 'AR' },
     { id: 'goals', label: 'Metas & Cajas', icon: Target, badge: null },
     { id: 'categories', label: 'Categorías y Subcategorías', icon: FolderPlus, badge: null },
     { id: 'ai', label: 'Gasto por Voz', icon: Mic, badge: 'IA', isModal: true },
-    { id: 'mobile_screens', label: '8 Pantallas Móviles', icon: Smartphone, badge: '8 Vistas', isModal: true },
-    { id: 'profile', label: 'Mi Perfil', icon: User, badge: null },
     { id: 'settings', label: 'Configuración', icon: Settings, badge: null },
     { id: 'subscriptions', label: 'Suscripción PRO', icon: BadgePercent, badge: 'PRO' },
   ];
@@ -134,7 +139,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex flex-col h-full min-h-full max-h-full overflow-hidden justify-between w-full">
           
           {/* Header with Clickable Logo to Home/Dashboard (Req 13) */}
-          <div className="h-16 px-4 flex items-center justify-between border-b border-purple-50 shrink-0 bg-white">
+          <div className="h-16 px-4 flex items-center justify-between border-b border-purple-50 dark:border-purple-900/30 shrink-0 bg-white dark:bg-[#130924]">
             {/* When expanded */}
             <button
               type="button"
@@ -160,7 +165,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className={`hidden cursor-pointer focus:outline-none ${!isPinned ? 'md:flex md:items-center md:justify-center md:w-full' : ''}`}
               title="Ir al Resumen / Inicio"
             >
-              <GastoArIcon size={30} />
+              <GastoArIcon size={30} variant={isDarkMode ? 'dark' : 'light'} />
             </button>
 
             {/* Pin Toggle on Desktop */}
@@ -276,8 +281,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onClick={() => {
                     if (isAiButton) {
                       onOpenAiModal();
-                    } else if (item.id === 'mobile_screens' && onOpenMobileScreens) {
-                      onOpenMobileScreens();
                     } else {
                       onSelectTab(item.id);
                     }
@@ -298,6 +301,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${
                       isActive
                         ? 'bg-white/20 text-white'
+                        : item.badge.includes('próx')
+                        ? 'bg-rose-500 text-white shadow-xs shadow-rose-500/40 animate-pulse'
                         : item.badge === 'Debes' 
                         ? 'bg-rose-50 text-rose-600 border border-rose-200' 
                         : item.badge === 'Te deben' 
@@ -327,14 +332,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onOpenProfileModal();
                   onCloseMobile();
                 }}
-                className={`flex items-center space-x-2 min-w-0 text-left cursor-pointer group ${!isPinned ? 'md:hidden' : ''}`}
-                title="Ver Mi Cuenta, Contraseña, Plan y Ajustes"
+                className={`flex items-center space-x-2 min-w-0 text-left cursor-pointer group ${!isPinned ? 'md:justify-center' : ''}`}
+                title={`Mi Perfil: ${currentUserName} (Tocar para ver perfil, contraseña y ajustes)`}
               >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#7928CA] to-[#F95420] text-white font-bold flex items-center justify-center text-xs shrink-0 shadow-xs border border-white group-hover:scale-105 transition-transform">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#7928CA] to-[#F95420] text-white font-bold flex items-center justify-center text-xs shrink-0 shadow-xs border border-white group-hover:scale-110 transition-transform">
                   {currentUserName.charAt(0).toUpperCase()}
                 </div>
-                <div className="truncate">
+                {isPinned && (
+                  <div className="truncate hidden md:block">
+                    <p className="text-xs font-bold text-slate-900 truncate group-hover:text-purple-900">{currentUserName}</p>
+                    <p className="text-[10px] text-purple-600 font-medium">Mi Perfil</p>
+                  </div>
+                )}
+                <div className="truncate md:hidden">
                   <p className="text-xs font-bold text-slate-900 truncate group-hover:text-purple-900">{currentUserName}</p>
+                  <p className="text-[10px] text-purple-600 font-medium">Mi Perfil</p>
                 </div>
               </button>
 

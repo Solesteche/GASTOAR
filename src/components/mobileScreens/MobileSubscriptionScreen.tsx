@@ -86,7 +86,7 @@ export const MobileSubscriptionScreen: React.FC<MobileSubscriptionScreenProps> =
           )}
 
           <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-            Pantalla 8 · Suscripción PRO
+            GastoAR PRO
           </span>
 
           <div className="w-9 h-9" />

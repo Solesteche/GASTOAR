@@ -30,7 +30,6 @@ import {
   Phone,
   AlertCircle,
   HelpCircle,
-  Smartphone,
   X
 } from 'lucide-react';
 import { BillingCycle, CoupleProfile, SubscriptionPlan, SubscriptionPlanId, UserAccount } from '../types';
@@ -39,6 +38,9 @@ import { SUBSCRIPTION_PLANS } from '../data/subscriptionPlans';
 import { formatCurrency } from '../utils/formatters';
 import { MercadoPagoModal } from './MercadoPagoModal';
 import { AdminAuthModal } from './AdminAuthModal';
+import { WelcomeScreen } from './mobileScreens/WelcomeScreen';
+import { MobileLoginScreen } from './mobileScreens/MobileLoginScreen';
+import { OnboardingScreen } from './mobileScreens/OnboardingScreen';
 import { 
   registerWithEmailFirebase, 
   sendVerificationEmailFirebase, 
@@ -66,7 +68,6 @@ interface AuthLandingPageProps {
   onGoogleLogin?: () => Promise<{ success: boolean; error?: string }>;
   onGuestDemo: () => void;
   onOpenAdminPanel?: () => void;
-  onOpenMobileScreens?: () => void;
 }
 
 export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
@@ -77,7 +78,6 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
   onGoogleLogin,
   onGuestDemo,
   onOpenAdminPanel,
-  onOpenMobileScreens,
 }) => {
   const [tab, setTab] = useState<'login' | 'register'>(initialTab);
 
@@ -121,6 +121,15 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
 
   // Billing Cycle Toggle for Plans
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
+
+  // Mobile Native Screens Flow Mode (Screen 2: Welcome, Screen 3: MobileLogin, Screen 4: Onboarding)
+  const [mobileViewMode, setMobileViewMode] = useState<'welcome' | 'onboarding' | 'login' | 'classic'>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      const onboardingDone = localStorage.getItem('gastoar_onboarding_completed');
+      return onboardingDone ? 'login' : 'welcome';
+    }
+    return 'classic';
+  });
 
   // Mercado Pago Checkout Modal State
   const [isMpModalOpen, setIsMpModalOpen] = useState<boolean>(false);
@@ -483,6 +492,108 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
     });
   };
 
+  // Screen 2: Welcome Screen (Mobile Flow)
+  if (mobileViewMode === 'welcome') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-3 sm:p-4">
+        <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden min-h-[580px] flex flex-col border border-purple-900/30">
+          <WelcomeScreen
+            onGetStarted={() => setMobileViewMode('onboarding')}
+            onLogin={() => setMobileViewMode('login')}
+            onExploreDemo={onGuestDemo}
+          />
+        </div>
+        <div className="flex items-center gap-3 mt-4">
+          <button
+            type="button"
+            onClick={() => setMobileViewMode('classic')}
+            className="text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            Ver versión web completa
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Screen 4: Onboarding Screen (Mobile Flow)
+  if (mobileViewMode === 'onboarding') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-3 sm:p-4">
+        <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden min-h-[580px] flex flex-col border border-purple-900/30">
+          <OnboardingScreen
+            onFinish={() => {
+              localStorage.setItem('gastoar_onboarding_completed', 'true');
+              setMobileViewMode('login');
+            }}
+            onSkip={() => {
+              localStorage.setItem('gastoar_onboarding_completed', 'true');
+              setMobileViewMode('login');
+            }}
+          />
+        </div>
+        <div className="flex items-center gap-3 mt-4">
+          <button
+            type="button"
+            onClick={() => setMobileViewMode('welcome')}
+            className="text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            ← Volver
+          </button>
+          <span className="text-slate-600">•</span>
+          <button
+            type="button"
+            onClick={() => setMobileViewMode('classic')}
+            className="text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            Ver versión web completa
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Screen 3: Mobile Login Screen (Mobile Flow)
+  if (mobileViewMode === 'login') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-3 sm:p-4">
+        <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden min-h-[580px] flex flex-col border border-purple-900/30">
+          <MobileLoginScreen
+            onBack={() => setMobileViewMode('welcome')}
+            onLogin={async (email, pass) => {
+              const res = await onLogin(email, pass);
+              return res;
+            }}
+            onGoogleLogin={onGoogleLogin}
+            onGoToRegister={() => {
+              handleTabSwitch('register');
+              setMobileViewMode('classic');
+            }}
+            onForgotPassword={() => setIsForgotModalOpen(true)}
+            onDemoLogin={onGuestDemo}
+          />
+        </div>
+        <div className="flex items-center gap-3 mt-4">
+          <button
+            type="button"
+            onClick={() => setMobileViewMode('welcome')}
+            className="text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            ← Volver a Bienvenida
+          </button>
+          <span className="text-slate-600">•</span>
+          <button
+            type="button"
+            onClick={() => setMobileViewMode('classic')}
+            className="text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            Ver versión web completa
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-purple-500 selection:text-white relative overflow-x-hidden">
       {/* Background visual accents */}
@@ -500,18 +611,13 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
         />
 
         <div className="flex items-center gap-2 sm:gap-3">
-          {onOpenMobileScreens && (
-            <button
-              type="button"
-              onClick={onOpenMobileScreens}
-              className="text-xs font-bold text-purple-300 hover:text-white px-3 py-2 rounded-xl bg-purple-950/50 hover:bg-purple-900/60 border border-purple-800/60 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
-              title="Explorar el diseño de las 8 pantallas móviles"
-            >
-              <Smartphone className="w-3.5 h-3.5 text-purple-400" />
-              <span className="hidden sm:inline">8 Pantallas Móviles</span>
-              <span className="sm:hidden">Móvil</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setMobileViewMode('welcome')}
+            className="text-xs font-semibold text-purple-300 hover:text-white px-3 py-2 rounded-xl bg-purple-950/40 hover:bg-purple-900/50 border border-purple-800/60 transition-all flex items-center gap-1 cursor-pointer"
+          >
+            <span>📱 Vista Móvil</span>
+          </button>
 
           <a
             href="#planes"

@@ -634,11 +634,18 @@ export function parseVoiceExpenseLocally(
       else concepto = 'Supermercado';
       hasExplicitCategory = true;
     }
-    // 2. Farmacia
-    else if (lower.includes('farmacity') || lower.includes('farmacia') || lower.includes('remedio') || lower.includes('medicamento')) {
-      categoria = 'Salud & Cuidado Personal';
+    // 2. Farmacia & Salud
+    else if (lower.includes('farmacity') || lower.includes('farmacia') || lower.includes('remedio') || lower.includes('medicamento') || lower.includes('médico') || lower.includes('prepaga')) {
+      categoria = 'Salud';
       subcategoria = 'Farmacia & Medicamentos';
       concepto = lower.includes('farmacity') ? 'Farmacity' : 'Farmacia';
+      hasExplicitCategory = true;
+    }
+    // 2.1 Cuidado Personal
+    else if (lower.includes('peluqueria') || lower.includes('peluquería') || lower.includes('barberia') || lower.includes('barbería') || lower.includes('gimnasio') || lower.includes('estetica') || lower.includes('estética') || lower.includes('masaje') || lower.includes('uñas')) {
+      categoria = 'Cuidado Personal';
+      subcategoria = 'Peluquería, Barbería & Estética';
+      concepto = lower.includes('gimnasio') ? 'Gimnasio' : 'Peluquería';
       hasExplicitCategory = true;
     }
     // 3. Nafta / Estación de servicio

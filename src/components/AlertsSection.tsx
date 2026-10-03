@@ -1,12 +1,24 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
-  Bell, BellRing, Building2, Calendar, CalendarClock, Check,
-  CheckCircle2, ChevronLeft, ChevronRight, Clock, Copy,
-  CreditCard, Droplets, Edit3, FileText, Flame, HeartPulse, Home, Landmark,
-  MoreHorizontal, Plus, Search, Trash2, Tv, Wifi, X, Zap
+  Bell, BellRing, Building2, Calendar, CalendarClock, CalendarPlus, Check,
+  CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock, Copy,
+  CreditCard, Download, Droplets, Edit3, ExternalLink, FileText, Flame, HeartPulse, Home, Landmark,
+  Layers, LayoutGrid, MoreHorizontal, Plus, Search, SlidersHorizontal, Trash2, Tv, Wifi, X, Zap, Volume2, AlertTriangle, Sparkles, Star
 } from 'lucide-react';
 import { CoupleProfile, Transaction } from '../types';
 import { formatCurrency } from '../utils/formatters';
+import {
+  checkAndNotifyVencimientos,
+  requestNotificationPermission,
+  sendTestNotification,
+  playNotificationSound,
+  convertDueDayToDateStr,
+  calculateHoursUntilDue,
+} from '../services/localNotificationService';
+import { CalendarExportModal } from './CalendarExportModal';
+import { GoogleCalendarSyncModal } from './GoogleCalendarSyncModal';
+import { AppleCalendarSyncModal } from './AppleCalendarSyncModal';
+import { generateVencimientosICS, downloadICS, openInAppleCalendar, isIOS } from '../utils/icsExport';
 
 export type AlertItemCategory = 'tarjeta' | 'alquiler' | 'expensas' | 'servicio' | 'impuesto' | 'suscripcion' | 'salud' | 'otro';
 
@@ -34,12 +46,26 @@ interface AlertsSectionProps {
   profile: CoupleProfile;
   transactions?: Transaction[];
   isDemoMode?: boolean;
+  isPro?: boolean;
   onShowToast: (msg: string, type: 'success' | 'error' | 'info') => void;
+  onSaveTransaction?: (txData: Partial<Transaction>) => void;
   onOpenTransactionModal?: () => void;
   onOpenCalendarModal?: () => void;
+  onOpenCashFlow?: () => void;
 }
 
 const DEMO_ITEM_IDS = ['e1', 's1', 's3', 'a1', 's4', 's2', 'c1', 'c2'];
+
+const ALL_QUICK_TEMPLATES = [
+  { name: 'Alquiler', icon: Home, bg: 'bg-red-50 text-red-500', defaultAmount: 650000, category: 'alquiler' as AlertItemCategory, provider: 'Inmobiliaria / Dueño' },
+  { name: 'Expensas', icon: FileText, bg: 'bg-orange-50 text-orange-500', defaultAmount: 135000, category: 'expensas' as AlertItemCategory, provider: 'Consorcio' },
+  { name: 'Luz', icon: Zap, bg: 'bg-amber-50 text-amber-500', defaultAmount: 38000, category: 'servicio' as AlertItemCategory, provider: 'Edenor' },
+  { name: 'Agua', icon: Droplets, bg: 'bg-blue-50 text-blue-500', defaultAmount: 28500, category: 'servicio' as AlertItemCategory, provider: 'AySA' },
+  { name: 'Gas', icon: Flame, bg: 'bg-amber-50 text-amber-600', defaultAmount: 14620, category: 'servicio' as AlertItemCategory, provider: 'Metrogas' },
+  { name: 'Internet', icon: Wifi, bg: 'bg-sky-50 text-sky-500', defaultAmount: 12490, category: 'servicio' as AlertItemCategory, provider: 'Personal Flow' },
+  { name: 'Tarjeta', icon: CreditCard, bg: 'bg-purple-50 text-purple-600', defaultAmount: 215450, category: 'tarjeta' as AlertItemCategory, provider: 'Visa Santander / BBVA' },
+  { name: 'Streaming', icon: Tv, bg: 'bg-emerald-50 text-emerald-600', defaultAmount: 6500, category: 'suscripcion' as AlertItemCategory, provider: 'Netflix / Spotify' },
+];
 
 const DEFAULT_ALERT_ITEMS: DueAlertItem[] = [
   { id: 'e1', category: 'expensas', name: 'Expensas', provider: 'Consorcio', dueDay: 10, estimatedAmount: 135000, paymentCode: '04928103940129', autoDebit: false, reminderDaysBeforeDue: 2 },
@@ -52,24 +78,27 @@ const DEFAULT_ALERT_ITEMS: DueAlertItem[] = [
   { id: 'c2', category: 'tarjeta', name: 'Mastercard BBVA', provider: 'BBVA', closeDay: 25, dueDay: 14, lastDigits: '1904', estimatedAmount: 14940, autoDebit: false, reminderDaysBeforeDue: 2 }
 ];
 
-const CATEGORY_META: Record<AlertItemCategory, { label: string; Icon: React.ElementType; soft: string; text: string }> = {
-  tarjeta: { label: 'Tarjeta', Icon: CreditCard, soft: 'bg-[#FFF3EE]', text: 'text-[#F95420]' },
-  alquiler: { label: 'Alquiler', Icon: Home, soft: 'bg-[#FFF1F2]', text: 'text-[#E11D48]' },
-  expensas: { label: 'Expensas', Icon: Home, soft: 'bg-[#F4EEFF]', text: 'text-[#7C3AED]' },
-  servicio: { label: 'Servicio', Icon: Wifi, soft: 'bg-[#EBF4FF]', text: 'text-[#2563EB]' },
-  impuesto: { label: 'Impuesto', Icon: Landmark, soft: 'bg-rose-50', text: 'text-rose-600' },
-  suscripcion: { label: 'Suscripción', Icon: Tv, soft: 'bg-emerald-50', text: 'text-emerald-600' },
-  salud: { label: 'Salud', Icon: HeartPulse, soft: 'bg-teal-50', text: 'text-teal-600' },
-  otro: { label: 'Otro', Icon: MoreHorizontal, soft: 'bg-slate-100', text: 'text-slate-600' }
+const CATEGORY_META: Record<AlertItemCategory, { label: string; Icon: React.ElementType; soft: string; text: string; border: string }> = {
+  tarjeta: { label: 'Tarjeta', Icon: CreditCard, soft: 'bg-[#FFF3EE]', text: 'text-[#F95420]', border: 'border-orange-200' },
+  alquiler: { label: 'Alquiler', Icon: Home, soft: 'bg-[#FFF1F2]', text: 'text-[#E11D48]', border: 'border-rose-200' },
+  expensas: { label: 'Expensas', Icon: Home, soft: 'bg-[#F4EEFF]', text: 'text-[#7C3AED]', border: 'border-purple-200' },
+  servicio: { label: 'Servicio', Icon: Wifi, soft: 'bg-[#EBF4FF]', text: 'text-[#2563EB]', border: 'border-blue-200' },
+  impuesto: { label: 'Impuesto', Icon: Landmark, soft: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-200' },
+  suscripcion: { label: 'Suscripción', Icon: Tv, soft: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
+  salud: { label: 'Salud', Icon: HeartPulse, soft: 'bg-teal-50', text: 'text-teal-600', border: 'border-teal-200' },
+  otro: { label: 'Otro', Icon: MoreHorizontal, soft: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' }
 };
 
 export const AlertsSection: React.FC<AlertsSectionProps> = ({
   profile,
   transactions,
   isDemoMode = false,
+  isPro = false,
   onShowToast,
+  onSaveTransaction,
   onOpenTransactionModal,
-  onOpenCalendarModal
+  onOpenCalendarModal,
+  onOpenCashFlow,
 }) => {
   const [items, setItems] = useState<DueAlertItem[]>(() => {
     try {
@@ -112,9 +141,50 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   const currentYear = now.getFullYear();
 
   const [activeView, setActiveView] = useState<'proximos' | 'mes' | 'pagados' | 'todos' | 'calendario'>('proximos');
+  const [urgencyFilter, setUrgencyFilter] = useState<'all' | 'week' | 'month' | 'next'>('all');
+  const [promptPayItem, setPromptPayItem] = useState<DueAlertItem | null>(null);
+  const [templateFrequency, setTemplateFrequency] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem('gastoar_vencimientos_tpl_freq');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [isCalendarSynced, setIsCalendarSynced] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('gastoar_calendar_synced') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'all' | AlertItemCategory>('all');
+  const [dateFilter, setDateFilter] = useState<'all' | 'week' | 'this_month' | 'next_month' | 'overdue'>('all');
+  const [modeFilter, setModeFilter] = useState<'all' | 'auto' | 'manual' | 'tarjeta'>('all');
+  const [activeCarouselPage, setActiveCarouselPage] = useState(0);
+  const carouselRef = useRef<HTMLDivElement>(null);
+
+  const handleCarouselScroll = () => {
+    if (carouselRef.current) {
+      const scrollLeft = carouselRef.current.scrollLeft;
+      const clientWidth = carouselRef.current.clientWidth;
+      const page = Math.round(scrollLeft / (clientWidth * 0.8));
+      setActiveCarouselPage(page);
+    }
+  };
+
+  const scrollToCarouselPage = (pageIdx: number) => {
+    if (carouselRef.current) {
+      const clientWidth = carouselRef.current.clientWidth;
+      carouselRef.current.scrollTo({
+        left: pageIdx * (clientWidth * 0.8),
+        behavior: 'smooth'
+      });
+      setActiveCarouselPage(pageIdx);
+    }
+  };
   const [sortBy, setSortBy] = useState<'day' | 'amount_desc' | 'name'>('day');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<DueAlertItem | null>(null);
@@ -122,6 +192,29 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   const [calendarYear, setCalendarYear] = useState(currentYear);
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<number>(currentDay);
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => localStorage.getItem('gastoar_vencimientos_notif_v1') === 'true');
+  const [isCalendarExportModalOpen, setIsCalendarExportModalOpen] = useState(false);
+  const [isGoogleCalendarModalOpen, setIsGoogleCalendarModalOpen] = useState(false);
+  const [isAppleCalendarModalOpen, setIsAppleCalendarModalOpen] = useState(false);
+
+  const handleDirectExportICS = (onlyPending = true) => {
+    const targetItems = onlyPending ? items.filter(i => !i.paidThisMonth) : items;
+    if (targetItems.length === 0) {
+      onShowToast('No hay pagos pendientes para exportar.', 'info');
+      return;
+    }
+    try {
+      const ics = generateVencimientosICS(items, {
+        currency: profile.currency,
+        onlyPending,
+        calendarName: 'Vencimientos Pendientes - GastoAR'
+      });
+      downloadICS(ics, onlyPending ? 'vencimientos_pendientes_gastoar.ics' : 'todos_vencimientos_gastoar.ics');
+      onShowToast(`✓ ${targetItems.length} pagos pendientes exportados a .ics`, 'success');
+    } catch (e) {
+      console.error(e);
+      onShowToast('Error al generar el archivo .ics', 'error');
+    }
+  };
 
   const [formCategory, setFormCategory] = useState<AlertItemCategory>('servicio');
   const [formName, setFormName] = useState('');
@@ -250,48 +343,45 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   };
 
   const toggleNotifications = async () => {
-    if (!('Notification' in window)) {
-      onShowToast('Tu navegador no soporta notificaciones web.', 'info');
-      return;
+    const res = await requestNotificationPermission();
+    if (res === 'granted') {
+      setNotificationsEnabled(true);
+      playNotificationSound();
+      onShowToast('¡Servicio de notificaciones a menos de 48 hs activado!', 'success');
+      // Trigger evaluation immediately
+      checkAndNotifyVencimientos([], items, {
+        force: true,
+        onInAppAlert: (alert) => {
+          onShowToast(`⏰ Alerta: "${alert.title}" vence en menos de 48 hs (${alert.urgencyMessage})`, 'info');
+        }
+      });
+    } else if (res === 'denied') {
+      onShowToast('Permiso de notificaciones rechazado en el navegador.', 'info');
+    } else {
+      onShowToast('Tu navegador no soporta notificaciones de escritorio.', 'info');
     }
-    if (Notification.permission !== 'granted') {
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') {
-        onShowToast('Permiso de notificaciones rechazado.', 'info');
-        return;
-      }
-    }
-    setNotificationsEnabled(true);
-    localStorage.setItem('gastoar_vencimientos_notif_v1', 'true');
-    onShowToast('Notificaciones activadas en este dispositivo.', 'success');
   };
 
-  // Verificación diaria de recordatorios en base a la anticipación configurada
-  useEffect(() => {
-    if (!notificationsEnabled || !('Notification' in window) || Notification.permission !== 'granted') return;
-    const notifKey = `gastoar_notif_sent_${currentYear}_${currentMonth}_${currentDay}`;
-    if (localStorage.getItem(notifKey)) return;
-
-    const dueToRemind = items.filter(item => {
-      if (item.paidThisMonth) return false;
-      const rem = item.reminderDaysBeforeDue !== undefined ? item.reminderDaysBeforeDue : 3;
-      const daysUntilDue = item.dueDay - currentDay;
-      return daysUntilDue >= 0 && daysUntilDue <= rem;
-    });
-
-    if (dueToRemind.length > 0) {
-      localStorage.setItem(notifKey, 'true');
-      const listNames = dueToRemind.map(i => `${i.name} (vence día ${i.dueDay})`).join(', ');
-      try {
-        new Notification('GastoAR • Recordatorio de Pago', {
-          body: `Tenés ${dueToRemind.length} vencimiento(s) para abonar: ${listNames}.`,
-          icon: '/favicon.ico'
-        });
-      } catch (e) {
-        console.warn('Error al disparar notificación:', e);
-      }
+  const handleTestNotification = async () => {
+    playNotificationSound();
+    const ok = await sendTestNotification();
+    if (ok) {
+      onShowToast('Notificación de prueba enviada con éxito ✓', 'success');
+    } else {
+      onShowToast('Sonido reproducido. Activa permisos para recibir notificaciones del sistema.', 'info');
     }
-  }, [notificationsEnabled, items, currentDay, currentMonth, currentYear]);
+  };
+
+  // Verificación periódica y a menos de 48 horas de la fecha de pago
+  useEffect(() => {
+    if (!notificationsEnabled) return;
+    checkAndNotifyVencimientos([], items, {
+      force: false,
+      onInAppAlert: (alert) => {
+        onShowToast(`⏰ Vencimiento en menos de 48 hs: "${alert.title}" (${alert.urgencyMessage})`, 'info');
+      }
+    });
+  }, [notificationsEnabled, items]);
 
   const stats = useMemo(() => {
     const pending = items.filter(i => !i.paidThisMonth);
@@ -309,15 +399,60 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
     };
   }, [items, currentDay]);
 
+  // Totales de gastos/compromisos por categoría para el carrusel
+  const categoryTotals = useMemo(() => {
+    const totals: Partial<Record<AlertItemCategory, number>> = {};
+    items.forEach(it => {
+      const cat = it.category || 'otro';
+      totals[cat] = (totals[cat] || 0) + (it.estimatedAmount || 0);
+    });
+    return totals;
+  }, [items]);
+
+  // Mostrar ÚNICAMENTE categorías que tengan gasto/monto > 0 o la categoría seleccionada (Req 3: cero ruido de categorías vacías)
+  const carouselCategories = useMemo<AlertItemCategory[]>(() => {
+    const activeWithSpending = (Object.keys(CATEGORY_META) as AlertItemCategory[])
+      .filter(cat => (categoryTotals[cat] || 0) > 0 || categoryFilter === cat)
+      .sort((a, b) => (categoryTotals[b] || 0) - (categoryTotals[a] || 0));
+
+    if (activeWithSpending.length === 0) {
+      const present = Array.from(new Set(items.map(i => i.category)));
+      return present.length > 0 ? present : (['servicio', 'tarjeta', 'expensas', 'alquiler'] as AlertItemCategory[]);
+    }
+    return activeWithSpending;
+  }, [categoryTotals, categoryFilter, items]);
+
   const filteredItems = useMemo(() => {
     let result = items.filter(i => {
+      // 1. Status view filter
       if (activeView === 'mes' && i.paidThisMonth) return false;
       if (activeView === 'pagados' && !i.paidThisMonth) return false;
       if (activeView === 'proximos' && i.paidThisMonth) return false;
+
+      // 2. Plazo / Fecha filter
+      if (dateFilter === 'overdue') {
+        if (i.paidThisMonth || i.dueDay >= currentDay) return false;
+      } else if (dateFilter === 'week') {
+        const diff = i.dueDay - currentDay;
+        if (diff < 0 || diff > 7) return false;
+      } else if (dateFilter === 'next_month') {
+        const diff = i.dueDay - currentDay;
+        if (diff <= 7) return false;
+      }
+
+      // 3. Modo de pago filter
+      if (modeFilter === 'auto' && !i.autoDebit) return false;
+      if (modeFilter === 'manual' && i.autoDebit) return false;
+      if (modeFilter === 'tarjeta' && i.category !== 'tarjeta') return false;
+
+      // 4. Categoría filter
       if (categoryFilter !== 'all' && i.category !== categoryFilter) return false;
+
+      // 5. Búsqueda con feedback
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
-        if (!`${i.name} ${i.provider} ${i.notes || ''}`.toLowerCase().includes(q)) return false;
+        const match = `${i.name} ${i.provider} ${i.notes || ''} ${i.paymentCode || ''} ${i.lastDigits || ''}`.toLowerCase().includes(q);
+        if (!match) return false;
       }
       return true;
     });
@@ -327,7 +462,125 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
       if (sortBy === 'name') return a.name.localeCompare(b.name);
       return a.dueDay - b.dueDay;
     });
-  }, [items, activeView, categoryFilter, searchTerm, sortBy]);
+  }, [items, activeView, dateFilter, modeFilter, categoryFilter, searchTerm, sortBy, currentDay]);
+
+  const totalFilteredAmount = useMemo(() => {
+    return filteredItems.reduce((acc, it) => acc + (it.estimatedAmount || 0), 0);
+  }, [filteredItems]);
+
+  const isSearchFiltered = searchTerm.trim().length > 0;
+  const isDateFiltered = dateFilter !== 'all';
+  const isModeFiltered = modeFilter !== 'all';
+  const isCategoryFiltered = categoryFilter !== 'all';
+
+  const activeFiltersCount = (isSearchFiltered ? 1 : 0) +
+    (isDateFiltered ? 1 : 0) +
+    (isModeFiltered ? 1 : 0) +
+    (isCategoryFiltered ? 1 : 0);
+
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setDateFilter('all');
+    setModeFilter('all');
+    setCategoryFilter('all');
+  };
+
+  const getDateFilterLabel = () => {
+    switch (dateFilter) {
+      case 'week': return 'Próximos 7 días';
+      case 'this_month': return 'Este mes';
+      case 'next_month': return 'Próximo mes';
+      case 'overdue': return 'Vencidos';
+      default: return 'Todos los plazos';
+    }
+  };
+
+  const getModeFilterLabel = () => {
+    switch (modeFilter) {
+      case 'auto': return 'Débito automático';
+      case 'manual': return 'Pago manual';
+      case 'tarjeta': return 'Tarjeta de crédito';
+      default: return 'Todos los modos';
+    }
+  };
+
+  const getCategoryFilterLabel = () => {
+    if (categoryFilter === 'all') return 'Todas';
+    return CATEGORY_META[categoryFilter]?.label || categoryFilter;
+  };
+
+  // ─── Agrupación de filas de vencimientos por fecha (Req 4) ──────────────────────
+  interface VencimientoDateGroup {
+    dateKey: string;
+    day: number;
+    displayDate: string;
+    isToday: boolean;
+    isTomorrow: boolean;
+    isPast: boolean;
+    hasUnpaid: boolean;
+    totalAmount: number;
+    items: DueAlertItem[];
+  }
+
+  const groupedVencimientos = useMemo<VencimientoDateGroup[]>(() => {
+    const groupsMap = new Map<number, DueAlertItem[]>();
+
+    filteredItems.forEach(it => {
+      const day = it.dueDay || 1;
+      const existing = groupsMap.get(day) || [];
+      existing.push(it);
+      groupsMap.set(day, existing);
+    });
+
+    const monthName = new Date(currentYear, currentMonth, 1)
+      .toLocaleDateString('es-AR', { month: 'long' });
+    const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
+    const sortedDays = Array.from(groupsMap.keys()).sort((a, b) => {
+      if (sortBy === 'amount_desc') {
+        const sumA = (groupsMap.get(a) || []).reduce((s, i) => s + (i.estimatedAmount || 0), 0);
+        const sumB = (groupsMap.get(b) || []).reduce((s, i) => s + (i.estimatedAmount || 0), 0);
+        return sumB - sumA;
+      }
+      return a - b;
+    });
+
+    const groups: VencimientoDateGroup[] = [];
+    sortedDays.forEach(day => {
+      const list = groupsMap.get(day) || [];
+      const isToday = day === currentDay;
+      const isTomorrow = day === currentDay + 1;
+      const isPast = day < currentDay;
+      const hasUnpaid = list.some(i => !i.paidThisMonth);
+      const totalAmount = list.reduce((sum, i) => sum + (i.estimatedAmount || 0), 0);
+
+      let displayDate = `Día ${day} de ${capitalizedMonth}`;
+      if (isToday) {
+        displayDate = `Hoy, ${day} de ${capitalizedMonth}`;
+      } else if (isTomorrow) {
+        displayDate = `Mañana, ${day} de ${capitalizedMonth}`;
+      } else if (isPast && hasUnpaid) {
+        const daysAgo = currentDay - day;
+        displayDate = `Día ${day} • Vencido hace ${daysAgo} ${daysAgo === 1 ? 'día' : 'días'}`;
+      } else if (isPast && !hasUnpaid) {
+        displayDate = `Día ${day} de ${capitalizedMonth} • Pagado ✓`;
+      }
+
+      groups.push({
+        dateKey: `day-${day}`,
+        day,
+        displayDate,
+        isToday,
+        isTomorrow,
+        isPast,
+        hasUnpaid,
+        totalAmount,
+        items: list,
+      });
+    });
+
+    return groups;
+  }, [filteredItems, currentDay, currentMonth, currentYear, sortBy]);
 
   const getItemIconConfig = (item: DueAlertItem) => {
     const nameLower = item.name.toLowerCase();
@@ -381,11 +634,19 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   const renderCard = (item: DueAlertItem) => {
     const { Icon, bg, text } = getItemIconConfig(item);
     const expanded = expandedItemId === item.id;
+    const dateStr = convertDueDayToDateStr(item.dueDay);
+    const hoursCalc = calculateHoursUntilDue(dateStr);
+    const isUnder48h = !item.paidThisMonth && hoursCalc.isUnder48Hours;
+
     return (
       <article
         key={item.id}
         className={`bg-white border rounded-2xl p-3.5 sm:p-4 transition-all shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:border-purple-200 ${
-          item.paidThisMonth ? 'border-slate-100 opacity-80' : 'border-slate-100'
+          isUnder48h 
+            ? 'border-amber-300 ring-2 ring-amber-400/20 bg-amber-50/10'
+            : item.paidThisMonth 
+            ? 'border-slate-100 opacity-80' 
+            : 'border-slate-100'
         }`}
       >
         <div
@@ -404,6 +665,11 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
                 </h3>
                 {item.lastDigits && (
                   <span className="text-[10px] font-mono font-bold text-slate-500">••{item.lastDigits}</span>
+                )}
+                {isUnder48h && (
+                  <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-rose-700 bg-rose-100 border border-rose-200 px-1.5 py-0.2 rounded-md animate-pulse">
+                    ⚡ &lt;48 hs
+                  </span>
                 )}
               </div>
               <p className="text-xs text-slate-400 font-normal truncate mt-0.5">
@@ -512,6 +778,67 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
                   <span>Registrar gasto</span>
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => setIsGoogleCalendarModalOpen(true)}
+                className="px-3 py-2.5 rounded-xl border border-blue-200 text-blue-700 bg-blue-50/70 hover:bg-blue-100 text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 transition-colors"
+                title="Sincronizar en Google Calendar automáticamente"
+              >
+                <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 40 40">
+                  <rect width="40" height="40" rx="8" fill="#FFFFFF"/>
+                  <path d="M28 8H12C9.79 8 8 9.79 8 12V28C8 30.21 9.79 32 12 32H28C30.21 32 32 30.21 32 28V12C32 9.79 30.21 8 28 8Z" fill="#FFFFFF"/>
+                  <path d="M28 8H12C9.79 8 8 9.79 8 12V15H32V12C32 9.79 30.21 8 28 8Z" fill="#1A73E8"/>
+                  <circle cx="13" cy="11.5" r="1.5" fill="#FFFFFF"/>
+                  <circle cx="27" cy="11.5" r="1.5" fill="#FFFFFF"/>
+                  <text x="20" y="26" fontSize="11" fontWeight="900" fill="#1A73E8" textAnchor="middle" fontFamily="sans-serif">
+                    31
+                  </text>
+                </svg>
+                <span>Google Cal</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    openInAppleCalendar([item], { currency: profile.currency, onlyPending: false });
+                    onShowToast(`✓ Vencimiento "${item.name}" abierto para Apple Calendar`, 'success');
+                  } catch (e) {
+                    console.error(e);
+                    onShowToast('Error al exportar a Apple Calendar', 'error');
+                  }
+                }}
+                className="px-3 py-2.5 rounded-xl border border-rose-200 text-rose-700 bg-rose-50/70 hover:bg-rose-100 text-xs font-bold cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 transition-colors"
+                title="Añadir este pago a Apple Calendar (iOS / iPhone / Mac)"
+              >
+                <div className="w-3.5 h-3.5 rounded bg-white flex flex-col items-center justify-center overflow-hidden shrink-0 border border-slate-200">
+                  <div className="w-full bg-[#FF3B30] text-[4px] leading-none py-0.2" />
+                  <span className="text-[7px] font-black text-slate-900 leading-none">{item.dueDay}</span>
+                </div>
+                <span>Apple Cal</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    const ics = generateVencimientosICS([item], {
+                      currency: profile.currency,
+                      onlyPending: false,
+                      calendarName: `Pago: ${item.name} - GastoAR`
+                    });
+                    const safeName = item.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                    downloadICS(ics, `vencimiento_${safeName}.ics`);
+                    onShowToast(`✓ Vencimiento "${item.name}" exportado a .ics para tu calendario`, 'success');
+                  } catch (e) {
+                    console.error(e);
+                    onShowToast('Error al exportar este pago', 'error');
+                  }
+                }}
+                className="px-3 py-2.5 rounded-xl border border-purple-200 text-purple-700 bg-purple-50/70 hover:bg-purple-100 text-xs font-bold cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-colors"
+                title="Exportar este pago a Google Calendar / Apple Calendar (.ics)"
+              >
+                <CalendarPlus className="w-3.5 h-3.5 text-purple-600" />
+                <span>Exportar .ics</span>
+              </button>
               <button
                 type="button"
                 onClick={() => openEdit(item)}
@@ -675,61 +1002,138 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   return (
     <div className="space-y-4 max-w-xl mx-auto pb-28 sm:pb-8">
       {/* 1. Header Card (Hero) */}
-      <section className="bg-gradient-to-br from-[#2E0854] via-[#45108A] to-[#6F2EC5] text-white rounded-3xl p-4 sm:p-5 shadow-lg shadow-purple-950/20 border border-purple-400/20 space-y-3.5 relative overflow-hidden">
+      <section
+        style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
+        className="text-white rounded-3xl p-3 sm:p-5 shadow-xl border border-purple-300/30 space-y-2.5 sm:space-y-3.5 relative overflow-hidden"
+      >
         {/* Ambient decorative glow */}
-        <div className="absolute -right-8 -top-8 w-36 h-36 bg-[#F95420]/15 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute -left-8 -bottom-8 w-36 h-36 bg-[#7928CA]/30 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -right-8 -top-8 w-36 h-36 bg-[#F95420]/20 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -left-8 -bottom-8 w-36 h-36 bg-pink-400/20 rounded-full blur-2xl pointer-events-none" />
 
         {/* Top row: Icon + Title + Subtitle */}
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-xs flex items-center justify-center shrink-0">
+        <div className="relative z-10 flex items-center gap-2.5 sm:gap-3">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/15 border border-white/25 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-xs">
             <div className="relative">
-              <CalendarClock className="w-6 h-6 text-white" />
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-[#F95420] rounded-full ring-2 ring-[#2E0854]" />
+              <CalendarClock className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-[#F95420] rounded-full ring-2 ring-[#7C3AED]" />
             </div>
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-tight">Vencimientos</h1>
-            <p className="text-xs text-purple-200 font-normal mt-0.5">Organizá tus pagos y evitá recargos.</p>
+            <h1 className="text-lg sm:text-2xl font-black text-white tracking-tight leading-tight">Vencimientos</h1>
+            <p className="text-xs text-purple-100 font-normal mt-0.5">Organizá tus pagos y evitá recargos.</p>
           </div>
         </div>
 
-        {/* Second row: Avisos & Calendario pills */}
-        <div className="relative z-10 grid grid-cols-2 gap-2.5">
-          <button
-            type="button"
-            onClick={toggleNotifications}
-            className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 ${
-              notificationsEnabled 
-                ? 'border-white/30 bg-white/20 text-white shadow-xs' 
-                : 'border-white/15 bg-white/10 text-white hover:bg-white/15'
-            }`}
-          >
-            {notificationsEnabled ? <BellRing className="w-4 h-4 text-[#FFA785]" /> : <Bell className="w-4 h-4 text-purple-200" />}
-            <span>{notificationsEnabled ? 'Avisos activos' : 'Avisos'}</span>
-          </button>
+        {/* Second row: Avisos, Calendario, Google Cal, Apple Cal, Exportar .ics & Flujo Pro pills */}
+        <div className={`relative z-10 grid ${onOpenCashFlow ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'} gap-1.5 sm:gap-2`}>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={toggleNotifications}
+              className={`flex-1 py-2 px-2 sm:py-2.5 sm:px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 ${
+                notificationsEnabled 
+                  ? 'border-white/40 bg-white/25 text-white shadow-xs' 
+                  : 'border-white/20 bg-white/10 text-white hover:bg-white/15'
+              }`}
+            >
+              {notificationsEnabled ? <BellRing className="w-3.5 h-3.5 text-[#FFA785]" /> : <Bell className="w-3.5 h-3.5 text-purple-100" />}
+              <span className="truncate">{notificationsEnabled ? 'Avisos (<48h)' : 'Avisos'}</span>
+            </button>
+            {notificationsEnabled && (
+              <button
+                type="button"
+                onClick={handleTestNotification}
+                className="py-2 px-2 sm:py-2.5 sm:px-2 rounded-xl border border-white/20 bg-white/10 text-white hover:bg-white/20 text-xs font-bold flex items-center justify-center shrink-0 cursor-pointer active:scale-95"
+                title="Probar sonido y notificación local de 48 hs"
+              >
+                <Volume2 className="w-3.5 h-3.5 text-amber-200" />
+              </button>
+            )}
+          </div>
 
           <button
             type="button"
             onClick={() => setActiveView(activeView === 'calendario' ? 'proximos' : 'calendario')}
-            className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 ${
+            className={`py-2 px-2 sm:py-2.5 sm:px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
               activeView === 'calendario'
-                ? 'border-white/40 bg-white/25 text-white shadow-xs'
-                : 'border-white/15 bg-white/10 text-white hover:bg-white/15'
+                ? 'border-white/50 bg-white/30 text-white shadow-xs'
+                : 'border-white/20 bg-white/10 text-white hover:bg-white/15'
             }`}
           >
-            <Calendar className="w-4 h-4 text-white" />
-            <span>Calendario</span>
+            <Calendar className="w-3.5 h-3.5 text-white" />
+            <span className="truncate">Calendario</span>
           </button>
+
+          {/* Sincronizar Google Calendar */}
+          <button
+            type="button"
+            onClick={() => setIsGoogleCalendarModalOpen(true)}
+            className="py-2 px-2 sm:py-2.5 sm:px-2.5 rounded-xl border border-blue-300/40 bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs"
+            title="Sincronizar pagos con Google Calendar automáticamente"
+          >
+            <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 40 40">
+              <rect width="40" height="40" rx="8" fill="#FFFFFF"/>
+              <path d="M28 8H12C9.79 8 8 9.79 8 12V28C8 30.21 9.79 32 12 32H28C30.21 32 32 30.21 32 28V12C32 9.79 30.21 8 28 8Z" fill="#FFFFFF"/>
+              <path d="M28 8H12C9.79 8 8 9.79 8 12V15H32V12C32 9.79 30.21 8 28 8Z" fill="#1A73E8"/>
+              <circle cx="13" cy="11.5" r="1.5" fill="#FFFFFF"/>
+              <circle cx="27" cy="11.5" r="1.5" fill="#FFFFFF"/>
+              <text x="20" y="26" fontSize="11" fontWeight="900" fill="#1A73E8" textAnchor="middle" fontFamily="sans-serif">
+                31
+              </text>
+            </svg>
+            <span className="truncate">Google Cal</span>
+            {stats.pendingCount > 0 && (
+              <span className="px-1.5 py-0.2 bg-blue-400/40 text-blue-100 rounded-md text-[10px] font-black">
+                {stats.pendingCount}
+              </span>
+            )}
+          </button>
+
+          {/* Apple Calendar (iOS) */}
+          <button
+            type="button"
+            onClick={() => setIsAppleCalendarModalOpen(true)}
+            className="py-2 px-2 sm:py-2.5 sm:px-2.5 rounded-xl border border-rose-300/40 bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs"
+            title="Sincronizar con Apple Calendar (iPhone / iPad / Mac)"
+          >
+            <div className="w-3.5 h-3.5 rounded bg-white flex flex-col items-center justify-center overflow-hidden shrink-0">
+              <div className="w-full bg-[#FF3B30] text-[4px] leading-none py-0.2" />
+              <span className="text-[7px] font-black text-slate-900 leading-none">{new Date().getDate()}</span>
+            </div>
+            <span className="truncate">Apple Cal</span>
+          </button>
+
+          {/* Exportar a Calendar (.ics) */}
+          <button
+            type="button"
+            onClick={() => setIsCalendarExportModalOpen(true)}
+            className="py-2 px-2 sm:py-2.5 sm:px-2.5 rounded-xl border border-amber-300/40 bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs"
+            title="Exportar pagos pendientes a un archivo .ics para Google Calendar o Apple Calendar"
+          >
+            <CalendarPlus className="w-3.5 h-3.5 text-amber-200" />
+            <span className="truncate">Exportar .ics</span>
+          </button>
+
+          {onOpenCashFlow && (
+            <button
+              type="button"
+              onClick={onOpenCashFlow}
+              className="py-2 px-2 sm:py-2.5 sm:px-2 rounded-xl border border-purple-200/40 bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
+              title="Proyección de Flujo de Caja Pro"
+            >
+              <span className="text-amber-200">🔮</span>
+              <span className="truncate">Flujo Pro</span>
+            </button>
+          )}
         </div>
 
         {/* Third row: Full-width vibrant orange button */}
         <button
           type="button"
           onClick={() => openCreate()}
-          className="relative z-10 w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#F95420] via-[#FF6B3D] to-[#FA541C] hover:from-[#E04412] hover:to-[#F95420] text-white text-sm font-black flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 active:scale-[0.98] transition-all cursor-pointer"
+          className="relative z-10 w-full py-2.5 sm:py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#F95420] via-[#FF6B3D] to-[#FA541C] hover:from-[#E04412] hover:to-[#F95420] text-white text-xs sm:text-sm font-black flex items-center justify-center gap-2 shadow-md shadow-orange-500/20 active:scale-[0.98] transition-all cursor-pointer"
         >
-          <Plus className="w-5 h-5 stroke-[2.5]" />
+          <Plus className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
           <span>Nuevo vencimiento</span>
         </button>
       </section>
@@ -788,20 +1192,29 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
         </button>
 
         {/* Card 2: PENDIENTES */}
-        <div className="bg-[#F5F7FF] border border-[#E4E9FC] rounded-2xl p-3 sm:p-4">
+        <button
+          type="button"
+          onClick={() => setIsCalendarExportModalOpen(true)}
+          className="text-left bg-[#F5F7FF] border border-[#E4E9FC] rounded-2xl p-3 sm:p-4 cursor-pointer hover:border-indigo-300 transition-all active:scale-[0.98] group"
+          title="Click para exportar pagos pendientes a Google Calendar o Apple Calendar (.ics)"
+        >
           <div className="flex items-center justify-between">
             <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-[#4F6BE8]">
               PENDIENTES
             </span>
-            <FileText className="w-4 h-4 text-[#4F6BE8] shrink-0" />
+            <div className="flex items-center gap-1 text-[#4F6BE8]">
+              <CalendarPlus className="w-3.5 h-3.5 opacity-80 group-hover:scale-110 transition-transform" />
+              <FileText className="w-4 h-4 shrink-0" />
+            </div>
           </div>
           <div className="mt-1 sm:mt-2 text-xs sm:text-base font-black text-slate-900 leading-tight truncate">
             {formatCurrency(stats.pendingAmount, profile.currency)}
           </div>
-          <p className="text-[10px] sm:text-[11px] text-slate-500 mt-0.5 truncate">
-            {stats.pendingCount} {stats.pendingCount === 1 ? 'pago' : 'pagos'}
+          <p className="text-[10px] sm:text-[11px] text-[#4F6BE8] font-bold mt-0.5 truncate flex items-center justify-between">
+            <span>{stats.pendingCount} {stats.pendingCount === 1 ? 'pago' : 'pagos'}</span>
+            <span className="text-[9px] underline">.ics ➔</span>
           </p>
-        </div>
+        </button>
 
         {/* Card 3: PAGADOS */}
         <button
@@ -877,71 +1290,553 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
             </div>
           </section>
 
-          {/* 5. Search Bar */}
-          <div className="relative w-full">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Buscar vencimiento..."
-              className="w-full pl-10 pr-9 py-3 rounded-2xl bg-[#F5F7FA] border border-slate-200/80 text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-purple-100 focus:border-purple-300 transition-all"
-            />
-            {searchTerm && (
+          {/* 5. SEARCH BAR & ACTIVE FILTERS (Req 1 & Req 2: feedback de resultados y filtros) */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  placeholder="Buscar vencimiento por nombre, proveedor o código..."
+                  className="w-full pl-10 pr-24 py-3 rounded-2xl bg-white border border-slate-200/90 text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-purple-200 focus:border-[#7928CA] transition-all shadow-2xs"
+                />
+                <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                  {isSearchFiltered && (
+                    <>
+                      <span className={`text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-full ${
+                        filteredItems.length > 0 
+                          ? 'bg-purple-100 text-[#7928CA]' 
+                          : 'bg-rose-100 text-rose-700'
+                      }`}>
+                        {filteredItems.length}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSearchTerm('')}
+                        className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                        title="Borrar búsqueda"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
               <button
                 type="button"
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                onClick={handleResetFilters}
+                className={`p-3 border rounded-2xl transition-all cursor-pointer shadow-2xs shrink-0 flex items-center gap-1.5 ${
+                  activeFiltersCount > 0 
+                    ? 'bg-purple-50 border-purple-300 text-[#7928CA]' 
+                    : 'bg-white hover:bg-purple-50 border-slate-200/90 hover:border-purple-200 text-slate-600 hover:text-[#7928CA]'
+                }`}
+                title="Restablecer filtros"
               >
-                <X className="w-4 h-4" />
+                <SlidersHorizontal className="w-4 h-4" />
+                {activeFiltersCount > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-[#7928CA] text-white text-[9px] font-black flex items-center justify-center">
+                    {activeFiltersCount}
+                  </span>
+                )}
               </button>
+            </div>
+
+            {/* Active search / filters feedback strip */}
+            {activeFiltersCount > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                {isSearchFiltered && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-[#7928CA] border border-purple-200 text-[11px] font-bold shadow-2xs">
+                    <span>Buscar: «{searchTerm}» ({filteredItems.length})</span>
+                    <button type="button" onClick={() => setSearchTerm('')} className="hover:text-purple-900 cursor-pointer ml-0.5">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {isDateFiltered && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-[#7928CA] border border-purple-200 text-[11px] font-bold shadow-2xs">
+                    <span>Plazo: {getDateFilterLabel()}</span>
+                    <button type="button" onClick={() => setDateFilter('all')} className="hover:text-purple-900 cursor-pointer ml-0.5">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {isModeFiltered && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-[#7928CA] border border-purple-200 text-[11px] font-bold shadow-2xs">
+                    <span>Modo: {getModeFilterLabel()}</span>
+                    <button type="button" onClick={() => setModeFilter('all')} className="hover:text-purple-900 cursor-pointer ml-0.5">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {isCategoryFiltered && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-[#7928CA] border border-purple-200 text-[11px] font-bold shadow-2xs">
+                    <span>Categoría: {getCategoryFilterLabel()}</span>
+                    <button type="button" onClick={() => setCategoryFilter('all')} className="hover:text-purple-900 cursor-pointer ml-0.5">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+              </div>
             )}
+
+            {/* 3 Dropdown Filter Pills (Responsive on mobile: grid-cols-1 sm:grid-cols-3) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              
+              {/* Pill 1: Plazo / Fecha */}
+              <div className="relative">
+                <div className={`w-full border rounded-2xl p-2.5 flex items-center justify-between gap-2.5 transition-all text-left cursor-pointer group shadow-2xs relative ${
+                  isDateFiltered 
+                    ? 'bg-purple-50/70 border-[#7928CA] ring-1 ring-purple-400/30' 
+                    : 'bg-white hover:bg-purple-50/50 border-slate-200/90 hover:border-purple-300'
+                }`}>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                      isDateFiltered ? 'bg-[#7928CA] text-white shadow-2xs' : 'bg-purple-100/70 text-[#7928CA]'
+                    }`}>
+                      <CalendarClock className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="block text-[10px] font-medium text-slate-400 leading-tight">
+                          Plazo
+                        </span>
+                        {isDateFiltered && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#7928CA]" />
+                        )}
+                      </div>
+                      <span className={`block text-xs font-bold leading-tight truncate transition-colors ${
+                        isDateFiltered ? 'text-[#7928CA]' : 'text-slate-800 group-hover:text-[#7928CA]'
+                      }`}>
+                        {getDateFilterLabel()}
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+
+                  {/* Invisible native select over pill */}
+                  <select
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value as any)}
+                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                    title="Filtrar por plazo o vencimiento"
+                  >
+                    <option value="all">Plazo: Todos los plazos</option>
+                    <option value="week">Plazo: Próximos 7 días (Urgente)</option>
+                    <option value="this_month">Plazo: Este mes</option>
+                    <option value="next_month">Plazo: Próximo mes</option>
+                    <option value="overdue">Plazo: Vencidos</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Pill 2: Modo de Pago */}
+              <div className="relative">
+                <div className={`w-full border rounded-2xl p-2.5 flex items-center justify-between gap-2.5 transition-all text-left cursor-pointer group shadow-2xs relative ${
+                  isModeFiltered 
+                    ? 'bg-purple-50/70 border-[#7928CA] ring-1 ring-purple-400/30' 
+                    : 'bg-white hover:bg-purple-50/50 border-slate-200/90 hover:border-purple-300'
+                }`}>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                      isModeFiltered ? 'bg-[#7928CA] text-white shadow-2xs' : 'bg-purple-100/70 text-[#7928CA]'
+                    }`}>
+                      <CreditCard className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="block text-[10px] font-medium text-slate-400 leading-tight">
+                          Modo
+                        </span>
+                        {isModeFiltered && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#7928CA]" />
+                        )}
+                      </div>
+                      <span className={`block text-xs font-bold leading-tight truncate transition-colors ${
+                        isModeFiltered ? 'text-[#7928CA]' : 'text-slate-800 group-hover:text-[#7928CA]'
+                      }`}>
+                        {getModeFilterLabel()}
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+
+                  {/* Invisible native select over pill */}
+                  <select
+                    value={modeFilter}
+                    onChange={(e) => setModeFilter(e.target.value as any)}
+                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                    title="Filtrar por modo de pago"
+                  >
+                    <option value="all">Modo: Todos los modos</option>
+                    <option value="auto">Modo: Débito automático</option>
+                    <option value="manual">Modo: Pago manual / Transferencia</option>
+                    <option value="tarjeta">Modo: Tarjeta de crédito</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Pill 3: Categoría */}
+              <div className="relative">
+                <div className={`w-full border rounded-2xl p-2.5 flex items-center justify-between gap-2.5 transition-all text-left cursor-pointer group shadow-2xs relative ${
+                  isCategoryFiltered 
+                    ? 'bg-purple-50/70 border-[#7928CA] ring-1 ring-purple-400/30' 
+                    : 'bg-white hover:bg-purple-50/50 border-slate-200/90 hover:border-purple-300'
+                }`}>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                      isCategoryFiltered ? 'bg-[#7928CA] text-white shadow-2xs' : 'bg-purple-100/70 text-[#7928CA]'
+                    }`}>
+                      <LayoutGrid className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="block text-[10px] font-medium text-slate-400 leading-tight">
+                          Categoría
+                        </span>
+                        {isCategoryFiltered && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#7928CA]" />
+                        )}
+                      </div>
+                      <span className={`block text-xs font-bold leading-tight truncate transition-colors ${
+                        isCategoryFiltered ? 'text-[#7928CA]' : 'text-slate-800 group-hover:text-[#7928CA]'
+                      }`}>
+                        {getCategoryFilterLabel()}
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+
+                  {/* Invisible native select over pill */}
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value as any)}
+                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                    title="Filtrar por categoría"
+                  >
+                    <option value="all">Todas las Categorías</option>
+                    {carouselCategories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {CATEGORY_META[cat]?.label} {categoryTotals[cat] ? `(${formatCurrency(categoryTotals[cat] || 0, profile.currency)})` : ''}
+                      </option>
+                    ))}
+                    {(Object.keys(CATEGORY_META) as AlertItemCategory[])
+                      .filter(c => !carouselCategories.includes(c))
+                      .map((cat) => (
+                        <option key={cat} value={cat}>{CATEGORY_META[cat]?.label}</option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+            </div>
           </div>
 
-          {/* 6. List of Items */}
-          <section className="space-y-2.5">
-            {/* List Heading */}
-            <div className="flex items-center justify-between px-0.5">
-              <h2 className="text-sm sm:text-base font-black text-slate-900">
-                {activeView === 'pagados' ? 'Pagados este mes' : activeView === 'todos' ? 'Todos los vencimientos' : 'Próximos vencimientos'}
-              </h2>
+          {/* 6. CATEGORÍAS CAROUSEL (Req 3: sin ruido de $0, solo con montos activos) */}
+          <div className="space-y-3 pt-1">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                Categorías de vencimientos
+              </h3>
               <button
                 type="button"
-                onClick={() => setActiveView('todos')}
-                className="text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-0.5 cursor-pointer"
+                onClick={() => setCategoryFilter('all')}
+                className="text-xs sm:text-sm font-bold text-[#7928CA] hover:text-[#5B21B6] hover:underline flex items-center gap-1 cursor-pointer transition-colors"
               >
-                <span>Ver todos</span>
+                <span>Ver todas</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            {filteredItems.length ? (
-              filteredItems.map(renderCard)
-            ) : (
-              <div className="bg-white border border-dashed border-slate-200 rounded-3xl p-6 sm:p-8 text-center">
-                <div className="w-12 h-12 rounded-2xl bg-orange-50 text-[#F95420] mx-auto flex items-center justify-center">
-                  <CalendarClock className="w-6 h-6" />
+            {/* Category Cards Carousel (Sized to fit exactly 4 cards on mobile view) */}
+            <div 
+              ref={carouselRef}
+              onScroll={handleCarouselScroll}
+              className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-none px-0.5 sm:px-1 snap-x snap-mandatory scroll-smooth"
+            >
+              {/* 1. TODAS Card */}
+              <button
+                type="button"
+                onClick={() => setCategoryFilter('all')}
+                className={`flex flex-col items-center justify-center p-1.5 sm:p-3 rounded-2xl transition-all cursor-pointer shrink-0 snap-start w-[calc((100%-24px)/4)] min-w-[68px] sm:w-auto sm:min-w-[96px] border ${
+                  categoryFilter === 'all'
+                    ? 'bg-purple-50/80 border-[#7928CA] shadow-xs'
+                    : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/50 shadow-2xs'
+                }`}
+              >
+                <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center mb-1 sm:mb-1.5 transition-all shrink-0 ${
+                  categoryFilter === 'all'
+                    ? 'bg-[#7928CA] text-white shadow-xs'
+                    : 'bg-purple-100/70 text-[#7928CA]'
+                }`}>
+                  <Layers className="w-4 h-4 sm:w-6 sm:h-6" />
                 </div>
-                <h3 className="mt-3 text-sm font-black text-slate-800">No hay vencimientos registrados</h3>
-                <p className="mt-1 text-xs text-slate-500">Agregá tus servicios, tarjetas o alquileres para llevar el control.</p>
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <span className={`text-[10px] sm:text-xs font-bold truncate w-full text-center tracking-tight ${categoryFilter === 'all' ? 'text-[#7928CA]' : 'text-slate-800'}`}>
+                  Todas
+                </span>
+                <span className={`text-[9px] sm:text-[11px] font-bold mt-0.5 truncate w-full text-center ${categoryFilter === 'all' ? 'text-[#7928CA]' : 'text-slate-500'}`}>
+                  {formatCurrency(totalFilteredAmount, profile.currency)}
+                </span>
+              </button>
+
+              {/* Dynamic Category Cards (Eliminando las que tengan $0) */}
+              {carouselCategories.map((catKey) => {
+                const meta = CATEGORY_META[catKey];
+                if (!meta) return null;
+                const Icon = meta.Icon;
+                const isSelected = categoryFilter === catKey;
+                const catAmount = categoryTotals[catKey] || 0;
+
+                return (
                   <button
+                    key={catKey}
                     type="button"
-                    onClick={() => openCreate()}
-                    className="px-4 py-2.5 rounded-xl bg-[#F95420] text-white text-xs font-extrabold cursor-pointer active:scale-95 shadow-sm hover:bg-[#E04412]"
+                    onClick={() => setCategoryFilter(isSelected ? 'all' : catKey)}
+                    className={`flex flex-col items-center justify-center p-1.5 sm:p-3 rounded-2xl transition-all cursor-pointer shrink-0 snap-start w-[calc((100%-24px)/4)] min-w-[68px] sm:w-auto sm:min-w-[96px] border ${
+                      isSelected 
+                        ? 'bg-purple-50/80 border-[#7928CA] shadow-xs' 
+                        : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/50 shadow-2xs'
+                    }`}
                   >
-                    + Agregar vencimiento
+                    <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center mb-1 sm:mb-1.5 transition-all border shrink-0 ${meta.soft} ${meta.text} ${meta.border} shadow-2xs`}>
+                      <Icon className="w-4 h-4 sm:w-6 sm:h-6" />
+                    </div>
+                    <span className={`text-[10px] sm:text-xs font-bold truncate w-full text-center tracking-tight ${isSelected ? 'text-[#7928CA]' : 'text-slate-800'}`}>
+                      {meta.label}
+                    </span>
+                    <span className={`text-[9px] sm:text-[11px] font-bold mt-0.5 truncate w-full text-center ${isSelected ? 'text-[#7928CA]' : 'text-slate-500'}`}>
+                      {formatCurrency(catAmount, profile.currency)}
+                    </span>
                   </button>
-                  {isDemoMode && (
-                    <button
-                      type="button"
-                      onClick={() => saveItems(DEFAULT_ALERT_ITEMS)}
-                      className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
-                    >
-                      Cargar ejemplos de prueba
-                    </button>
-                  )}
+                );
+              })}
+            </div>
+
+            {/* Carousel Slider Indicator (Matching TransactionsTable) */}
+            <div className="flex items-center justify-center gap-1.5 pt-1">
+              {Array.from({ length: Math.max(3, Math.ceil((1 + carouselCategories.length) / 4)) }).map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => scrollToCarouselPage(idx)}
+                  className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                    activeCarouselPage === idx 
+                      ? 'w-7 sm:w-8 bg-[#7928CA]' 
+                      : 'w-3.5 sm:w-5 bg-slate-200 hover:bg-slate-300'
+                  }`}
+                  aria-label={`Página ${idx + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Calendar Sync Banner */}
+          {stats.pendingCount > 0 && activeView !== 'pagados' && (
+            <div className="bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-purple-50/70 border border-blue-200/80 rounded-2xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-white border border-blue-200 text-blue-600 flex items-center justify-center shrink-0 shadow-2xs">
+                  <Calendar className="w-4.5 h-4.5 text-blue-600" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-xs font-black text-slate-900 truncate">
+                      Sincronizá tus vencimientos en tu calendario
+                    </p>
+                    <span className="text-[9px] bg-blue-600 text-white font-extrabold uppercase px-1.5 py-0.2 rounded-full">
+                      Auto-Sync
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 truncate mt-0.5">
+                    {stats.pendingCount} {stats.pendingCount === 1 ? 'pago pendiente' : 'pagos pendientes'} con alarmas automáticas en Google y Apple Calendar.
+                  </p>
                 </div>
               </div>
+              <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setIsGoogleCalendarModalOpen(true)}
+                  className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1 shadow-2xs cursor-pointer active:scale-95 transition-all"
+                  title="Sincronizar con Google Calendar"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Google Cal</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAppleCalendarModalOpen(true)}
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95 transition-all"
+                  title="Añadir a Apple Calendar (iOS / iPhone / Mac)"
+                >
+                  <div className="w-3.5 h-3.5 rounded bg-white flex flex-col items-center justify-center overflow-hidden shrink-0">
+                    <div className="w-full bg-[#FF3B30] text-[4px] leading-none py-0.2" />
+                    <span className="text-[7px] font-black text-slate-900 leading-none">{new Date().getDate()}</span>
+                  </div>
+                  <span>Apple Cal</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCalendarExportModalOpen(true)}
+                  className="px-2 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Descargar archivo manual .ics"
+                >
+                  <Download className="w-3 h-3 text-slate-500" />
+                  <span>.ics</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 7. List of Items Grouped by Date (Req 4: agrupación por fecha) */}
+          <section className="space-y-4">
+            {/* List Heading */}
+            <div className="flex items-center justify-between px-0.5 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm sm:text-base font-black text-slate-900">
+                  {activeView === 'pagados' ? 'Pagados este mes' : activeView === 'todos' ? 'Todos los vencimientos' : 'Próximos vencimientos'}
+                </h2>
+                <span className="text-[11px] font-extrabold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                  {filteredItems.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {stats.pendingCount > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsGoogleCalendarModalOpen(true)}
+                      className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-2xs"
+                      title="Sincronizar pagos con Google Calendar"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                      <span className="hidden sm:inline">Google Cal</span>
+                      <span className="sm:hidden">GCal</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsAppleCalendarModalOpen(true)}
+                      className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-2xs"
+                      title="Añadir a Apple Calendar (iOS / iPhone / Mac)"
+                    >
+                      <Calendar className="w-3.5 h-3.5 text-rose-600" />
+                      <span className="hidden sm:inline">Apple Cal</span>
+                      <span className="sm:hidden">Apple</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsCalendarExportModalOpen(true)}
+                      className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#F95420] border border-orange-200 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-2xs"
+                      title="Exportar pagos pendientes a un archivo .ics"
+                    >
+                      <CalendarPlus className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Exportar .ics</span>
+                      <span className="sm:hidden">.ics</span>
+                      <span className="px-1.5 py-0.2 rounded-full bg-[#F95420] text-white text-[10px] font-black">
+                        {stats.pendingCount}
+                      </span>
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveView('todos')}
+                  className="text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-0.5 cursor-pointer ml-1"
+                >
+                  <span>Ver todos</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Grouped items by date */}
+            {groupedVencimientos.length > 0 ? (
+              groupedVencimientos.map((group) => (
+                <div key={group.dateKey} className="space-y-2">
+                  {/* Group Date Header with subtotal and indicator dot */}
+                  <div className="flex items-center justify-between px-2 pt-2 pb-1 border-b border-slate-100">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                        group.isToday 
+                          ? 'bg-[#7928CA] ring-4 ring-purple-100' 
+                          : group.isTomorrow 
+                          ? 'bg-amber-500 ring-4 ring-amber-100' 
+                          : group.isPast && group.hasUnpaid
+                          ? 'bg-rose-500 ring-4 ring-rose-100'
+                          : 'bg-slate-300'
+                      }`} />
+                      <span className="text-xs sm:text-sm font-black text-slate-800 tracking-tight truncate">
+                        {group.displayDate}
+                      </span>
+                      <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full shrink-0">
+                        {group.items.length} {group.items.length === 1 ? 'vencimiento' : 'vencimientos'}
+                      </span>
+                    </div>
+
+                    {/* Day subtotal */}
+                    <div className="text-right text-xs font-bold shrink-0 ml-2">
+                      <span className="text-slate-800 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200/80 shadow-2xs">
+                        {formatCurrency(group.totalAmount, profile.currency)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Cards for this date group */}
+                  <div className="space-y-2">
+                    {group.items.map(renderCard)}
+                  </div>
+                </div>
+              ))
+            ) : (
+              /* Empty state (feedback for active search or general empty) */
+              activeFiltersCount > 0 ? (
+                <div className="bg-white border border-dashed border-purple-200 rounded-3xl p-6 sm:p-8 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-50 text-[#7928CA] mx-auto flex items-center justify-center">
+                    <Search className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-sm font-black text-slate-800">
+                    No se encontraron vencimientos para los filtros aplicados
+                  </h3>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    {searchTerm.trim() ? `No hay coincidencias con «${searchTerm}».` : 'Probá cambiando el plazo, modo o categoría.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="px-4 py-2 rounded-xl bg-purple-100 hover:bg-purple-200 text-[#7928CA] text-xs font-black cursor-pointer transition-colors"
+                  >
+                    Restablecer filtros y búsqueda
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-white border border-dashed border-slate-200 rounded-3xl p-6 sm:p-8 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-orange-50 text-[#F95420] mx-auto flex items-center justify-center">
+                    <CalendarClock className="w-6 h-6" />
+                  </div>
+                  <h3 className="mt-3 text-sm font-black text-slate-800">No hay vencimientos registrados</h3>
+                  <p className="mt-1 text-xs text-slate-500">Agregá tus servicios, tarjetas o alquileres para llevar el control.</p>
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openCreate()}
+                      className="px-4 py-2.5 rounded-xl bg-[#F95420] text-white text-xs font-extrabold cursor-pointer active:scale-95 shadow-sm hover:bg-[#E04412]"
+                    >
+                      + Agregar vencimiento
+                    </button>
+                    {isDemoMode && (
+                      <button
+                        type="button"
+                        onClick={() => saveItems(DEFAULT_ALERT_ITEMS)}
+                        className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
+                      >
+                        Cargar ejemplos de prueba
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
             )}
           </section>
         </>
@@ -1236,6 +2131,44 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
           </div>
         </div>
       )}
+
+      {/* Calendar Export Modal (.ics for Google Calendar and Apple Calendar) */}
+      <CalendarExportModal
+        isOpen={isCalendarExportModalOpen}
+        onClose={() => setIsCalendarExportModalOpen(false)}
+        items={items}
+        currency={profile.currency}
+        onShowToast={onShowToast}
+        onOpenGoogleCalendarSync={() => setIsGoogleCalendarModalOpen(true)}
+        onOpenAppleCalendarSync={() => setIsAppleCalendarModalOpen(true)}
+      />
+
+      {/* Google Calendar Direct Automated Sync Modal */}
+      <GoogleCalendarSyncModal
+        isOpen={isGoogleCalendarModalOpen}
+        onClose={() => setIsGoogleCalendarModalOpen(false)}
+        items={items}
+        currency={profile.currency}
+        onShowToast={onShowToast}
+        onSyncComplete={() => {
+          try {
+            const saved = localStorage.getItem('gastoar_vencimientos_alerts_v5');
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              if (Array.isArray(parsed)) setItems(parsed);
+            }
+          } catch {}
+        }}
+      />
+
+      {/* Apple Calendar (iOS / iPhone / Mac) Native Sync Modal */}
+      <AppleCalendarSyncModal
+        isOpen={isAppleCalendarModalOpen}
+        onClose={() => setIsAppleCalendarModalOpen(false)}
+        items={items}
+        currency={profile.currency}
+        onShowToast={onShowToast}
+      />
     </div>
   );
 };

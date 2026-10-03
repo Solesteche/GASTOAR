@@ -420,7 +420,7 @@ export const BudgetProjectionSection: React.FC<BudgetProjectionSectionProps> = (
               ¿Querés fijar esta proyección como tus nuevos límites?
             </h4>
             <p className="text-xs text-slate-600 font-medium">
-              Al confirmar, se actualizarán los presupuestos de todas tus categorías con el valor calculado para el próximo mes ({nextMonths[0]?.name}).
+              Al confirmar, se actualizarán los presupuestos de todas tus categorías con el valor calculado para el próximo mes ({nextMonths[0]?.name || 'Próximo mes'}).
             </p>
           </div>
 
@@ -471,7 +471,7 @@ export const BudgetProjectionSection: React.FC<BudgetProjectionSectionProps> = (
                   </div>
                   <div className="bg-purple-100/40 p-1.5 rounded-lg border border-purple-200/50">
                     <span className="text-[10px] text-purple-900 font-bold block">
-                      {nextMonths[0]?.name}
+                      {nextMonths[0]?.name || 'Mes 1'}
                     </span>
                     <span className="font-black text-[#7928CA] font-outfit block mt-0.5">
                       {formatCurrency(item.month1.projected, currency)}
@@ -480,8 +480,8 @@ export const BudgetProjectionSection: React.FC<BudgetProjectionSectionProps> = (
                 </div>
 
                 <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
-                  <span>{nextMonths[1]?.name}: <strong>{formatCurrency(item.month2.projected, currency)}</strong></span>
-                  <span>{nextMonths[2]?.name}: <strong>{formatCurrency(item.month3.projected, currency)}</strong></span>
+                  <span>{nextMonths[1]?.name || 'Mes 2'}: <strong>{formatCurrency(item.month2.projected, currency)}</strong></span>
+                  <span>{nextMonths[2]?.name || 'Mes 3'}: <strong>{formatCurrency(item.month3.projected, currency)}</strong></span>
                 </div>
               </div>
             ))}
@@ -497,13 +497,13 @@ export const BudgetProjectionSection: React.FC<BudgetProjectionSectionProps> = (
                     Base Actual ({sourceMode === 'current_budget' ? 'Límite' : 'Gasto Real'})
                   </th>
                   <th className="py-3 px-4 text-right bg-purple-50/50 text-[#7928CA]">
-                    {nextMonths[0]?.name} (+{Math.round(nextMonths[0]?.rate * 100)}%)
+                    {nextMonths[0]?.name || 'Mes 1'} (+{Math.round((nextMonths[0]?.rate || 0) * 100)}%)
                   </th>
                   <th className="py-3 px-4 text-right hidden md:table-cell">
-                    {nextMonths[1]?.name} (+{Math.round(nextMonths[1]?.rate * 100)}%)
+                    {nextMonths[1]?.name || 'Mes 2'} (+{Math.round((nextMonths[1]?.rate || 0) * 100)}%)
                   </th>
                   <th className="py-3 px-4 text-right hidden lg:table-cell">
-                    {nextMonths[2]?.name} (+{Math.round(nextMonths[2]?.rate * 100)}%)
+                    {nextMonths[2]?.name || 'Mes 3'} (+{Math.round((nextMonths[2]?.rate || 0) * 100)}%)
                   </th>
                 </tr>
               </thead>

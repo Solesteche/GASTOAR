@@ -18,7 +18,7 @@ import { CashFlowEngine, CashFlowProjection, DayProjection, ScheduledPayment } f
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-interface CashFlowSectionProps {
+export interface CashFlowSectionProps {
   transactions: Transaction[];
   currentBalance: number;
   scheduledPayments?: ScheduledPayment[];
@@ -216,9 +216,9 @@ export const CashFlowSection: React.FC<CashFlowSectionProps> = ({
                 fill="url(#cfGrad)"
                 dot={(props: any) => {
                   const d: DayProjection = props.payload;
-                  if (d.isCritical) return <circle key={props.key} cx={props.cx} cy={props.cy} r={4} fill="#EF4444" stroke="white" strokeWidth={1.5} />;
-                  if (d.isPayday) return <circle key={props.key} cx={props.cx} cy={props.cy} r={4} fill="#10B981" stroke="white" strokeWidth={1.5} />;
-                  return <circle key={props.key} cx={props.cx} cy={props.cy} r={0} />;
+                  if (d?.isCritical) return <circle key={props.key || `crit-${props.cx}-${props.cy}`} cx={props.cx} cy={props.cy} r={4} fill="#EF4444" stroke="white" strokeWidth={1.5} />;
+                  if (d?.isPayday) return <circle key={props.key || `pay-${props.cx}-${props.cy}`} cx={props.cx} cy={props.cy} r={4} fill="#10B981" stroke="white" strokeWidth={1.5} />;
+                  return <circle key={props.key || `dot-${props.cx}-${props.cy}`} cx={props.cx} cy={props.cy} r={0} />;
                 }}
               />
             </AreaChart>

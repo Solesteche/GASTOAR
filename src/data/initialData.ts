@@ -52,11 +52,18 @@ export const DEFAULT_CATEGORY_MAP: CategoryMap = {
     "Patente & VTV",
     "Mecánico, Repuestos, Gomera & Lavadero"
   ],
-  "Salud & Cuidado Personal": [
+  "Salud": [
     "Farmacia & Medicamentos",
     "Prepaga / Obra Social (OSDE, Swiss Medical, Galeno)",
-    "Peluquería & Estética",
-    "Gimnasio, Club, Pádel & Deportes"
+    "Consultas Médicas & Especialistas",
+    "Estudios, Análisis & Odontología",
+    "Óptica & Lentes"
+  ],
+  "Cuidado Personal": [
+    "Peluquería, Barbería & Estética",
+    "Gimnasio, Club, Pádel & Deportes",
+    "Cosmética, Perfumería & Cuidado Facial",
+    "Spa, Masajes & Uñas"
   ],
   "Educación & Formación": [
     "Cuotas Colegio / Jardín",
@@ -65,26 +72,10 @@ export const DEFAULT_CATEGORY_MAP: CategoryMap = {
     "Libros, Manuales & Fotocopias",
     "Útiles Escolares & Librería"
   ],
-  "Entretenimiento, Ocio & Salidas": [
+  "Entretenimiento": [
     "Salidas, Cine & Teatro",
     "Recitales, Boliches & Fiestas",
     "Videojuegos & Entretenimiento Digital"
-  ],
-  "Suscripciones y Plataformas": [
-    "Netflix",
-    "Spotify",
-    "YouTube Premium",
-    "Disney+ / Star+",
-    "Amazon Prime Video",
-    "Max (HBO Max)",
-    "Apple TV+ / iCloud",
-    "ChatGPT Plus / OpenAI",
-    "Paramount+",
-    "Crunchyroll",
-    "Mercado Libre (Meli+)",
-    "PlayStation Plus / Xbox Game Pass",
-    "Google One / Drive",
-    "Otras plataformas digitales"
   ],
   "Indumentaria & Calzado": [
     "Ropa Urbana & Casual",
@@ -100,28 +91,74 @@ export const DEFAULT_CATEGORY_MAP: CategoryMap = {
     "Pet Shop, Juguetes & Accesorios",
     "Peluquería Canina & Paseador"
   ],
-  "Tecnología, Electro & Bazar": [
+  "Tecnología, Electrónica & Bazar": [
     "Celulares, Computación & Accesorios",
     "Electrodomésticos para el Hogar",
     "Muebles & Decoración",
     "Bazar, Vajilla & Cocina"
+  ],
+  "Suscripciones & Plataformas": [
+    "Netflix",
+    "Spotify",
+    "YouTube Premium",
+    "Disney+ / Star+",
+    "Amazon Prime Video",
+    "Max (HBO Max)",
+    "Apple TV+ / iCloud",
+    "ChatGPT Plus / OpenAI",
+    "Paramount+",
+    "Crunchyroll",
+    "Mercado Libre (Meli+)",
+    "PlayStation Plus / Xbox Game Pass",
+    "Google One / Drive",
+    "Otras plataformas digitales"
   ]
 };
 
 export const DEFAULT_CATEGORY_COLORS: CategoryColors = {
-  "Alimentación & Bebidas": "#2563eb", // Royal Blue
-  "Alquiler": "#7c3aed", // Deep Violet
-  "Expensas": "#9333ea", // Purple
-  "Servicios": "#f59e0b", // Amber
-  "Transporte & Movilidad": "#10b981", // Emerald
-  "Salud & Cuidado Personal": "#ec4899", // Pink
-  "Educación & Formación": "#6366f1", // Indigo
-  "Entretenimiento, Ocio & Salidas": "#8b5cf6", // Violet
-  "Suscripciones y Plataformas": "#7928CA", // Purple Accent
-  "Suscripciones": "#7928CA", // Compatibility alias
-  "Indumentaria & Calzado": "#06b6d4", // Cyan
-  "Mascotas": "#f97316", // Orange
-  "Tecnología, Electro & Bazar": "#14b8a6", // Teal
+  "Alimentación & Bebidas": "#2563EB", // Azul
+  "Alquiler": "#9333EA", // Violeta
+  "Expensas": "#7E22CE", // Violeta oscuro
+  "Servicios": "#F95420", // Naranja marca
+  "Transporte & Movilidad": "#10B981", // Verde
+  "Salud": "#EF4444", // Rojo/Coral
+  "Cuidado Personal": "#EC4899", // Rosa
+  "Educación & Formación": "#3B82F6", // Azul claro
+  "Entretenimiento": "#D946EF", // Magenta
+  "Entretenimiento & Ocio": "#D946EF", // Magenta
+  "Entretenimiento, Ocio & Salidas": "#D946EF", // Magenta (alias)
+  "Entretenimiento, Ocio & Suscripciones": "#D946EF", // Magenta (alias)
+  "Indumentaria & Calzado": "#06B6D4", // Cyan
+  "Mascotas": "#F59E0B", // Ámbar
+  "Tecnología, Electrónica & Bazar": "#6366F1", // Índigo
+  "Tecnología, Electro & Bazar": "#6366F1", // Índigo (alias)
+  "Suscripciones & Plataformas": "#A855F7", // Violeta claro
+  "Suscripciones y Plataformas": "#A855F7", // Violeta claro (alias)
+  "Suscripciones": "#A855F7", // Alias
+  "Salud & Cuidado Personal": "#EF4444", // Legacy fallback
+};
+
+export const DEFAULT_CATEGORY_BG_COLORS: Record<string, string> = {
+  "Alimentación & Bebidas": "#EFF6FF",
+  "Alquiler": "#FAF5FF",
+  "Expensas": "#F5F3FF",
+  "Servicios": "#FFF4EF",
+  "Transporte & Movilidad": "#ECFDF5",
+  "Salud": "#FEF2F2",
+  "Cuidado Personal": "#FDF2F8",
+  "Educación & Formación": "#EFF6FF",
+  "Entretenimiento": "#FDF4FF",
+  "Entretenimiento & Ocio": "#FDF4FF",
+  "Entretenimiento, Ocio & Salidas": "#FDF4FF",
+  "Entretenimiento, Ocio & Suscripciones": "#FDF4FF",
+  "Indumentaria & Calzado": "#ECFEFF",
+  "Mascotas": "#FFFBEB",
+  "Tecnología, Electrónica & Bazar": "#EEF2FF",
+  "Tecnología, Electro & Bazar": "#EEF2FF",
+  "Suscripciones & Plataformas": "#FAF5FF",
+  "Suscripciones y Plataformas": "#FAF5FF",
+  "Suscripciones": "#FAF5FF",
+  "Salud & Cuidado Personal": "#FEF2F2",
 };
 
 export const DEFAULT_BUDGETS: Budgets = {
@@ -131,14 +168,14 @@ export const DEFAULT_BUDGETS: Budgets = {
     "Expensas": 85000,
     "Servicios": 120000,
     "Transporte & Movilidad": 85000,
-    "Salud & Cuidado Personal": 95000,
+    "Salud": 65000,
+    "Cuidado Personal": 35000,
     "Educación & Formación": 65000,
-    "Entretenimiento, Ocio & Salidas": 55000,
-    "Suscripciones y Plataformas": 60000,
-    "Suscripciones": 60000,
+    "Entretenimiento": 55000,
     "Indumentaria & Calzado": 60000,
     "Mascotas": 45000,
-    "Tecnología, Electro & Bazar": 40000
+    "Tecnología, Electrónica & Bazar": 40000,
+    "Suscripciones & Plataformas": 60000
   },
   subcategories: {
     "Supermercado & Hipermercado": 230000,
@@ -268,8 +305,8 @@ export const DEFAULT_TRANSACTIONS: Transaction[] = [
     descripcion: "Peluquería y barbería mensual", 
     monto: 16000.00, 
     moneda: "ARS", 
-    categoria: "Salud & Cuidado Personal", 
-    subcategoria: "Peluquería & Estética",
+    categoria: "Cuidado Personal", 
+    subcategoria: "Peluquería, Barbería & Estética",
     fecha: formatDate(8),
     tipo: "individual",
     pagadoPor: "user1",
@@ -295,7 +332,7 @@ export const DEFAULT_TRANSACTIONS: Transaction[] = [
     descripcion: "Antibióticos y analgésicos recetados", 
     monto: 37214.00, 
     moneda: "ARS", 
-    categoria: "Salud & Cuidado Personal", 
+    categoria: "Salud", 
     subcategoria: "Farmacia & Medicamentos",
     fecha: formatDate(10),
     tipo: "pareja",
@@ -309,7 +346,7 @@ export const DEFAULT_TRANSACTIONS: Transaction[] = [
     descripcion: "Cuota mensual salud", 
     monto: 85385.00, 
     moneda: "ARS", 
-    categoria: "Salud & Cuidado Personal", 
+    categoria: "Salud", 
     subcategoria: "Prepaga / Obra Social (OSDE, Swiss Medical, Galeno)",
     fecha: formatDate(11),
     tipo: "pareja",
@@ -392,7 +429,7 @@ export const DEFAULT_TRANSACTIONS: Transaction[] = [
     descripcion: "Televisor para el living en cuotas sin interés",
     monto: 540000.00,
     moneda: "ARS",
-    categoria: "Tecnología, Electro & Bazar",
+    categoria: "Tecnología, Electrónica & Bazar",
     subcategoria: "Electrodomésticos para el Hogar",
     fecha: formatDate(45),
     tipo: "pareja",
@@ -412,7 +449,7 @@ export const DEFAULT_TRANSACTIONS: Transaction[] = [
     descripcion: "Equipamiento para la cocina en 12 cuotas",
     monto: 720000.00,
     moneda: "ARS",
-    categoria: "Tecnología, Electro & Bazar",
+    categoria: "Tecnología, Electrónica & Bazar",
     subcategoria: "Electrodomésticos para el Hogar",
     fecha: formatDate(100),
     tipo: "pareja",
@@ -451,7 +488,7 @@ export const DEFAULT_TRANSACTIONS: Transaction[] = [
     descripcion: "Upgrade para home office",
     monto: 240000.00,
     moneda: "ARS",
-    categoria: "Tecnología, Electro & Bazar",
+    categoria: "Tecnología, Electrónica & Bazar",
     subcategoria: "Celulares, Computación & Accesorios",
     fecha: formatDate(60),
     tipo: "individual",
@@ -463,6 +500,53 @@ export const DEFAULT_TRANSACTIONS: Transaction[] = [
     montoCuota: 40000.00,
     tarjetaNombre: "Amex Galicia",
     primerMesCuota: "2026-06"
+  },
+  {
+    id: "21",
+    concepto: "Cafetera Nespresso Vertuo",
+    descripcion: "Cafetera y cápsulas en 3 cuotas fijas (¡Última cuota este mes!)",
+    monto: 105000.00,
+    moneda: "ARS",
+    categoria: "Tecnología, Electrónica & Bazar",
+    subcategoria: "Electrodomésticos para el Hogar",
+    fecha: formatDate(65),
+    tipo: "pareja",
+    pagadoPor: "user1",
+    splitType: "50_50",
+    metodoPago: "Crédito",
+    esCuotas: true,
+    cuotasTotal: 3,
+    cuotaActual: 3,
+    montoCuota: 35000.00,
+    tarjetaNombre: "Visa Santander",
+    primerMesCuota: (() => {
+      const d = new Date();
+      const start = new Date(d.getFullYear(), d.getMonth() - 2, 10);
+      return `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
+    })()
+  },
+  {
+    id: "22",
+    concepto: "Campera Térmica Columbia",
+    descripcion: "Indumentaria en 6 cuotas (¡Finaliza este mes!)",
+    monto: 180000.00,
+    moneda: "ARS",
+    categoria: "Indumentaria & Calzado",
+    subcategoria: "Indumentaria de Invierno",
+    fecha: formatDate(150),
+    tipo: "individual",
+    pagadoPor: "user2",
+    metodoPago: "Crédito",
+    esCuotas: true,
+    cuotasTotal: 6,
+    cuotaActual: 6,
+    montoCuota: 30000.00,
+    tarjetaNombre: "Mastercard BBVA",
+    primerMesCuota: (() => {
+      const d = new Date();
+      const start = new Date(d.getFullYear(), d.getMonth() - 5, 10);
+      return `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
+    })()
   }
 ];
 
