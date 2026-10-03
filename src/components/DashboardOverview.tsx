@@ -26,6 +26,9 @@ import {
   ArrowUpRight,
   ArrowRight,
   Sparkles,
+  BellRing,
+  Plus,
+  PieChart as LucidePieChart,
 } from 'lucide-react';
 import {
   PieChart,
@@ -173,6 +176,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   categoryMap,
   budgets,
   goals = [],
+  isDemoMode = false,
   activeMode = 'all',
   onModeChange,
   onOpenTransactionModal,
@@ -195,9 +199,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onOpenSettlementModal,
 }) => {
   const isUser1 = profile?.currentUser === 'user1';
-  const currentUserName = profile ? (isUser1 ? profile.user1Name : profile.user2Name) : 'Sol';
-  const displayName = (currentUserName === 'Sol' || profile?.user1Name === 'Sol')
-    ? 'Sol Esteche'
+  const currentUserName = profile ? (isUser1 ? profile.user1Name : profile.user2Name) : (isDemoMode ? 'Sol' : 'Mi Usuario');
+  const displayName = isDemoMode
+    ? ((currentUserName === 'Sol' || profile?.user1Name === 'Sol') ? 'Sol Esteche' : currentUserName)
     : currentUserName;
 
   // Modal de Cotizaciones
@@ -403,12 +407,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     const categories = budgets?.categories || {};
     const sumCategories = Object.values(categories).reduce<number>((acc, b) => acc + (Number(b) || 0), 0);
     if (activeMode === 'individual') {
-      return sumCategories > 0 ? Math.round(sumCategories * 0.5) : (totalIncome > 0 ? Math.round(totalIncome * 0.8) : 770000);
+      return sumCategories > 0 ? Math.round(sumCategories * 0.5) : (totalIncome > 0 ? Math.round(totalIncome * 0.8) : (isDemoMode ? 770000 : 0));
     }
     if (sumCategories > 0) return sumCategories;
     if (totalIncome > 0) return totalIncome;
-    return 770000; // valor estético de referencia
-  }, [budgets, totalIncome, activeMode]);
+    return isDemoMode ? 770000 : 0;
+  }, [budgets, totalIncome, activeMode, isDemoMode]);
 
   // Balance disponible
   const availableBalance = useMemo(() => {
@@ -492,12 +496,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   // ─── Metas de Ahorro y Gastos en Cuotas ──────────────────────────────────
   const effectiveGoals = useMemo(() => {
     if (goals && goals.length > 0) return goals;
-    try {
-      const saved = localStorage.getItem('control_gastos_goals_v1');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return DEFAULT_GOALS;
-  }, [goals]);
+    if (isDemoMode) {
+      try {
+        const saved = localStorage.getItem('control_gastos_goals_v1');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+      return DEFAULT_GOALS;
+    }
+    return [];
+  }, [goals, isDemoMode]);
 
   const goalsMetrics = useMemo(() => {
     let totalTarget = 0;
@@ -601,15 +608,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     if (budgets?.categories && Object.keys(budgets.categories).length > 0) {
       return budgets.categories;
     }
-    return DEFAULT_BUDGETS.categories || {};
-  }, [budgets?.categories]);
+    return isDemoMode ? (DEFAULT_BUDGETS.categories || {}) : {};
+  }, [budgets?.categories, isDemoMode]);
 
   const userSubBudgets = useMemo(() => {
     if (budgets?.subcategories && Object.keys(budgets.subcategories).length > 0) {
       return budgets.subcategories;
     }
-    return DEFAULT_BUDGETS.subcategories || {};
-  }, [budgets?.subcategories]);
+    return isDemoMode ? (DEFAULT_BUDGETS.subcategories || {}) : {};
+  }, [budgets?.subcategories, isDemoMode]);
 
   const modeMultiplier = activeMode === 'individual' ? 0.5 : 1.0;
 
@@ -914,6 +921,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       return realBills.slice(0, 5);
     }
 
+    if (!isDemoMode) {
+      return [];
+    }
+
     // Default mock list with explicit semantic urgency:
     // 1. Tarjeta Visa (2 días) - Rojo
     // 2. Expensas (7 días) - Naranja
@@ -989,7 +1000,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         urgency: semantic.urgency
       };
     });
-  }, [vencimientos]);
+  }, [vencimientos, isDemoMode]);
 
   // Distribución de gastos (Pie Data) con paleta y proporciones de la imagen
   const categoryPieData = useMemo(() => {
@@ -1011,13 +1022,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       });
     }
 
-    // Default mock distribution matching screenshot exactly:
-    // Vivienda: 34% ($ 64.000) - Violeta #7C3AED
-    // Alimentación: 28% ($ 52.000) - Naranja #F97316
-    // Transporte: 15% ($ 28.000) - Celeste #60A5FA
-    // Servicios: 12% ($ 22.000) - Lavanda #818CF8
-    // Otros: 11% ($ 21.000) - Azul cielo #BAE6FD
-    // Total = $ 187.000
+    if (!isDemoMode) {
+      return [];
+    }
+
+    // Default mock distribution matching screenshot exactly for demo mode:
     return [
       { name: 'Vivienda', value: 64000, pct: 34, color: '#7C3AED' },
       { name: 'Alimentación', value: 52000, pct: 28, color: '#F97316' },
@@ -1025,14 +1034,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       { name: 'Servicios', value: 22000, pct: 12, color: '#818CF8' },
       { name: 'Otros', value: 21000, pct: 11, color: '#BAE6FD' },
     ];
-  }, [monthExpensesList, categoryColors]);
+  }, [monthExpensesList, categoryColors, isDemoMode]);
 
   const displayTotalExpenses = useMemo(() => {
     if (monthExpensesList && monthExpensesList.length > 0 && totalExpenses > 0) {
       return totalExpenses;
     }
-    return 187000;
-  }, [monthExpensesList, totalExpenses]);
+    return isDemoMode ? 187000 : 0;
+  }, [monthExpensesList, totalExpenses, isDemoMode]);
 
   // Visuales para últimos movimientos
   const getMovementVisuals = (categoria?: string, title?: string) => {
@@ -1122,11 +1131,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       return list;
     }
 
-    // Default mock matching image screenshot exactly:
-    // 1. Supermercado | Hoy, 12:34 | - $ 27.500 | ShoppingCart | #EEF2FF
-    // 2. Combustible | Ayer, 18:20 | - $ 42.000 | Fuel | #FFF7ED
-    // 3. Restaurante | Ayer, 13:15 | - $ 18.200 | Utensils | #FFF1F2
-    // 4. Transferencia | 25 sep, 2026 | - $ 65.000 | ArrowLeftRight | #F5F3FF
+    if (!isDemoMode) {
+      return [];
+    }
+
+    // Default mock matching image screenshot exactly for demo mode:
     return [
       {
         id: 'm1',
@@ -1165,7 +1174,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         iconBg: 'bg-[#F5F3FF] dark:bg-purple-950/40',
       },
     ];
-  }, [monthExpensesList, transactions]);
+  }, [monthExpensesList, transactions, isDemoMode]);
 
   // Math para el Ring del Hero Card (Diámetro 72px)
   const ringRadius = 40;
@@ -1800,44 +1809,64 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
 
         {/* Lista de vencimientos con color semántico según urgencia */}
-        <div className="divide-y divide-slate-100/80">
-          {upcomingBills.map(bill => (
-            <div
-              key={bill.id}
-              onClick={() => onNavigateTab ? onNavigateTab('card_alerts') : {}}
-              className="py-3 px-1.5 sm:px-2 flex items-center justify-between gap-3 hover:bg-slate-50/70 rounded-2xl transition-colors cursor-pointer group"
-            >
-              {/* Left: Ícono circular pastel + Título y Subtítulo con fecha */}
-              <div className="flex items-center gap-3 min-w-0">
-                <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full ${bill.iconBg} flex items-center justify-center text-lg shrink-0 shadow-2xs group-hover:scale-105 transition-transform`}>
-                  <span>{bill.icon}</span>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-slate-900 truncate leading-snug">
-                    {bill.title}
-                  </p>
-                  <p className="text-xs text-slate-400 font-normal truncate mt-0.5">
-                    {bill.subtitle} • {bill.dueDateLabel}
-                  </p>
-                </div>
-              </div>
-
-              {/* Right: Monto + Píldora de color semántico (Rojo Tarjeta Visa, Naranja Expensas, Verde Internet) */}
-              <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
-                <span className="text-sm sm:text-base font-bold text-slate-900 tabular-nums">
-                  $ {bill.amount.toLocaleString('es-AR')}
-                </span>
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-bold shrink-0 min-w-[76px] flex items-center justify-center gap-1.5 shadow-2xs transition-transform group-hover:scale-105 ${bill.semanticBadgeClass}`}
-                  title={`${bill.title}: ${bill.relativeDaysLabel} (${bill.urgencyName})`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${bill.dotClass}`} />
-                  <span>{bill.relativeDaysLabel}</span>
-                </span>
-              </div>
+        {upcomingBills.length === 0 ? (
+          <div className="py-7 text-center space-y-2">
+            <div className="w-10 h-10 rounded-2xl bg-purple-50 dark:bg-purple-950/40 text-[#7928CA] dark:text-purple-300 flex items-center justify-center mx-auto">
+              <BellRing className="w-5 h-5" />
             </div>
-          ))}
-        </div>
+            <p className="text-xs font-bold text-slate-700 dark:text-slate-200">No tenés vencimientos próximos</p>
+            <p className="text-[11px] text-slate-400 max-w-sm mx-auto">Agregá tus facturas, cuotas o servicios para recibir alertas y mantener tus pagos al día.</p>
+            {onNavigateTab && (
+              <button
+                type="button"
+                onClick={() => onNavigateTab('card_alerts')}
+                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold cursor-pointer transition-all active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Agregar vencimiento</span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100/80">
+            {upcomingBills.map(bill => (
+              <div
+                key={bill.id}
+                onClick={() => onNavigateTab ? onNavigateTab('card_alerts') : {}}
+                className="py-3 px-1.5 sm:px-2 flex items-center justify-between gap-3 hover:bg-slate-50/70 rounded-2xl transition-colors cursor-pointer group"
+              >
+                {/* Left: Ícono circular pastel + Título y Subtítulo con fecha */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full ${bill.iconBg} flex items-center justify-center text-lg shrink-0 shadow-2xs group-hover:scale-105 transition-transform`}>
+                    <span>{bill.icon}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-900 truncate leading-snug">
+                      {bill.title}
+                    </p>
+                    <p className="text-xs text-slate-400 font-normal truncate mt-0.5">
+                      {bill.subtitle} • {bill.dueDateLabel}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right: Monto + Píldora de color semántico (Rojo Tarjeta Visa, Naranja Expensas, Verde Internet) */}
+                <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
+                  <span className="text-sm sm:text-base font-bold text-slate-900 tabular-nums">
+                    $ {bill.amount.toLocaleString('es-AR')}
+                  </span>
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-bold shrink-0 min-w-[76px] flex items-center justify-center gap-1.5 shadow-2xs transition-transform group-hover:scale-105 ${bill.semanticBadgeClass}`}
+                    title={`${bill.title}: ${bill.relativeDaysLabel} (${bill.urgencyName})`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${bill.dotClass}`} />
+                    <span>{bill.relativeDaysLabel}</span>
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
@@ -2240,65 +2269,85 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
 
             {/* Content: Donut + Legend */}
-            <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-6 py-1">
-              {/* Donut chart */}
-              <div className="relative w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categoryPieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={46}
-                      outerRadius={68}
-                      dataKey="value"
-                      strokeWidth={2}
-                      stroke="#ffffff"
-                      startAngle={90}
-                      endAngle={-270}
-                    >
-                      {categoryPieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
+            {categoryPieData.length === 0 ? (
+              <div className="py-8 text-center space-y-2">
+                <div className="w-10 h-10 rounded-2xl bg-purple-50 dark:bg-purple-950/40 text-[#7928CA] dark:text-purple-300 flex items-center justify-center mx-auto">
+                  <LucidePieChart className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Sin gastos en este período</p>
+                <p className="text-[11px] text-slate-400 max-w-xs mx-auto">El gráfico de distribución por categorías se generará automáticamente con tus primeros gastos.</p>
+                {onOpenTransactionModal && (
+                  <button
+                    type="button"
+                    onClick={onOpenTransactionModal}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold cursor-pointer transition-all active:scale-95"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Cargar primer gasto</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-6 py-1">
+                {/* Donut chart */}
+                <div className="relative w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={categoryPieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={46}
+                        outerRadius={68}
+                        dataKey="value"
+                        strokeWidth={2}
+                        stroke="#ffffff"
+                        startAngle={90}
+                        endAngle={-270}
+                      >
+                        {categoryPieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
 
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-                  <span className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight tracking-tight">
-                    {isBalanceHidden ? '$ •••••' : `$ ${displayTotalExpenses.toLocaleString('es-AR')}`}
-                  </span>
-                  <span className="text-[11px] sm:text-xs text-slate-400 font-normal">
-                    gasto total
-                  </span>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                    <span className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight tracking-tight">
+                      {isBalanceHidden ? '$ •••••' : `$ ${displayTotalExpenses.toLocaleString('es-AR')}`}
+                    </span>
+                    <span className="text-[11px] sm:text-xs text-slate-400 font-normal">
+                      gasto total
+                    </span>
+                  </div>
+                </div>
+
+                {/* Legend with percentages and amounts */}
+                <div className="flex-1 w-full space-y-3 sm:space-y-3.5">
+                  {categoryPieData.map((item) => (
+                    <div key={item.name} className="flex items-center justify-between text-xs sm:text-sm">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <span className="font-bold text-slate-800 dark:text-slate-100 truncate">
+                          {item.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 sm:gap-5 flex-shrink-0">
+                        <span className="text-slate-400 dark:text-slate-400 font-medium tabular-nums w-8 text-right">
+                          {item.pct}%
+                        </span>
+                        <span className="font-semibold text-slate-700 dark:text-slate-300 tabular-nums w-20 text-right">
+                          {isBalanceHidden ? '$ •••' : `$ ${item.value.toLocaleString('es-AR')}`}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-
-              {/* Legend with percentages and amounts */}
-              <div className="flex-1 w-full space-y-3 sm:space-y-3.5">
-                {categoryPieData.map((item) => (
-                  <div key={item.name} className="flex items-center justify-between text-xs sm:text-sm">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: item.color }}
-                      />
-                      <span className="font-bold text-slate-800 dark:text-slate-100 truncate">
-                        {item.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 sm:gap-5 flex-shrink-0">
-                      <span className="text-slate-400 dark:text-slate-400 font-medium tabular-nums w-8 text-right">
-                        {item.pct}%
-                      </span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-300 tabular-nums w-20 text-right">
-                        {isBalanceHidden ? '$ •••' : `$ ${item.value.toLocaleString('es-AR')}`}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -2326,38 +2375,58 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
 
             {/* List of movements */}
-            <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
-              {recentMovements.map((tx) => (
-                <div
-                  key={tx.id}
-                  onClick={() => onNavigateTab ? onNavigateTab('transactions') : {}}
-                  className="py-3 sm:py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 rounded-2xl px-2 transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${tx.iconBg}`}>
-                      {tx.icon}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                        {tx.title}
-                      </p>
-                      <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-400 font-medium">
-                        {tx.subtitle}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex-shrink-0 text-right">
-                    <span className={`text-xs sm:text-sm font-bold tabular-nums ${
-                      tx.isPositive ? 'text-emerald-500' : 'text-rose-500'
-                    }`}>
-                      {tx.isPositive ? '+ ' : '- '}
-                      {isBalanceHidden ? '$ •••••' : `$ ${tx.amount.toLocaleString('es-AR')}`}
-                    </span>
-                  </div>
+            {recentMovements.length === 0 ? (
+              <div className="py-8 text-center space-y-2">
+                <div className="w-10 h-10 rounded-2xl bg-purple-50 dark:bg-purple-950/40 text-[#6D3FEA] flex items-center justify-center mx-auto">
+                  <CreditCard className="w-5 h-5" />
                 </div>
-              ))}
-            </div>
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-200">No hay movimientos registrados</p>
+                <p className="text-[11px] text-slate-400 max-w-xs mx-auto">Tus gastos e ingresos se listarán aquí en tiempo real cuando comiences a registrar transacciones.</p>
+                {onOpenTransactionModal && (
+                  <button
+                    type="button"
+                    onClick={onOpenTransactionModal}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold cursor-pointer transition-all active:scale-95"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Cargar gasto</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                {recentMovements.map((tx) => (
+                  <div
+                    key={tx.id}
+                    onClick={() => onNavigateTab ? onNavigateTab('transactions') : {}}
+                    className="py-3 sm:py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 rounded-2xl px-2 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${tx.iconBg}`}>
+                        {tx.icon}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                          {tx.title}
+                        </p>
+                        <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-400 font-medium">
+                          {tx.subtitle}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex-shrink-0 text-right">
+                      <span className={`text-xs sm:text-sm font-bold tabular-nums ${
+                        tx.isPositive ? 'text-emerald-500' : 'text-rose-500'
+                      }`}>
+                        {tx.isPositive ? '+ ' : '- '}
+                        {isBalanceHidden ? '$ •••••' : `$ ${tx.amount.toLocaleString('es-AR')}`}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
