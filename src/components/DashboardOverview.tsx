@@ -60,6 +60,7 @@ import { BudgetAlertsModal, CriticalBudgetItem, CriticalSubcategoryItem } from '
 import { GoalsMovementsModal } from './GoalsMovementsModal';
 import { InstallmentsMovementsModal } from './InstallmentsMovementsModal';
 import { ExpenseDistributionModal } from './ExpenseDistributionModal';
+import { QuickStartChecklist } from './onboarding';
 import { getInstallmentPlanDetails } from '../utils/installmentCalculations';
 import { DEFAULT_BUDGETS, DEFAULT_GOALS } from '../data/initialData';
 import { CashFlowEngine, CashFlowProjection } from '../CashFlowEngine';
@@ -69,6 +70,7 @@ export type { Vencimiento };
 interface DashboardOverviewProps {
   transactions: Transaction[];
   profile: CoupleProfile;
+  userAccount?: UserAccount | null;
   categoryColors: CategoryColors;
   categoryMap: CategoryMap;
   budgets: Budgets;
@@ -76,7 +78,7 @@ interface DashboardOverviewProps {
   isDemoMode?: boolean;
   activeMode?: ExpenseMode;
   onModeChange?: (mode: ExpenseMode) => void;
-  onOpenTransactionModal: () => void;
+  onOpenTransactionModal: (initialType?: 'gasto' | 'ingreso') => void;
   onOpenIncomeModal?: () => void;
   onOpenBudgetModal?: () => void;
   onNavigateTab?: (tab: any) => void;
@@ -94,6 +96,7 @@ interface DashboardOverviewProps {
   isDarkMode?: boolean;
   onOpenProfileModal?: () => void;
   onOpenSettlementModal?: () => void;
+  onRestartTour?: () => void;
 }
 
 const MONTH_NAMES = [
