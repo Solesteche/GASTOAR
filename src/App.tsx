@@ -950,11 +950,59 @@ export default function App() {
         // Never merge it with whatever was left by another account/demo.
         isRemoteUpdate.current = true;
 
-        setTransactions(
-          Array.isArray(data.transactions)
-            ? (data.transactions as Transaction[])
-            : [],
-        );
+        // Migration for accounts created before per-user local storage was
+        // introduced. If Firestore has no real app data yet, recover the
+        // previous local data instead of showing an empty dashboard. Demo
+        // transactions are explicitly excluded by their known IDs.
+        const remoteTransactions = Array.isArray(data.transactions)
+          ? (data.transactions as Transaction[])
+          : [];
+        // If the cloud document is empty, keep the already-loaded local state
+        // for this account. This prevents an empty Firestore snapshot from
+        // erasing valid data that was already present on the device.
+        let transactionsToUse = remoteTransactions.length > 0 ? remoteTransactions : transactions;
+        let budgetsToUse = data.budgets && typeof data.budgets === 'object'
+          ? data.budgets as Budgets
+          : budgets;
+        let profileToUse = (data.profile as CoupleProfile | undefined) || profile;
+
+        if (remoteTransactions.length === 0 && !isDemoMode) {
+          try {
+            const legacyRaw = localStorage.getItem('control_gastos_tx_v5');
+            if (legacyRaw) {
+              const legacy = JSON.parse(legacyRaw);
+              if (Array.isArray(legacy)) {
+                const demoIds = new Set(Array.from({ length: 37 }, (_, i) => String(i + 1)));
+                const recovered = legacy.filter((t: Transaction) => !demoIds.has(String(t?.id)));
+                if (recovered.length > 0) {
+                  transactionsToUse = recovered;
+                  writeScopedStorage('control_gastos_tx_v5', activeUserId, recovered);
+                }
+              }
+            }
+          } catch {}
+        }
+
+        if ((!data.budgets || !data.budgets.categories || Object.keys(data.budgets.categories as object).length === 0) && !isDemoMode && (!budgets?.categories || Object.keys(budgets.categories).length === 0)) {
+          try {
+            const legacyRaw = localStorage.getItem('control_gastos_budgets_v5');
+            if (legacyRaw) {
+              const legacy = JSON.parse(legacyRaw);
+              const isDemoBudget = legacy?.categories?.['Alimentación & Bebidas'] === 380000 &&
+                legacy?.categories?.['Alquiler'] === 450000;
+              if (legacy?.categories && !isDemoBudget && Object.keys(legacy.categories).length > 0) {
+                budgetsToUse = legacy as Budgets;
+                writeScopedStorage('control_gastos_budgets_v5', activeUserId, budgetsToUse);
+              }
+            }
+          } catch {}
+        }
+
+        if (!profileToUse && currentUserAccount?.name) {
+          profileToUse = { ...DEFAULT_COUPLE_PROFILE, user1Name: currentUserAccount.name };
+        }
+
+        setTransactions(transactionsToUse);
 
         if (data.categoryMap && Object.keys(data.categoryMap as object).length > 0) {
           setCategoryMap(data.categoryMap as Record<string, string[]>);
@@ -971,40 +1019,47 @@ export default function App() {
           setCategoryColors(DEFAULT_CATEGORY_COLORS);
         }
 
-        setBudgets(
-          data.budgets && typeof data.budgets === 'object'
-            ? data.budgets as Budgets
-            : { categories: {}, subcategories: {} },
-        );
+        setBudgets(budgetsToUse);
 
-        if (data.profile) {
-          setProfile(data.profile as CoupleProfile);
+        // Keep the authenticated account name as the source of truth for the
+        // personal greeting. Older app-state snapshots may contain the generic
+        // placeholder "Mi Usuario" (or the old full-name value).
+        if (profileToUse) {
+          const cloudProfile = profileToUse;
+          const accountName = (currentUserAccount?.name || '').trim();
+          const isGenericProfileName = !cloudProfile.user1Name ||
+            cloudProfile.user1Name === 'Mi Usuario' ||
+            cloudProfile.user1Name === 'Sol' ||
+            cloudProfile.user1Name === 'Sol Esteche';
+          setProfile(
+            isGenericProfileName && accountName
+              ? { ...cloudProfile, user1Name: accountName }
+              : cloudProfile,
+          );
+        } else if (currentUserAccount?.name) {
+          setProfile(prev => ({ ...prev, user1Name: currentUserAccount.name }));
         }
 
         setSettlementHistory(
-          Array.isArray(data.settlementHistory)
+          Array.isArray(data.settlementHistory) && data.settlementHistory.length > 0
             ? data.settlementHistory as SettlementRecord[]
-            : [],
+            : settlementHistory,
         );
 
         setGoals(
-          Array.isArray(data.goals)
+          Array.isArray(data.goals) && data.goals.length > 0
             ? data.goals as Goal[]
-            : [],
+            : goals,
         );
 
         setSubscriptions(
-          Array.isArray(data.subscriptions)
+          Array.isArray(data.subscriptions) && data.subscriptions.length > 0
             ? data.subscriptions as UserSubscription[]
-            : [],
+            : subscriptions,
         );
 
-        if ('vencimientos' in data) {
-          setVencimientos(
-            Array.isArray(data.vencimientos)
-              ? data.vencimientos as Vencimiento[]
-              : [],
-          );
+        if ('vencimientos' in data && Array.isArray(data.vencimientos) && data.vencimientos.length > 0) {
+          setVencimientos(data.vencimientos as Vencimiento[]);
         }
 
         isInitialCloudLoadDone.current = true;

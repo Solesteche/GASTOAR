@@ -122,10 +122,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   isDarkMode = false,
 }) => {
   const isUser1 = profile?.currentUser === 'user1';
-  const currentUserName = profile ? (isUser1 ? profile.user1Name : profile.user2Name) : 'Sol';
-  const displayName = (currentUserName === 'Sol' || profile?.user1Name === 'Sol')
-    ? 'Sol Esteche'
-    : currentUserName;
+  const currentUserName = profile ? (isUser1 ? profile.user1Name : profile.user2Name) : '';
+  // The greeting must use only the first name, never the surname.
+  const displayName = (currentUserName || 'Usuario')
+    .trim()
+    .split(/\s+/)[0] || 'Usuario';
 
   // Modal de Cotizaciones
   const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
