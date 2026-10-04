@@ -385,6 +385,7 @@ export default function App() {
     );
     if (saved.length > 0) {
       try {
+
         const parsed: Transaction[] = saved;
         return parsed.map(tx => {
           if (tx.categoria === 'Salud & Cuidado Personal') {
@@ -435,6 +436,7 @@ export default function App() {
   });
 
   const [categoryMap, setCategoryMap] = useState<CategoryMap>(() => {
+
     const ownerId = getStoredOwnerId();
     const saved = readScopedStorage<CategoryMap>(
       'control_gastos_catmap_v6',
@@ -497,6 +499,7 @@ export default function App() {
   });
 
   const [categoryColors, setCategoryColors] = useState<CategoryColors>(() => {
+
     const ownerId = getStoredOwnerId();
     const saved = readScopedStorage<CategoryColors>(
       'control_gastos_colors_v6',
@@ -511,6 +514,7 @@ export default function App() {
 
   const [budgets, setBudgets] = useState<Budgets>(() => {
     const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
+
     const ownerId = getStoredOwnerId();
     const saved = readScopedStorage<Budgets>(
       'control_gastos_budgets_v5',
@@ -555,6 +559,7 @@ export default function App() {
   });
 
   const [profile, setProfile] = useState<CoupleProfile>(() => {
+
     const ownerId = getStoredOwnerId();
     const saved = readScopedStorage<CoupleProfile>(
       'control_gastos_profile_v3',
@@ -566,7 +571,18 @@ export default function App() {
         if (parsed?.accountCode && (parsed.accountCode.startsWith('PAREJA-') || parsed.accountCode.startsWith('PAIR-'))) {
           parsed.accountCode = parsed.accountCode.replace(/^(PAREJA|PAIR)-/, 'COMPARTIDA-');
         }
+        if (!isDemo && parsed?.user1Name === 'Sol' && parsed?.user2Name === 'Martín') {
+          return {
+            accountCode: parsed.accountCode || ('COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000)),
+            user1Name: 'Mi Usuario',
+            user2Name: 'Mi Pareja',
+            currentUser: 'user1',
+            currency: 'ARS',
+            defaultSplit: '50_50',
+          };
+        }
         return parsed;
+
     } catch {}
     return saved;
   });
@@ -582,6 +598,7 @@ export default function App() {
 
   const [goals, setGoals] = useState<Goal[]>(() => {
     const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
+
     const ownerId = getStoredOwnerId();
     return readScopedStorage<Goal[]>(
       'control_gastos_goals_v1',
@@ -592,6 +609,8 @@ export default function App() {
 
   // ─── Vencimientos ─────────────────────────────────────────────────────────────
   const [vencimientos, setVencimientos] = useState<Vencimiento[]>(() => {
+
+    const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
     const today = new Date();
     const pad = (n: number) => n.toString().padStart(2, '0');
     const addDays = (d: Date, days: number) => {
@@ -648,6 +667,7 @@ export default function App() {
       },
     ];
 
+
     const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
     const ownerId = getStoredOwnerId();
     const saved = readScopedStorage<Vencimiento[]>(
@@ -676,6 +696,7 @@ export default function App() {
         }
       } catch {}
     }
+
     return saved;
   });
 
@@ -792,6 +813,7 @@ export default function App() {
 
   const appTotalIncome = useMemo(() => {
     return transactions.filter(t => t.tipoTransaccion === 'ingreso').reduce((s, t) => s + Number(t.monto || 0), 0);
+
   }, [transactions]);
 
   const appTotalExpenses = useMemo(() => {
@@ -2110,6 +2132,27 @@ export default function App() {
     setIsAuthenticated(false);
     localStorage.setItem('control_gastos_is_demo', 'false');
     localStorage.setItem('control_gastos_is_authenticated', 'false');
+    // Limpieza total del estado demo
+    setTransactions([]);
+    setGoals([]);
+    setBudgets({ categories: {}, subcategories: {} });
+    setVencimientos([]);
+    setSettlementHistory([]);
+    setProfile({
+      accountCode: 'COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000),
+      user1Name: 'Mi Usuario',
+      user2Name: 'Mi Pareja',
+      currentUser: 'user1',
+      currency: 'ARS',
+      defaultSplit: '50_50',
+    });
+    localStorage.removeItem('control_gastos_tx_v5');
+    localStorage.removeItem('control_gastos_budgets_v5');
+    localStorage.removeItem('control_gastos_goals_v1');
+    localStorage.removeItem('control_gastos_settlements_v3');
+    localStorage.removeItem('gastoar_vencimientos_v1');
+    localStorage.removeItem('gastoar_vencimientos_alerts_v5');
+    localStorage.removeItem('gastoar_card_alerts_v2');
     showToast('Has salido del modo demostración. ¡Registrate para crear tu cuenta real!', 'info');
   };
 
@@ -2134,10 +2177,31 @@ export default function App() {
     setIsAdmin(false);
     setIsDemoMode(false);
     setCurrentUserAccount(null);
+    setTransactions([]);
+    setGoals([]);
+    setBudgets({ categories: {}, subcategories: {} });
+    setVencimientos([]);
+    setSettlementHistory([]);
+    setProfile({
+      accountCode: 'COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000),
+      user1Name: 'Mi Usuario',
+      user2Name: 'Mi Pareja',
+      currentUser: 'user1',
+      currency: 'ARS',
+      defaultSplit: '50_50',
+    });
     localStorage.removeItem('control_gastos_is_authenticated');
     localStorage.removeItem('control_gastos_is_admin');
     localStorage.removeItem('control_gastos_is_demo');
     localStorage.removeItem('control_gastos_account_v1');
+
+    localStorage.removeItem('control_gastos_tx_v5');
+    localStorage.removeItem('control_gastos_budgets_v5');
+    localStorage.removeItem('control_gastos_goals_v1');
+    localStorage.removeItem('control_gastos_settlements_v3');
+    localStorage.removeItem('gastoar_vencimientos_v1');
+    localStorage.removeItem('gastoar_vencimientos_alerts_v5');
+    localStorage.removeItem('gastoar_card_alerts_v2');
     showToast('Has cerrado sesión correctamente. ¡Hasta pronto!', 'info');
     navigate('/login', { replace: true });
   };
