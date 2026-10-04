@@ -32,7 +32,6 @@ import {
   CoupleProfile,
   DailyFinancialScore,
   ExpenseMode,
-  Goal,
   Transaction,
   Vencimiento
 } from '../types';
@@ -51,7 +50,6 @@ interface DashboardOverviewProps {
   categoryColors: CategoryColors;
   categoryMap: CategoryMap;
   budgets: Budgets;
-  goals?: Goal[];
   isDemoMode?: boolean;
   activeMode?: ExpenseMode;
   onModeChange?: (mode: ExpenseMode) => void;
@@ -71,9 +69,6 @@ interface DashboardOverviewProps {
   onOpenVoiceModal?: () => void;
   onToggleSidebar?: () => void;
   isDarkMode?: boolean;
-  onOpenProfileModal?: () => void;
-  onOpenSettlementModal?: () => void;
-  onRestartTour?: () => void;
 }
 
 const MONTH_NAMES = [
@@ -122,11 +117,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   isDarkMode = false,
 }) => {
   const isUser1 = profile?.currentUser === 'user1';
-  const currentUserName = profile ? (isUser1 ? profile.user1Name : profile.user2Name) : '';
-  // The greeting must use only the first name, never the surname.
-  const displayName = (currentUserName || 'Usuario')
-    .trim()
-    .split(/\s+/)[0] || 'Usuario';
+  const currentUserName = profile ? (isUser1 ? profile.user1Name : profile.user2Name) : 'Sol';
+  const displayName = (currentUserName === 'Sol' || profile?.user1Name === 'Sol')
+    ? 'Sol Esteche'
+    : currentUserName;
 
   // Modal de Cotizaciones
   const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);

@@ -385,7 +385,6 @@ export default function App() {
     );
     if (saved.length > 0) {
       try {
-
         const parsed: Transaction[] = saved;
         return parsed.map(tx => {
           if (tx.categoria === 'Salud & Cuidado Personal') {
@@ -436,7 +435,6 @@ export default function App() {
   });
 
   const [categoryMap, setCategoryMap] = useState<CategoryMap>(() => {
-
     const ownerId = getStoredOwnerId();
     const saved = readScopedStorage<CategoryMap>(
       'control_gastos_catmap_v6',
@@ -499,7 +497,6 @@ export default function App() {
   });
 
   const [categoryColors, setCategoryColors] = useState<CategoryColors>(() => {
-
     const ownerId = getStoredOwnerId();
     const saved = readScopedStorage<CategoryColors>(
       'control_gastos_colors_v6',
@@ -514,7 +511,6 @@ export default function App() {
 
   const [budgets, setBudgets] = useState<Budgets>(() => {
     const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
-
     const ownerId = getStoredOwnerId();
     const saved = readScopedStorage<Budgets>(
       'control_gastos_budgets_v5',
@@ -559,7 +555,7 @@ export default function App() {
   });
 
   const [profile, setProfile] = useState<CoupleProfile>(() => {
-
+    const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
     const ownerId = getStoredOwnerId();
     const saved = readScopedStorage<CoupleProfile>(
       'control_gastos_profile_v3',
@@ -582,7 +578,6 @@ export default function App() {
           };
         }
         return parsed;
-
     } catch {}
     return saved;
   });
@@ -598,7 +593,6 @@ export default function App() {
 
   const [goals, setGoals] = useState<Goal[]>(() => {
     const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
-
     const ownerId = getStoredOwnerId();
     return readScopedStorage<Goal[]>(
       'control_gastos_goals_v1',
@@ -609,8 +603,6 @@ export default function App() {
 
   // ─── Vencimientos ─────────────────────────────────────────────────────────────
   const [vencimientos, setVencimientos] = useState<Vencimiento[]>(() => {
-
-    const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
     const today = new Date();
     const pad = (n: number) => n.toString().padStart(2, '0');
     const addDays = (d: Date, days: number) => {
@@ -667,7 +659,6 @@ export default function App() {
       },
     ];
 
-
     const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
     const ownerId = getStoredOwnerId();
     const saved = readScopedStorage<Vencimiento[]>(
@@ -696,7 +687,6 @@ export default function App() {
         }
       } catch {}
     }
-
     return saved;
   });
 
@@ -813,7 +803,6 @@ export default function App() {
 
   const appTotalIncome = useMemo(() => {
     return transactions.filter(t => t.tipoTransaccion === 'ingreso').reduce((s, t) => s + Number(t.monto || 0), 0);
-
   }, [transactions]);
 
   const appTotalExpenses = useMemo(() => {
@@ -950,59 +939,11 @@ export default function App() {
         // Never merge it with whatever was left by another account/demo.
         isRemoteUpdate.current = true;
 
-        // Migration for accounts created before per-user local storage was
-        // introduced. If Firestore has no real app data yet, recover the
-        // previous local data instead of showing an empty dashboard. Demo
-        // transactions are explicitly excluded by their known IDs.
-        const remoteTransactions = Array.isArray(data.transactions)
-          ? (data.transactions as Transaction[])
-          : [];
-        // If the cloud document is empty, keep the already-loaded local state
-        // for this account. This prevents an empty Firestore snapshot from
-        // erasing valid data that was already present on the device.
-        let transactionsToUse = remoteTransactions.length > 0 ? remoteTransactions : transactions;
-        let budgetsToUse = data.budgets && typeof data.budgets === 'object'
-          ? data.budgets as Budgets
-          : budgets;
-        let profileToUse = (data.profile as CoupleProfile | undefined) || profile;
-
-        if (remoteTransactions.length === 0 && !isDemoMode) {
-          try {
-            const legacyRaw = localStorage.getItem('control_gastos_tx_v5');
-            if (legacyRaw) {
-              const legacy = JSON.parse(legacyRaw);
-              if (Array.isArray(legacy)) {
-                const demoIds = new Set(Array.from({ length: 37 }, (_, i) => String(i + 1)));
-                const recovered = legacy.filter((t: Transaction) => !demoIds.has(String(t?.id)));
-                if (recovered.length > 0) {
-                  transactionsToUse = recovered;
-                  writeScopedStorage('control_gastos_tx_v5', activeUserId, recovered);
-                }
-              }
-            }
-          } catch {}
-        }
-
-        if ((!data.budgets || !data.budgets.categories || Object.keys(data.budgets.categories as object).length === 0) && !isDemoMode && (!budgets?.categories || Object.keys(budgets.categories).length === 0)) {
-          try {
-            const legacyRaw = localStorage.getItem('control_gastos_budgets_v5');
-            if (legacyRaw) {
-              const legacy = JSON.parse(legacyRaw);
-              const isDemoBudget = legacy?.categories?.['Alimentación & Bebidas'] === 380000 &&
-                legacy?.categories?.['Alquiler'] === 450000;
-              if (legacy?.categories && !isDemoBudget && Object.keys(legacy.categories).length > 0) {
-                budgetsToUse = legacy as Budgets;
-                writeScopedStorage('control_gastos_budgets_v5', activeUserId, budgetsToUse);
-              }
-            }
-          } catch {}
-        }
-
-        if (!profileToUse && currentUserAccount?.name) {
-          profileToUse = { ...DEFAULT_COUPLE_PROFILE, user1Name: currentUserAccount.name };
-        }
-
-        setTransactions(transactionsToUse);
+        setTransactions(
+          Array.isArray(data.transactions)
+            ? (data.transactions as Transaction[])
+            : [],
+        );
 
         if (data.categoryMap && Object.keys(data.categoryMap as object).length > 0) {
           setCategoryMap(data.categoryMap as Record<string, string[]>);
@@ -1019,47 +960,40 @@ export default function App() {
           setCategoryColors(DEFAULT_CATEGORY_COLORS);
         }
 
-        setBudgets(budgetsToUse);
+        setBudgets(
+          data.budgets && typeof data.budgets === 'object'
+            ? data.budgets as Budgets
+            : { categories: {}, subcategories: {} },
+        );
 
-        // Keep the authenticated account name as the source of truth for the
-        // personal greeting. Older app-state snapshots may contain the generic
-        // placeholder "Mi Usuario" (or the old full-name value).
-        if (profileToUse) {
-          const cloudProfile = profileToUse;
-          const accountName = (currentUserAccount?.name || '').trim();
-          const isGenericProfileName = !cloudProfile.user1Name ||
-            cloudProfile.user1Name === 'Mi Usuario' ||
-            cloudProfile.user1Name === 'Sol' ||
-            cloudProfile.user1Name === 'Sol Esteche';
-          setProfile(
-            isGenericProfileName && accountName
-              ? { ...cloudProfile, user1Name: accountName }
-              : cloudProfile,
-          );
-        } else if (currentUserAccount?.name) {
-          setProfile(prev => ({ ...prev, user1Name: currentUserAccount.name }));
+        if (data.profile) {
+          setProfile(data.profile as CoupleProfile);
         }
 
         setSettlementHistory(
-          Array.isArray(data.settlementHistory) && data.settlementHistory.length > 0
+          Array.isArray(data.settlementHistory)
             ? data.settlementHistory as SettlementRecord[]
-            : settlementHistory,
+            : [],
         );
 
         setGoals(
-          Array.isArray(data.goals) && data.goals.length > 0
+          Array.isArray(data.goals)
             ? data.goals as Goal[]
-            : goals,
+            : [],
         );
 
         setSubscriptions(
-          Array.isArray(data.subscriptions) && data.subscriptions.length > 0
+          Array.isArray(data.subscriptions)
             ? data.subscriptions as UserSubscription[]
-            : subscriptions,
+            : [],
         );
 
-        if ('vencimientos' in data && Array.isArray(data.vencimientos) && data.vencimientos.length > 0) {
-          setVencimientos(data.vencimientos as Vencimiento[]);
+        if ('vencimientos' in data) {
+          setVencimientos(
+            Array.isArray(data.vencimientos)
+              ? data.vencimientos as Vencimiento[]
+              : [],
+          );
         }
 
         isInitialCloudLoadDone.current = true;
@@ -2249,14 +2183,6 @@ export default function App() {
     localStorage.removeItem('control_gastos_is_admin');
     localStorage.removeItem('control_gastos_is_demo');
     localStorage.removeItem('control_gastos_account_v1');
-
-    localStorage.removeItem('control_gastos_tx_v5');
-    localStorage.removeItem('control_gastos_budgets_v5');
-    localStorage.removeItem('control_gastos_goals_v1');
-    localStorage.removeItem('control_gastos_settlements_v3');
-    localStorage.removeItem('gastoar_vencimientos_v1');
-    localStorage.removeItem('gastoar_vencimientos_alerts_v5');
-    localStorage.removeItem('gastoar_card_alerts_v2');
     showToast('Has cerrado sesión correctamente. ¡Hasta pronto!', 'info');
     navigate('/login', { replace: true });
   };
