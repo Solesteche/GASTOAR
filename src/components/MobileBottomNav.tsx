@@ -19,7 +19,8 @@ import {
   Settings,
   BadgePercent,
   TrendingUp,
-  Coins
+  Coins,
+  Compass
 } from 'lucide-react';
 
 interface MobileBottomNavProps {
@@ -29,6 +30,7 @@ interface MobileBottomNavProps {
   onToggleSidebar?: () => void;
   hasDebt: boolean;
   urgentVencimientosCount?: number;
+  onRestartTour?: () => void;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
@@ -38,6 +40,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   onToggleSidebar,
   hasDebt,
   urgentVencimientosCount = 0,
+  onRestartTour,
 }) => {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -209,6 +212,21 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 </div>
                 <span>Plan PRO</span>
               </button>
+
+              {onRestartTour && (
+                <button
+                  onClick={() => {
+                    setIsMoreOpen(false);
+                    onRestartTour();
+                  }}
+                  className="p-3 rounded-2xl border bg-purple-50/70 border-purple-200/90 text-purple-900 flex flex-col items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-purple-100 text-[#7928CA] flex items-center justify-center">
+                    <Compass className="w-4.5 h-4.5" />
+                  </div>
+                  <span>Tour Guiado</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

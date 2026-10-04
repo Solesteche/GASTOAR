@@ -122,6 +122,10 @@ import {
   SettingsScreen 
 } from './components/mobileScreens/SettingsScreen';
 import { 
+  OnboardingWelcomeModal, 
+  OnboardingSpotlightTour 
+} from './components/onboarding';
+import { 
   MobileSubscriptionScreen 
 } from './components/mobileScreens/MobileSubscriptionScreen';
 import { 
@@ -305,6 +309,12 @@ export default function App() {
             }
             setCurrentUserAccount(profileFromDb);
             localStorage.setItem('control_gastos_account_v1', JSON.stringify(profileFromDb));
+            setProfile(prev => ({
+              ...prev,
+              user1Name: profileFromDb.name || user.displayName || prev.user1Name,
+              user2Name: profileFromDb.partnerName || prev.user2Name,
+              accountCode: profileFromDb.accountCode || prev.accountCode,
+            }));
           } else {
             // IMPORTANT: never inherit account fields from the previous local
             // session here. This callback can run while a brand-new Firebase
@@ -323,6 +333,11 @@ export default function App() {
             };
             setCurrentUserAccount(updated);
             localStorage.setItem('control_gastos_account_v1', JSON.stringify(updated));
+            setProfile(prev => ({
+              ...prev,
+              user1Name: name,
+              accountCode: updated.accountCode,
+            }));
           }
         } catch (e) {
           console.warn('Error synchronizing Firebase user profile:', e);
@@ -747,6 +762,74 @@ export default function App() {
     return !sessionStorage.getItem('gastoar_splash_seen');
   });
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState<boolean>(false);
+
+  // Guided Onboarding Tour State (Spotlight + Tooltips + Welcome Modal)
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState<boolean>(() => {
+    try {
+      const isCompleted = localStorage.getItem('gastoar_has_completed_onboarding_v1') === 'true';
+      const isDemo = localStorage.getItem('control_gastos_is_demo') === 'true';
+      const isAuth = localStorage.getItem('control_gastos_is_authenticated') === 'true';
+      return isAuth && !isCompleted && !isDemo;
+    } catch {
+      return false;
+    }
+  });
+  const [isTourActive, setIsTourActive] = useState<boolean>(false);
+
+  const handleStartOnboardingTour = () => {
+    setIsWelcomeModalOpen(false);
+    setActiveTab('dashboard');
+    setIsTourActive(true);
+  };
+
+  const handleSkipOnboardingTour = () => {
+    setIsWelcomeModalOpen(false);
+    setIsTourActive(false);
+    localStorage.setItem('gastoar_has_completed_onboarding_v1', 'true');
+  };
+
+  const handleCompleteOnboardingTour = () => {
+    setIsTourActive(false);
+    setIsWelcomeModalOpen(false);
+    localStorage.setItem('gastoar_has_completed_onboarding_v1', 'true');
+    showToast('¡Felicitaciones! Ya sabés cómo usar GastoAR 🚀', 'success');
+  };
+
+  const handleRestartOnboardingTour = () => {
+    setActiveTab('dashboard');
+    setIsWelcomeModalOpen(true);
+  };
+
+  const handleSaveInitialBalance = (amount: number) => {
+    const initialTx: Transaction = {
+      id: 'tx-saldo-inicial-' + Date.now(),
+      concepto: 'Saldo Inicial',
+      monto: Math.abs(amount),
+      moneda: profile.currency || 'ARS',
+      tipo: 'individual',
+      tipoTransaccion: 'ingreso',
+      categoria: 'Ingresos',
+      subcategoria: 'Saldo inicial',
+      fecha: new Date().toISOString().split('T')[0],
+      metodoPago: 'Efectivo',
+      pagadoPor: profile.currentUser || 'user1',
+      createdAt: Date.now(),
+    };
+    handleSaveTransaction(initialTx);
+    showToast('¡Saldo inicial cargado con éxito! 💰', 'success');
+  };
+
+  const handleUpdateUserName = (newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    setProfile(prev => ({
+      ...prev,
+      user1Name: trimmed,
+    }));
+    if (currentUserAccount) {
+      handleUpdateAccount({ name: trimmed });
+    }
+  };
 
   // Filters State
   const [filters, setFilters] = useState<FilterState>(() => {
@@ -2306,6 +2389,7 @@ export default function App() {
         {/* Top Header */}
         <Header
           profile={profile}
+          userAccount={currentUserAccount}
           activeMode={activeMode}
           onModeChange={handleModeChange}
           onOpenTransactionModal={(initialType) => { 
@@ -2486,6 +2570,7 @@ export default function App() {
               <DashboardOverview
                 transactions={transactions}
                 profile={profile}
+                userAccount={currentUserAccount}
                 categoryColors={categoryColors}
                 categoryMap={categoryMap}
                 budgets={budgets}
@@ -2493,10 +2578,10 @@ export default function App() {
                 isDemoMode={isDemoMode}
                 activeMode={activeMode}
                 onModeChange={handleModeChange}
-                onOpenTransactionModal={() => { 
+                onOpenTransactionModal={(initialType) => { 
                   setEditingTransaction(null); 
                   setInitialIsCuotas(false); 
-                  setTxModalInitialType('gasto'); 
+                  setTxModalInitialType(initialType || 'gasto'); 
                   setIsTxModalOpen(true); 
                 }}
                 onOpenIncomeModal={() => setIsIncomeModalOpen(true)}
@@ -2519,6 +2604,7 @@ export default function App() {
                 onOpenCashFlowTab={() => setActiveTab('cashflow')}
                 onOpenProfileModal={() => setIsProfileModalOpen(true)}
                 onOpenSettlementModal={() => setIsSettlementModalOpen(true)}
+                onRestartTour={handleRestartOnboardingTour}
               />
             </div>
           )}
@@ -2635,6 +2721,7 @@ export default function App() {
                 onOpenCloudSync={() => setIsCloudSyncModalOpen(true)}
                 onLogout={handleLogout}
                 onShowToast={showToast}
+                onRestartTour={handleRestartOnboardingTour}
               />
             </div>
           )}
@@ -2653,7 +2740,7 @@ export default function App() {
                 onExportData={handleExportData}
                 onLogout={handleLogout}
                 onShowToast={showToast}
-                onOpenOnboarding={() => setIsOnboardingModalOpen(true)}
+                onOpenOnboarding={handleRestartOnboardingTour}
               />
             </div>
           )}
@@ -2673,6 +2760,7 @@ export default function App() {
         onToggleSidebar={() => setIsSidebarOpenMobile(prev => !prev)}
         hasDebt={debtInfo.debtAmount > 0}
         urgentVencimientosCount={urgentCount}
+        onRestartTour={handleRestartOnboardingTour}
       />
 
       {/* Floating Demo Mode Exit & Register Pill / Bar (Req: fácil salida y registro) */}
@@ -2846,6 +2934,10 @@ export default function App() {
           setIsProfileModalOpen(false);
           setIsCloudSyncModalOpen(true);
         }}
+        onRestartTour={() => {
+          setIsProfileModalOpen(false);
+          handleRestartOnboardingTour();
+        }}
       />
 
       {/* Firebase Cloud Sync & Selective Historic Partition Loader Modal */}
@@ -2907,6 +2999,30 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Guided Onboarding 1: Welcome Modal */}
+      <OnboardingWelcomeModal
+        isOpen={isWelcomeModalOpen}
+        onStartTour={handleStartOnboardingTour}
+        onSkipTour={handleSkipOnboardingTour}
+        currentName={currentUserAccount?.name || profile.user1Name}
+        onUpdateName={handleUpdateUserName}
+      />
+
+      {/* Guided Onboarding 2: Spotlight + Tooltips Step-by-Step Tour */}
+      <OnboardingSpotlightTour
+        isActive={isTourActive}
+        onCompleteTour={handleCompleteOnboardingTour}
+        onDismissTour={handleSkipOnboardingTour}
+        onSaveInitialBalance={handleSaveInitialBalance}
+        onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
+        onOpenTransactionModal={() => {
+          setEditingTransaction(null);
+          setInitialIsCuotas(false);
+          setTxModalInitialType('gasto');
+          setIsTxModalOpen(true);
+        }}
+      />
 
       {/* Pantalla 1: Native Splash Screen on App Launch */}
       {showSplash && (

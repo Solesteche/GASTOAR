@@ -15,7 +15,8 @@ import {
   Smartphone,
   Trash2,
   FileDown,
-  Sparkles
+  Sparkles,
+  Compass
 } from 'lucide-react';
 import { CoupleProfile, UserAccount } from '../../types';
 import {
@@ -296,6 +297,26 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-purple-600" />
+            </button>
+          )}
+
+          {/* Repetir Tour de Bienvenida */}
+          {onOpenOnboarding && (
+            <button
+              type="button"
+              onClick={onOpenOnboarding}
+              className="w-full p-3 rounded-2xl hover:bg-purple-50/70 flex items-center justify-between text-left transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                  <Compass className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">Repetir tour de bienvenida</span>
+                  <span className="text-[10px] text-slate-400 font-medium">Guía paso a paso interactiva</span>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-purple-700" />
             </button>
           )}
 

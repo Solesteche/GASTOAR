@@ -27,6 +27,7 @@ interface UserProfileModalProps {
   onSelectPlanPayment?: (plan: any, cycle: any) => void;
   onShowToast?: (msg: string, type: 'success' | 'error' | 'info') => void;
   onNavigateToTab?: (tab: string) => void;
+  onRestartTour?: () => void;
 }
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({
@@ -42,6 +43,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   onLogout,
   onShowToast,
   onNavigateToTab,
+  onRestartTour,
 }) => {
   if (!isOpen) return null;
 
@@ -91,6 +93,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               onLogout();
             }}
             onShowToast={onShowToast}
+            onRestartTour={onRestartTour}
           />
         </motion.div>
       </div>

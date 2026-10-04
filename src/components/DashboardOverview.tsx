@@ -32,9 +32,12 @@ import {
   CoupleProfile,
   DailyFinancialScore,
   ExpenseMode,
+  Goal,
   Transaction,
+  UserAccount,
   Vencimiento
 } from '../types';
+import { auth } from '../lib/firebase';
 import { computeDailyFinancialScore, getTodayDateString } from '../utils/scoreEngine';
 import { DailyScoreModal } from './DailyScoreModal';
 import { CurrencyModal } from './CurrencyModal';
@@ -47,13 +50,15 @@ export type { Vencimiento };
 interface DashboardOverviewProps {
   transactions: Transaction[];
   profile: CoupleProfile;
+  userAccount?: UserAccount | null;
   categoryColors: CategoryColors;
   categoryMap: CategoryMap;
   budgets: Budgets;
+  goals?: Goal[];
   isDemoMode?: boolean;
   activeMode?: ExpenseMode;
   onModeChange?: (mode: ExpenseMode) => void;
-  onOpenTransactionModal: () => void;
+  onOpenTransactionModal: (initialType?: 'gasto' | 'ingreso') => void;
   onOpenIncomeModal?: () => void;
   onOpenBudgetModal?: () => void;
   onNavigateTab?: (tab: any) => void;
@@ -69,6 +74,9 @@ interface DashboardOverviewProps {
   onOpenVoiceModal?: () => void;
   onToggleSidebar?: () => void;
   isDarkMode?: boolean;
+  onOpenProfileModal?: () => void;
+  onOpenSettlementModal?: () => void;
+  onRestartTour?: () => void;
 }
 
 const MONTH_NAMES = [
@@ -94,9 +102,12 @@ const DEFAULT_CATEGORY_COLORS: Record<string, string> = {
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   transactions = [],
   profile,
+  userAccount,
   categoryColors = {},
   categoryMap,
   budgets,
+  goals = [],
+  isDemoMode = false,
   activeMode = 'all',
   onModeChange,
   onOpenTransactionModal,
@@ -115,12 +126,44 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onOpenVoiceModal,
   onToggleSidebar,
   isDarkMode = false,
+  onOpenProfileModal,
+  onOpenSettlementModal,
+  onRestartTour,
 }) => {
   const isUser1 = profile?.currentUser === 'user1';
-  const currentUserName = profile ? (isUser1 ? profile.user1Name : profile.user2Name) : 'Sol';
-  const displayName = (currentUserName === 'Sol' || profile?.user1Name === 'Sol')
-    ? 'Sol Esteche'
-    : currentUserName;
+  const profileName = profile ? (isUser1 ? profile.user1Name : profile.user2Name) : '';
+
+  const displayName = useMemo(() => {
+    if (isDemoMode) {
+      return (profileName && profileName !== 'Mi Usuario') ? profileName : 'Sol Esteche';
+    }
+
+    // 1. From authenticated userAccount
+    if (userAccount?.name && userAccount.name.trim() && userAccount.name !== 'Mi Usuario') {
+      return userAccount.name.trim();
+    }
+    // 2. From Firebase auth
+    if (auth.currentUser?.displayName && auth.currentUser.displayName.trim() && auth.currentUser.displayName !== 'Mi Usuario') {
+      return auth.currentUser.displayName.trim();
+    }
+    // 3. From profile if customized
+    if (profileName && profileName.trim() && profileName !== 'Mi Usuario' && profileName !== 'Sol') {
+      return profileName.trim();
+    }
+    // 4. From email prefix
+    const email = userAccount?.email || auth.currentUser?.email;
+    if (email) {
+      const prefix = email.split('@')[0].replace(/[._-]/g, ' ').trim();
+      if (prefix) {
+        return prefix
+          .split(' ')
+          .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join(' ');
+      }
+    }
+
+    return profileName || 'Usuario';
+  }, [isDemoMode, userAccount, profileName]);
 
   // Modal de Cotizaciones
   const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
@@ -237,12 +280,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     const categories = budgets?.categories || {};
     const sumCategories = Object.values(categories).reduce<number>((acc, b) => acc + (Number(b) || 0), 0);
     if (activeMode === 'individual') {
-      return sumCategories > 0 ? Math.round(sumCategories * 0.5) : (totalIncome > 0 ? Math.round(totalIncome * 0.8) : 770000);
+      return sumCategories > 0
+        ? Math.round(sumCategories * 0.5)
+        : (totalIncome > 0 ? Math.round(totalIncome * 0.8) : (isDemoMode ? 770000 : 0));
     }
     if (sumCategories > 0) return sumCategories;
     if (totalIncome > 0) return totalIncome;
-    return 770000; // valor estético de referencia
-  }, [budgets, totalIncome, activeMode]);
+    return isDemoMode ? 770000 : 0;
+  }, [budgets, totalIncome, activeMode, isDemoMode]);
 
   // Balance disponible
   const availableBalance = useMemo(() => {
@@ -294,22 +339,24 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   const budgetUsedPercent = generalBudget > 0
     ? Math.min(100, Math.round((totalExpenses / generalBudget) * 100))
-    : 81;
+    : (isDemoMode ? 81 : 0);
 
   // Límite diario & Promedio 7 días
   const now = new Date();
   const daysInMonth = new Date(yearNumber, monthNumber + 1, 0).getDate();
   const daysRemaining = Math.max(1, daysInMonth - now.getDate() + 1);
   const remainingBudget = Math.max(0, generalBudget - totalExpenses);
-  const dailyBudgetRemaining = Math.max(0, Math.round(remainingBudget / daysRemaining));
+  const dailyBudgetRemaining = generalBudget > 0
+    ? Math.max(0, Math.round(remainingBudget / daysRemaining))
+    : (isDemoMode ? 26552 : 0);
   const dailyLimit = useMemo(() => {
-    return generalBudget > 0 ? Math.round(generalBudget / 30) : 26000;
-  }, [generalBudget]);
+    return generalBudget > 0 ? Math.round(generalBudget / 30) : (isDemoMode ? 26000 : 0);
+  }, [generalBudget, isDemoMode]);
 
   const dailyAvailablePercent = useMemo(() => {
-    if (dailyLimit <= 0) return 100;
-    return Math.min(100, Math.max(0, Math.round((dailyBudgetRemaining / dailyLimit) * 100))) || 100;
-  }, [dailyBudgetRemaining, dailyLimit]);
+    if (dailyLimit <= 0) return isDemoMode ? 100 : 0;
+    return Math.min(100, Math.max(0, Math.round((dailyBudgetRemaining / dailyLimit) * 100)));
+  }, [dailyBudgetRemaining, dailyLimit, isDemoMode]);
 
   const last7DaysStats = useMemo(() => {
     const pad = (n: number) => n.toString().padStart(2, '0');
@@ -319,9 +366,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
     const txsThisWeek = (transactions || []).filter(t => t.tipoTransaccion !== 'ingreso' && t.fecha >= s7 && t.fecha <= sToday);
     const spentThisWeek = txsThisWeek.reduce((acc, t) => acc + (t.monto || 0), 0);
-    const avg7Days = spentThisWeek > 0 ? Math.round(spentThisWeek / 7) : 3650;
-    return { avg7Days, diffPct: 78 };
-  }, [transactions, now]);
+    const avg7Days = spentThisWeek > 0
+      ? Math.round(spentThisWeek / 7)
+      : (isDemoMode ? 3650 : 0);
+    return { avg7Days, diffPct: spentThisWeek > 0 ? 12 : (isDemoMode ? 78 : 0) };
+  }, [transactions, now, isDemoMode]);
 
   // Vencimientos dinámicos (con fallback a la lista estética si está vacía)
   const upcomingBills = useMemo(() => {
@@ -340,7 +389,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           icon: v.icon || '💳',
           title: v.title || 'Servicio',
           cat: v.cat || 'Servicios',
-          dueText: daysLeft === 0 ? 'Vence hoy' : daysLeft === 1 ? 'Vence mañana' : `Vence en ${daysLeft} días`,
+          dueText: daysLeft === 0 ? 'Vence hoy' : daysLeft === 1 ? 'Vence mañana' : (daysLeft < 0 ? `Vencido hace ${Math.abs(daysLeft)} días` : `Vence en ${daysLeft} días`),
           amount: v.amount || 0,
           daysLeft,
           color: daysLeft <= 3 ? 'text-rose-500' : daysLeft <= 7 ? 'text-amber-500' : 'text-blue-500',
@@ -353,15 +402,18 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       return realBills.slice(0, 5);
     }
 
-    // Default mock list matching the mockup screenshot
-    return [
-      { id: '1', icon: '💳', title: 'Tarjeta Visa', cat: 'Tarjetas', dueText: 'Vence en 3 días', amount: 66000, daysLeft: 3, color: 'text-rose-500', bg: 'bg-rose-500/10' },
-      { id: '2', icon: '🏢', title: 'Expensas', cat: 'Vivienda', dueText: 'Vence en 5 días', amount: 135000, daysLeft: 5, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-      { id: '3', icon: '💧', title: 'AySA', cat: 'Servicios', dueText: 'Vence en 8 días', amount: 28500, daysLeft: 8, color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
-      { id: '4', icon: '🌐', title: 'Internet', cat: 'Servicios', dueText: 'Vence en 11 días', amount: 12000, daysLeft: 11, color: 'text-purple-500', bg: 'bg-purple-500/10' },
-      { id: '5', icon: '🏠', title: 'Alquiler', cat: 'Vivienda', dueText: 'Vence en 14 días', amount: 650000, daysLeft: 14, color: 'text-emerald-500', bg: 'bg-emerald-500/10' }
-    ];
-  }, [vencimientos]);
+    if (isDemoMode) {
+      return [
+        { id: '1', icon: '💳', title: 'Tarjeta Visa', cat: 'Tarjetas', dueText: 'Vence en 3 días', amount: 66000, daysLeft: 3, color: 'text-rose-500', bg: 'bg-rose-500/10' },
+        { id: '2', icon: '🏢', title: 'Expensas', cat: 'Vivienda', dueText: 'Vence en 5 días', amount: 135000, daysLeft: 5, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+        { id: '3', icon: '💧', title: 'AySA', cat: 'Servicios', dueText: 'Vence en 8 días', amount: 28500, daysLeft: 8, color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
+        { id: '4', icon: '🌐', title: 'Internet', cat: 'Servicios', dueText: 'Vence en 11 días', amount: 12000, daysLeft: 11, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+        { id: '5', icon: '🏠', title: 'Alquiler', cat: 'Vivienda', dueText: 'Vence en 14 días', amount: 650000, daysLeft: 14, color: 'text-emerald-500', bg: 'bg-emerald-500/10' }
+      ];
+    }
+
+    return [];
+  }, [vencimientos, isDemoMode]);
 
   // Distribución de gastos (Pie Data)
   const categoryPieData = useMemo(() => {
@@ -382,16 +434,19 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       });
     }
 
-    // Default mock distribution matching screenshot exactly
-    return [
-      { name: 'Alimentación', value: 198720, pct: 32, color: '#3B82F6' },
-      { name: 'Vivienda', value: 149040, pct: 24, color: '#EC4899' },
-      { name: 'Transporte', value: 93150, pct: 15, color: '#8B5CF6' },
-      { name: 'Salud', value: 55890, pct: 9, color: '#10B981' },
-      { name: 'Ocio', value: 49680, pct: 8, color: '#F59E0B' },
-      { name: 'Otros', value: 74520, pct: 12, color: '#64748B' },
-    ];
-  }, [monthExpensesList, categoryColors]);
+    if (isDemoMode) {
+      return [
+        { name: 'Alimentación', value: 198720, pct: 32, color: '#3B82F6' },
+        { name: 'Vivienda', value: 149040, pct: 24, color: '#EC4899' },
+        { name: 'Transporte', value: 93150, pct: 15, color: '#8B5CF6' },
+        { name: 'Salud', value: 55890, pct: 9, color: '#10B981' },
+        { name: 'Ocio', value: 49680, pct: 8, color: '#F59E0B' },
+        { name: 'Otros', value: 74520, pct: 12, color: '#64748B' },
+      ];
+    }
+
+    return [];
+  }, [monthExpensesList, categoryColors, isDemoMode]);
 
   // Últimos movimientos (con fallback para que coincida con el mockup)
   const recentMovements = useMemo(() => {
@@ -400,8 +455,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       .slice(0, 4)
       .map(t => ({
         id: t.id,
-        title: t.descripcion || t.categoria || 'Gasto',
-        subtitle: `Hoy · ${t.categoria || 'Varios'}`,
+        title: t.descripcion || t.concepto || t.categoria || 'Gasto',
+        subtitle: `${t.fecha || 'Hoy'} · ${t.categoria || 'Varios'}`,
         amount: t.monto || 0,
         emoji: t.emoji || (t.categoria === 'Alimentación' ? '🛒' : t.categoria === 'Transporte' ? '🚗' : t.categoria === 'Salud' ? '💊' : '☕')
       }));
@@ -410,13 +465,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       return list;
     }
 
-    return [
-      { id: 'm1', title: 'Supermercado', subtitle: 'Hoy · Alimentación', amount: 32500, emoji: '🛒' },
-      { id: 'm2', title: 'Café', subtitle: 'Hoy · Gastronomía', amount: 4500, emoji: '☕' },
-      { id: 'm3', title: 'Uber', subtitle: 'Ayer · Transporte', amount: 6800, emoji: '🚗' },
-      { id: 'm4', title: 'Farmacia', subtitle: 'Ayer · Salud', amount: 12300, emoji: '💊' },
-    ];
-  }, [transactions]);
+    if (isDemoMode) {
+      return [
+        { id: 'm1', title: 'Supermercado', subtitle: 'Hoy · Alimentación', amount: 32500, emoji: '🛒' },
+        { id: 'm2', title: 'Café', subtitle: 'Hoy · Gastronomía', amount: 4500, emoji: '☕' },
+        { id: 'm3', title: 'Uber', subtitle: 'Ayer · Transporte', amount: 6800, emoji: '🚗' },
+        { id: 'm4', title: 'Farmacia', subtitle: 'Ayer · Salud', amount: 12300, emoji: '💊' },
+      ];
+    }
+
+    return [];
+  }, [transactions, isDemoMode]);
 
   // Math para el Ring del Hero Card (Diámetro ~110px)
   const ringRadius = 42;
@@ -615,10 +674,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
 
             <p className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-2 tabular-nums">
-              {isBalanceHidden ? "$ •••••" : `$ ${(dailyBudgetRemaining > 0 ? dailyBudgetRemaining : 97509).toLocaleString('es-AR')}`}
+              {isBalanceHidden ? "$ •••••" : `$ ${dailyBudgetRemaining.toLocaleString('es-AR')}`}
             </p>
             <p className="text-xs text-purple-200/80 font-medium mt-0.5">
-              de {isBalanceHidden ? '$ •••••' : `$ ${(dailyLimit || 26000).toLocaleString('es-AR')}`}
+              {dailyLimit > 0
+                ? `de ${isBalanceHidden ? '$ •••••' : `$ ${dailyLimit.toLocaleString('es-AR')}`}`
+                : (isDemoMode ? 'de $ 26.000' : 'Sin límite establecido')}
             </p>
           </div>
 
@@ -648,19 +709,25 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
 
             <p className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-2 tabular-nums">
-              {isBalanceHidden ? "$ •••••" : `$ ${(last7DaysStats.avg7Days || 3650).toLocaleString('es-AR')}`}
+              {isBalanceHidden ? "$ •••••" : `$ ${last7DaysStats.avg7Days.toLocaleString('es-AR')}`}
             </p>
             <p className="text-xs text-purple-200/80 font-medium mt-0.5">
-              en los últimos 7 días
+              {last7DaysStats.avg7Days > 0 ? 'en los últimos 7 días' : 'Sin gastos en los últimos 7 días'}
             </p>
           </div>
 
           <div>
             <div className="my-3 h-2" />
-            <p className="text-xs font-bold text-emerald-400 flex items-center gap-1">
-              <span>↓</span>
-              <span>{Math.abs(last7DaysStats.diffPct || 78)}% vs sem. ant.</span>
-            </p>
+            {last7DaysStats.avg7Days > 0 ? (
+              <p className="text-xs font-bold text-emerald-400 flex items-center gap-1">
+                <span>↓</span>
+                <span>{Math.abs(last7DaysStats.diffPct)}% vs sem. ant.</span>
+              </p>
+            ) : (
+              <p className="text-xs font-medium text-purple-200/70">
+                Al día sin gastos
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -906,30 +973,45 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
 
             <div className="divide-y divide-slate-50 dark:divide-purple-900/20">
-              {upcomingBills.map(bill => (
-                <div
-                  key={bill.id}
-                  onClick={() => onNavigateTab ? onNavigateTab('card_alerts') : {}}
-                  className="py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-purple-950/20 rounded-xl px-1.5 transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`w-8 h-8 rounded-xl ${bill.bg} flex items-center justify-center text-sm flex-shrink-0`}>
-                      {bill.icon}
+              {upcomingBills.length > 0 ? (
+                upcomingBills.map(bill => (
+                  <div
+                    key={bill.id}
+                    onClick={() => onNavigateTab ? onNavigateTab('card_alerts') : {}}
+                    className="py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-purple-950/20 rounded-xl px-1.5 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`w-8 h-8 rounded-xl ${bill.bg} flex items-center justify-center text-sm flex-shrink-0`}>
+                        {bill.icon}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{bill.title}</p>
+                        <p className={`text-[10px] font-semibold ${bill.color}`}>{bill.dueText}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{bill.title}</p>
-                      <p className={`text-[10px] font-semibold ${bill.color}`}>{bill.dueText}</p>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-xs font-black text-slate-900 dark:text-white tabular-nums">
-                      ${bill.amount.toLocaleString('es-AR')}
-                    </span>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-xs font-black text-slate-900 dark:text-white tabular-nums">
+                        ${bill.amount.toLocaleString('es-AR')}
+                      </span>
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                    </div>
                   </div>
+                ))
+              ) : (
+                <div className="py-6 text-center">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">No tenés vencimientos pendientes</p>
+                  {onNavigateTab && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigateTab('card_alerts')}
+                      className="text-xs font-bold text-[#7928CA] dark:text-purple-300 hover:underline cursor-pointer"
+                    >
+                      + Agregar vencimiento
+                    </button>
+                  )}
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
@@ -959,51 +1041,64 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <div className="bg-white dark:bg-[#181332] rounded-2xl p-4 border border-slate-100 dark:border-purple-900/40 shadow-xs">
             <h3 className="text-xs font-bold text-slate-800 dark:text-white mb-3">Distribución de gastos</h3>
 
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              {/* Donut chart */}
-              <div className="relative w-36 h-36 flex-shrink-0 flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categoryPieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={36}
-                      outerRadius={56}
-                      dataKey="value"
-                      strokeWidth={2}
-                      stroke={isDarkMode ? '#181332' : '#ffffff'}
-                    >
-                      {categoryPieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
+            {categoryPieData.length > 0 ? (
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                {/* Donut chart */}
+                <div className="relative w-36 h-36 flex-shrink-0 flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={categoryPieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={36}
+                        outerRadius={56}
+                        dataKey="value"
+                        strokeWidth={2}
+                        stroke={isDarkMode ? '#181332' : '#ffffff'}
+                      >
+                        {categoryPieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
 
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-                  <span className="text-xs font-black text-slate-900 dark:text-white leading-tight">
-                    {isBalanceHidden ? '$ •••' : ars(totalExpenses)}
-                  </span>
-                  <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">Gastados</span>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                    <span className="text-xs font-black text-slate-900 dark:text-white leading-tight">
+                      {isBalanceHidden ? '$ •••' : ars(totalExpenses)}
+                    </span>
+                    <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">Gastados</span>
+                  </div>
+                </div>
+
+                {/* Legend with percentages */}
+                <div className="flex-1 grid grid-cols-2 gap-x-2 gap-y-1.5 text-[11px] w-full">
+                  {categoryPieData.map((item) => (
+                    <div key={item.name} className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                        <span className="text-slate-600 dark:text-slate-300 truncate font-medium">{item.name}</span>
+                      </div>
+                      <span className="font-bold text-slate-900 dark:text-white tabular-nums flex-shrink-0">
+                        {item.pct}%
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
-
-              {/* Legend with percentages */}
-              <div className="flex-1 grid grid-cols-2 gap-x-2 gap-y-1.5 text-[11px] w-full">
-                {categoryPieData.map((item) => (
-                  <div key={item.name} className="flex items-center justify-between gap-1">
-                    <div className="flex items-center gap-1.5 truncate">
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                      <span className="text-slate-600 dark:text-slate-300 truncate font-medium">{item.name}</span>
-                    </div>
-                    <span className="font-bold text-slate-900 dark:text-white tabular-nums flex-shrink-0">
-                      {item.pct}%
-                    </span>
-                  </div>
-                ))}
+            ) : (
+              <div className="py-8 text-center">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Sin gastos registrados en este período</p>
+                <button
+                  type="button"
+                  onClick={() => onOpenTransactionModal('gasto')}
+                  className="text-xs font-bold text-[#7928CA] dark:text-purple-300 hover:underline cursor-pointer"
+                >
+                  + Registrar primer gasto
+                </button>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Card: Últimos movimientos */}
@@ -1025,30 +1120,43 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
 
             <div className="divide-y divide-slate-50 dark:divide-purple-900/20">
-              {recentMovements.map((tx) => (
-                <div
-                  key={tx.id}
-                  onClick={() => onNavigateTab ? onNavigateTab('transactions') : {}}
-                  className="py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-purple-950/20 rounded-xl px-1.5 transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center text-sm flex-shrink-0">
-                      {tx.emoji}
+              {recentMovements.length > 0 ? (
+                recentMovements.map((tx) => (
+                  <div
+                    key={tx.id}
+                    onClick={() => onNavigateTab ? onNavigateTab('transactions') : {}}
+                    className="py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-purple-950/20 rounded-xl px-1.5 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center text-sm flex-shrink-0">
+                        {tx.emoji}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{tx.title}</p>
+                        <p className="text-[10px] text-slate-400 font-medium">{tx.subtitle}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{tx.title}</p>
-                      <p className="text-[10px] text-slate-400 font-medium">{tx.subtitle}</p>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-xs font-black text-rose-500 dark:text-rose-400 tabular-nums">
-                      - ${tx.amount.toLocaleString('es-AR')}
-                    </span>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-xs font-black text-rose-500 dark:text-rose-400 tabular-nums">
+                        - ${tx.amount.toLocaleString('es-AR')}
+                      </span>
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                    </div>
                   </div>
+                ))
+              ) : (
+                <div className="py-8 text-center">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">No registraste movimientos aún</p>
+                  <button
+                    type="button"
+                    onClick={() => onOpenTransactionModal('gasto')}
+                    className="text-xs font-bold text-[#F95420] hover:underline cursor-pointer"
+                  >
+                    + Cargar primer gasto
+                  </button>
                 </div>
-              ))}
+              )}
             </div>
           </div>
 

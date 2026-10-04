@@ -9,11 +9,13 @@ import {
   HelpCircle,
   Mic
 } from 'lucide-react';
-import { CoupleProfile, ExpenseMode } from '../types';
+import { CoupleProfile, ExpenseMode, UserAccount } from '../types';
 import { GastoArBrand } from './GastoArLogo';
+import { auth } from '../lib/firebase';
 
 interface HeaderProps {
   profile?: CoupleProfile;
+  userAccount?: UserAccount | null;
   activeMode?: ExpenseMode;
   onModeChange?: (mode: ExpenseMode) => void;
   onOpenTransactionModal?: (initialType?: 'gasto' | 'ingreso') => void;
@@ -32,6 +34,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   profile,
+  userAccount,
   activeMode = 'all',
   onModeChange,
   onOpenTransactionModal,
@@ -50,7 +53,30 @@ export const Header: React.FC<HeaderProps> = ({
   const addMenuRef = useRef<HTMLDivElement>(null);
 
   const isUser1 = profile?.currentUser === 'user1';
-  const currentUserName = profile ? (isUser1 ? profile.user1Name : profile.user2Name) : 'Usuario';
+  const profileName = profile ? (isUser1 ? profile.user1Name : profile.user2Name) : '';
+
+  const currentUserName = React.useMemo(() => {
+    if (isDemoMode) {
+      return (profileName && profileName !== 'Mi Usuario') ? profileName : 'Sol Esteche';
+    }
+    if (userAccount?.name && userAccount.name.trim() && userAccount.name !== 'Mi Usuario') {
+      return userAccount.name.trim();
+    }
+    if (auth.currentUser?.displayName && auth.currentUser.displayName.trim() && auth.currentUser.displayName !== 'Mi Usuario') {
+      return auth.currentUser.displayName.trim();
+    }
+    if (profileName && profileName.trim() && profileName !== 'Mi Usuario' && profileName !== 'Sol') {
+      return profileName.trim();
+    }
+    const email = userAccount?.email || auth.currentUser?.email;
+    if (email) {
+      const prefix = email.split('@')[0].replace(/[._-]/g, ' ').trim();
+      if (prefix) {
+        return prefix.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      }
+    }
+    return profileName || 'Usuario';
+  }, [isDemoMode, userAccount, profileName]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -189,7 +215,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
 
           {/* Quick Action Buttons for Gasto & Ingreso */}
-          <div className="hidden md:flex items-center gap-2">
+          <div id="tour-add-expense-desktop" data-tour="tour-add-expense" className="hidden md:flex items-center gap-2">
             <button
               type="button"
               onClick={handleOpenGasto}
@@ -215,6 +241,8 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="relative md:hidden" ref={addMenuRef}>
               <div className="flex items-center">
                 <button
+                  id="tour-add-expense"
+                  data-tour="tour-add-expense"
                   type="button"
                   onClick={() => setShowAddMenu(prev => !prev)}
                   title="Registrar Gasto o Ingreso"

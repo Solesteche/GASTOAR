@@ -18,7 +18,8 @@ import {
   Crown,
   X,
   Copy,
-  Calendar
+  Calendar,
+  Compass
 } from 'lucide-react';
 import { CoupleProfile, UserAccount, UserSubscription } from '../../types';
 
@@ -33,6 +34,7 @@ interface ProfileScreenProps {
   onOpenCloudSync?: () => void;
   onLogout: () => void;
   onShowToast?: (msg: string, type: 'success' | 'error' | 'info') => void;
+  onRestartTour?: () => void;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -45,7 +47,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onNavigateToTab,
   onOpenCloudSync,
   onLogout,
-  onShowToast
+  onShowToast,
+  onRestartTour
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [userName, setUserName] = useState(userAccount?.name || profile.user1Name || 'Usuario');
@@ -324,6 +327,33 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </span>
               </div>
               <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-teal-500 transition-colors" />
+            </button>
+          )}
+
+          {/* 5.5 Repetir Tour de Bienvenida */}
+          {onRestartTour && (
+            <button
+              type="button"
+              onClick={() => {
+                if (onClose) onClose();
+                onRestartTour();
+              }}
+              className="w-full p-3 rounded-2xl hover:bg-purple-50/70 flex items-center justify-between text-left transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Compass className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">
+                    Repetir tour de bienvenida
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    Guía paso a paso interactiva
+                  </span>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-purple-600 transition-colors" />
             </button>
           )}
 
