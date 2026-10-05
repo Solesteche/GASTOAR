@@ -58,6 +58,9 @@ import {
   AuthLandingPage 
 } from './components/AuthLandingPage';
 import { 
+  AdminAuthModal 
+} from './components/AdminAuthModal';
+import { 
   DashboardOverview 
 } from './components/DashboardOverview';
 import { 
@@ -707,6 +710,7 @@ export default function App() {
 
   // UI States
   const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'installments' | 'card_alerts' | 'couple_balance' | 'budgets' | 'categories' | 'ai' | 'settlement' | 'goals' | 'subscriptions' | 'admin_subscriptions' | 'charts' | 'profile' | 'settings' | 'cashflow' | 'currency'>('dashboard');
+  const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState<boolean>(false);
 
   // Sync route path with activeTab if user accesses specific route
   useEffect(() => {
@@ -719,14 +723,19 @@ export default function App() {
     else if (raw === 'categories' || raw === 'categorias') setActiveTab('categories');
     else if (raw === 'goals' || raw === 'metas') setActiveTab('goals');
     else if (raw === 'subscriptions' || raw === 'suscripciones') setActiveTab('subscriptions');
-    else if (raw === 'admin_subscriptions' || raw === 'admin') setActiveTab('admin_subscriptions');
+    else if (raw === 'admin_subscriptions' || raw === 'admin') {
+      if (!isAdmin) {
+        setIsAdminAuthModalOpen(true);
+      }
+      setActiveTab('admin_subscriptions');
+    }
     else if (raw === 'transactions' || raw === 'gastos') setActiveTab('transactions');
     else if (raw === 'cashflow' || raw === 'flujocaja' || raw === 'flujo') setActiveTab('cashflow');
     else if (raw === 'currency' || raw === 'dolar' || raw === 'divisas') setActiveTab('currency');
     else if (raw === 'profile' || raw === 'perfil') setActiveTab('profile');
     else if (raw === 'settings' || raw === 'configuracion' || raw === 'ajustes') setActiveTab('settings');
     else if (raw === 'dashboard') setActiveTab('dashboard');
-  }, [location.pathname]);
+  }, [location.pathname, isAdmin]);
   const [activeMode, setActiveMode] = useState<ExpenseMode>(() => {
     const saved = localStorage.getItem('gastoar_active_mode');
     if (saved === 'individual' || saved === 'pareja') return saved;
@@ -2329,8 +2338,7 @@ export default function App() {
                     navigate('/', { replace: true });
                   }}
                   onOpenAdminPanel={() => {
-                    handleOpenAdminPanel();
-                    navigate('/admin', { replace: true });
+                    setIsAdminAuthModalOpen(true);
                   }}
                 />
               </>
@@ -2349,7 +2357,7 @@ export default function App() {
                   subscription={activeUserSub}
                   onSelectPlanPayment={handleSelectPlanPayment}
                   onLogout={handleLogout}
-                  onOpenAdminPanel={handleOpenAdminPanel}
+                  onOpenAdminPanel={() => setIsAdminAuthModalOpen(true)}
                 />
               ) : (
                 <div className={`min-h-screen flex flex-col md:flex-row antialiased selection:bg-purple-100 selection:text-purple-900 transition-colors duration-300 ${isDarkMode ? 'dark bg-[#0a0314] text-purple-50' : 'bg-slate-50 text-slate-800'}`}>
@@ -2381,6 +2389,7 @@ export default function App() {
         onExitDemo={handleExitDemo}
         isDarkMode={isDarkMode}
         urgentVencimientosCount={urgentCount}
+        onOpenAdminAuth={() => setIsAdminAuthModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -2717,7 +2726,15 @@ export default function App() {
                   showToast('Perfil actualizado con éxito', 'success');
                 }}
                 onUpdateAccount={handleUpdateAccount}
-                onNavigateToTab={(tab) => setActiveTab(tab as any)}
+                onNavigateToTab={(tab) => {
+                  if (tab === 'admin' || tab === 'admin_subscriptions') {
+                    if (!isAdmin) {
+                      setIsAdminAuthModalOpen(true);
+                      return;
+                    }
+                  }
+                  setActiveTab(tab as any);
+                }}
                 onOpenCloudSync={() => setIsCloudSyncModalOpen(true)}
                 onLogout={handleLogout}
                 onShowToast={showToast}
@@ -3043,6 +3060,17 @@ export default function App() {
           }
         />
       </Routes>
+
+      {/* Global Admin Auth Modal */}
+      <AdminAuthModal
+        isOpen={isAdminAuthModalOpen}
+        onClose={() => setIsAdminAuthModalOpen(false)}
+        onSuccess={() => {
+          setIsAdminAuthModalOpen(false);
+          handleOpenAdminPanel();
+          navigate('/admin', { replace: true });
+        }}
+      />
     </>
   );
 }

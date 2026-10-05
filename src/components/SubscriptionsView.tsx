@@ -264,13 +264,26 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({
         onClose={() => setIsMpModalOpen(false)}
         plan={selectedPlanForPayment}
         billingCycle={billingCycle}
-        userEmail={userAccount?.email || 'estechesol@gmail.com'}
+        userEmail={userAccount?.email || 'usuario@gastoar.com'}
         userName={userAccount?.name || profile.user1Name}
         accountCode={profile.accountCode}
         onPaymentSuccess={(details) => {
           onSelectPlanPayment(selectedPlanForPayment!, billingCycle);
         }}
       />
+
+      {onOpenAdminPanel && (
+        <div className="flex justify-center pt-2 pb-6">
+          <button
+            type="button"
+            onClick={onOpenAdminPanel}
+            className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border border-slate-200 shadow-xs"
+          >
+            <ShieldCheck className="w-4 h-4 text-amber-500" />
+            <span>Acceso al Panel de Administración de Clientes</span>
+          </button>
+        </div>
+      )}
 
     </div>
   );

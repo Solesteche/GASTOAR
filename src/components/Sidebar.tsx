@@ -56,6 +56,7 @@ interface SidebarProps {
   onExitDemo?: () => void;
   isDarkMode?: boolean;
   urgentVencimientosCount?: number;
+  onOpenAdminAuth?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -84,6 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onExitDemo,
   isDarkMode = false,
   urgentVencimientosCount = 0,
+  onOpenAdminAuth,
 }) => {
   const isUser1 = profile.currentUser === 'user1';
   const currentUserName = isUser1 ? profile.user1Name : profile.user2Name;
@@ -115,9 +117,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'subscriptions', label: 'Suscripción PRO', icon: BadgePercent, badge: 'PRO' },
   ];
 
-  const adminItem = { id: 'admin_subscriptions', label: 'Panel Admin Clientes', icon: ShieldCheck, badge: 'Admin' };
+  const adminItem = isAdmin 
+    ? { id: 'admin_subscriptions', label: 'Panel Admin Clientes', icon: ShieldCheck, badge: 'Admin' }
+    : (onOpenAdminAuth ? { id: 'admin_auth', label: 'Acceso Administrador', icon: ShieldCheck, badge: 'Admin' } : null);
 
-  const navItems = isAdmin ? [...baseNavItems, adminItem] : baseNavItems;
+  const navItems = adminItem ? [...baseNavItems, adminItem] : baseNavItems;
 
   return (
     <>
@@ -274,12 +278,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
               const isActive = activeTab === item.id;
               const isAiButton = item.id === 'ai';
               const isCardAlertsButton = item.id === 'card_alerts';
+              const isAdminAuthButton = item.id === 'admin_auth';
 
               return (
                 <button
                   key={item.id}
                   onClick={() => {
-                    if (isAiButton) {
+                    if (isAdminAuthButton && onOpenAdminAuth) {
+                      onOpenAdminAuth();
+                    } else if (isAiButton) {
                       onOpenAiModal();
                     } else {
                       onSelectTab(item.id);
@@ -351,6 +358,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
               <div className="flex items-center gap-1">
+                {onOpenAdminAuth && !isAdmin && (
+                  <button
+                    type="button"
+                    onClick={onOpenAdminAuth}
+                    className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                    title="Acceso al Panel de Administración"
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                  </button>
+                )}
                 {onOpenLogoDownload && isPinned && (
                   <button
                     type="button"

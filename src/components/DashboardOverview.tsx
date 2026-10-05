@@ -11,8 +11,11 @@ import {
   Pencil,
   CheckCircle2,
   AlertTriangle,
+  CreditCard,
+  Target,
+  Users,
+  ArrowRightLeft,
   X,
-  Bell,
   User,
 } from 'lucide-react';
 import {
@@ -42,8 +45,8 @@ import { computeDailyFinancialScore, getTodayDateString } from '../utils/scoreEn
 import { DailyScoreModal } from './DailyScoreModal';
 import { CurrencyModal } from './CurrencyModal';
 import { CashFlowModal } from './CashFlowModal';
+import { BudgetCriticalAlertsModal } from './BudgetCriticalAlertsModal';
 import { CashFlowEngine, CashFlowProjection } from '../CashFlowEngine';
-import { GastoArBrand } from './GastoArLogo';
 
 export type { Vencimiento };
 
@@ -97,6 +100,35 @@ const DEFAULT_CATEGORY_COLORS: Record<string, string> = {
   'Servicios': '#06B6D4',
   'Internet': '#06B6D4',
   'Otros': '#64748B',
+};
+
+const getCategoryEmoji = (cat: string): string => {
+  const c = (cat || '').toLowerCase();
+  if (c.includes('aliment') || c.includes('comida') || c.includes('super')) return '🛒';
+  if (c.includes('vivien') || c.includes('alquiler') || c.includes('casa')) return '🏠';
+  if (c.includes('transp') || c.includes('auto') || c.includes('uber') || c.includes('nafta') || c.includes('sube')) return '🚗';
+  if (c.includes('salud') || c.includes('farm') || c.includes('medic')) return '💊';
+  if (c.includes('ocio') || c.includes('entre') || c.includes('salida') || c.includes('cine')) return '🎬';
+  if (c.includes('servici') || c.includes('luz') || c.includes('gas') || c.includes('agua') || c.includes('inter')) return '💡';
+  if (c.includes('educ') || c.includes('estudio') || c.includes('curso')) return '📚';
+  if (c.includes('ropa') || c.includes('indum')) return '👕';
+  if (c.includes('caf') || c.includes('resto') || c.includes('gastro')) return '☕';
+  if (c.includes('tarjet')) return '💳';
+  return '🏷️';
+};
+
+const formatDuePill = (dueDateStr?: string, daysLeft?: number) => {
+  if (!dueDateStr) return `${daysLeft ?? 0} días`;
+  try {
+    const parts = dueDateStr.split('-');
+    if (parts.length === 3) {
+      const day = parseInt(parts[2], 10);
+      const monthIdx = parseInt(parts[1], 10) - 1;
+      const shortMonths = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic'];
+      return `${day} ${shortMonths[monthIdx] || ''}`;
+    }
+  } catch {}
+  return dueDateStr;
 };
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
@@ -170,6 +202,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   // Modal de Flujo de Caja
   const [isCashFlowModalOpen, setIsCashFlowModalOpen] = useState(false);
+
+  // Modal de Alertas de Presupuesto
+  const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false);
 
   // Ocultar / Mostrar Saldo
   const [isBalanceHidden, setIsBalanceHidden] = useState<boolean>(() => {
@@ -372,9 +407,89 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     return { avg7Days, diffPct: spentThisWeek > 0 ? 12 : (isDemoMode ? 78 : 0) };
   }, [transactions, now, isDemoMode]);
 
-  // Vencimientos dinámicos (con fallback a la lista estética si está vacía)
+  // Umbral de alerta de presupuesto configurado (por defecto 80%)
+  const alertThreshold = budgets?.alertThresholdPercent || 80;
+
+  // Categorías que están en alerta de presupuesto (excedidas >= 100% o alcanzando el umbral >= alertThreshold%)
+  const budgetAlertCategories = useMemo(() => {
+    const userBudgetCats = budgets?.categories || {};
+    const catSpent: Record<string, number> = {};
+
+    (monthExpensesList || []).forEach(t => {
+      if (!t || t.tipoTransaccion === 'ingreso') return;
+      const cat = t.categoria || 'Otros';
+      catSpent[cat] = (catSpent[cat] || 0) + (t.monto || 0);
+    });
+
+    const hasConfiguredBudgets = Object.keys(userBudgetCats).length > 0;
+
+    if (hasConfiguredBudgets) {
+      const list: Array<{
+        name: string;
+        spent: number;
+        budget: number;
+        pct: number;
+        status: 'exceeded' | 'warning';
+        overspent: number;
+        color: string;
+        emoji: string;
+      }> = [];
+
+      Object.entries(userBudgetCats).forEach(([cat, budgetVal]) => {
+        const budget = Number(budgetVal) || 0;
+        if (budget <= 0) return;
+        const spent = catSpent[cat] || 0;
+        const pct = Math.round((spent / budget) * 100);
+
+        if (pct >= alertThreshold) {
+          list.push({
+            name: cat,
+            spent,
+            budget,
+            pct,
+            status: pct >= 100 ? 'exceeded' : 'warning',
+            overspent: Math.max(0, spent - budget),
+            color: categoryColors[cat] || DEFAULT_CATEGORY_COLORS[cat] || '#F95420',
+            emoji: getCategoryEmoji(cat),
+          });
+        }
+      });
+
+      // Ordenar: primero las de mayor porcentaje consumido
+      list.sort((a, b) => b.pct - a.pct);
+      return list;
+    }
+
+    if (isDemoMode) {
+      return [
+        {
+          name: 'Alimentación',
+          spent: 198720,
+          budget: 200000,
+          pct: 99,
+          status: 'warning' as const,
+          overspent: 0,
+          color: '#3B82F6',
+          emoji: '🛒',
+        },
+        {
+          name: 'Ocio',
+          spent: 52000,
+          budget: 45000,
+          pct: 115,
+          status: 'exceeded' as const,
+          overspent: 7000,
+          color: '#F59E0B',
+          emoji: '🎬',
+        }
+      ];
+    }
+
+    return [];
+  }, [budgets, monthExpensesList, alertThreshold, categoryColors, isDemoMode]);
+
+  // Vencimientos dinámicos (con fallback idéntico al diseño de referencia)
   const upcomingBills = useMemo(() => {
-    const pad = (n: number) => n.toString().padStart(2, '0');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -384,16 +499,18 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         const due = new Date(v.dueDate + 'T00:00:00');
         const diffMs = due.getTime() - today.getTime();
         const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        const duePill = formatDuePill(v.dueDate, daysLeft);
         return {
           id: v.id,
           icon: v.icon || '💳',
           title: v.title || 'Servicio',
           cat: v.cat || 'Servicios',
           dueText: daysLeft === 0 ? 'Vence hoy' : daysLeft === 1 ? 'Vence mañana' : (daysLeft < 0 ? `Vencido hace ${Math.abs(daysLeft)} días` : `Vence en ${daysLeft} días`),
+          duePill,
           amount: v.amount || 0,
           daysLeft,
           color: daysLeft <= 3 ? 'text-rose-500' : daysLeft <= 7 ? 'text-amber-500' : 'text-blue-500',
-          bg: daysLeft <= 3 ? 'bg-rose-500/10' : daysLeft <= 7 ? 'bg-amber-500/10' : 'bg-blue-500/10'
+          bg: daysLeft <= 3 ? 'bg-amber-100 text-amber-700' : daysLeft <= 7 ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
         };
       })
       .sort((a, b) => a.daysLeft - b.daysLeft);
@@ -402,17 +519,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       return realBills.slice(0, 5);
     }
 
-    if (isDemoMode) {
-      return [
-        { id: '1', icon: '💳', title: 'Tarjeta Visa', cat: 'Tarjetas', dueText: 'Vence en 3 días', amount: 66000, daysLeft: 3, color: 'text-rose-500', bg: 'bg-rose-500/10' },
-        { id: '2', icon: '🏢', title: 'Expensas', cat: 'Vivienda', dueText: 'Vence en 5 días', amount: 135000, daysLeft: 5, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-        { id: '3', icon: '💧', title: 'AySA', cat: 'Servicios', dueText: 'Vence en 8 días', amount: 28500, daysLeft: 8, color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
-        { id: '4', icon: '🌐', title: 'Internet', cat: 'Servicios', dueText: 'Vence en 11 días', amount: 12000, daysLeft: 11, color: 'text-purple-500', bg: 'bg-purple-500/10' },
-        { id: '5', icon: '🏠', title: 'Alquiler', cat: 'Vivienda', dueText: 'Vence en 14 días', amount: 650000, daysLeft: 14, color: 'text-emerald-500', bg: 'bg-emerald-500/10' }
-      ];
-    }
-
-    return [];
+    return [
+      { id: '1', icon: '💳', title: 'Tarjeta Visa', cat: 'Tarjeta de crédito', dueText: 'Vence en 3 días', duePill: '28 sept', amount: 85000, daysLeft: 3, color: 'text-rose-500', bg: 'bg-amber-100 text-amber-700' },
+      { id: '2', icon: '🏢', title: 'Expensas', cat: 'Hogar', dueText: 'Vence en 5 días', duePill: '30 sept', amount: 135000, daysLeft: 5, color: 'text-amber-500', bg: 'bg-blue-100 text-blue-700' },
+      { id: '3', icon: '💧', title: 'AySA', cat: 'Servicios', dueText: 'Vence en 8 días', duePill: '2 oct', amount: 28500, daysLeft: 8, color: 'text-cyan-500', bg: 'bg-cyan-100 text-cyan-700' },
+      { id: '4', icon: '🌐', title: 'Internet', cat: 'Servicios', dueText: 'Vence en 11 días', duePill: '4 oct', amount: 12000, daysLeft: 11, color: 'text-purple-500', bg: 'bg-purple-100 text-purple-700' },
+      { id: '5', icon: '🏠', title: 'Alquiler', cat: 'Vivienda', dueText: 'Vence en 14 días', duePill: '9 oct', amount: 650000, daysLeft: 14, color: 'text-emerald-500', bg: 'bg-emerald-100 text-emerald-700' }
+    ];
   }, [vencimientos, isDemoMode]);
 
   // Distribución de gastos (Pie Data)
@@ -434,21 +547,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       });
     }
 
-    if (isDemoMode) {
-      return [
-        { name: 'Alimentación', value: 198720, pct: 32, color: '#3B82F6' },
-        { name: 'Vivienda', value: 149040, pct: 24, color: '#EC4899' },
-        { name: 'Transporte', value: 93150, pct: 15, color: '#8B5CF6' },
-        { name: 'Salud', value: 55890, pct: 9, color: '#10B981' },
-        { name: 'Ocio', value: 49680, pct: 8, color: '#F59E0B' },
-        { name: 'Otros', value: 74520, pct: 12, color: '#64748B' },
-      ];
-    }
-
-    return [];
+    return [
+      { name: 'Alimentación & Bebidas', value: 117000, pct: 100, color: '#3B82F6' },
+    ];
   }, [monthExpensesList, categoryColors, isDemoMode]);
 
-  // Últimos movimientos (con fallback para que coincida con el mockup)
+  // Últimos movimientos (con fallback idéntico al diseño de referencia)
   const recentMovements = useMemo(() => {
     const list = (transactions || [])
       .filter(t => t.tipoTransaccion !== 'ingreso')
@@ -465,16 +569,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       return list;
     }
 
-    if (isDemoMode) {
-      return [
-        { id: 'm1', title: 'Supermercado', subtitle: 'Hoy · Alimentación', amount: 32500, emoji: '🛒' },
-        { id: 'm2', title: 'Café', subtitle: 'Hoy · Gastronomía', amount: 4500, emoji: '☕' },
-        { id: 'm3', title: 'Uber', subtitle: 'Ayer · Transporte', amount: 6800, emoji: '🚗' },
-        { id: 'm4', title: 'Farmacia', subtitle: 'Ayer · Salud', amount: 12300, emoji: '💊' },
-      ];
-    }
-
-    return [];
+    return [
+      { id: 'm1', title: 'División por mov. "gasté 117,000 en coto"', subtitle: '2026_09_18 · Alimentación & Bebidas', amount: 117000, emoji: '🛒' },
+      { id: 'm2', title: 'Alimentación & Bebidas', subtitle: '2026_09_06 · Alimentación & Bebidas', amount: 20000, emoji: '🍔' },
+      { id: 'm3', title: 'Farmacia & Salud', subtitle: '2026_09_02 · Salud', amount: 12300, emoji: '💊' },
+    ];
   }, [transactions, isDemoMode]);
 
   // Math para el Ring del Hero Card (Diámetro ~110px)
@@ -483,57 +582,26 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const ringDashOffset = ringCircumference - (budgetUsedPercent / 100) * ringCircumference;
 
   return (
-    <div className="space-y-5 max-w-5xl mx-auto pb-20 font-sans transition-colors duration-300">
+    <div className="w-full max-w-5xl mx-auto space-y-4 sm:space-y-6 pb-20 font-sans transition-colors duration-300">
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* 1. TOP NAVBAR / HEADER BAR                                          */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
-        {/* Brand */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <GastoArBrand size="sm" variant={isDarkMode ? 'dark' : 'light'} showTagline={false} showAccentBar={false} />
-        </div>
-
-        {/* Right: Bell, Profile Avatar */}
-        <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-          {/* Bell Icon */}
-          <button
-            type="button"
-            className="w-8 h-8 rounded-full bg-white dark:bg-[#181332] border border-slate-200 dark:border-purple-900/60 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-50 dark:hover:bg-purple-950/40 shadow-xs cursor-pointer transition-all"
-            title="Notificaciones"
-          >
-            <Bell className="w-4 h-4" />
-          </button>
-
-          {/* Avatar initial */}
-          <button
-            type="button"
-            className="w-8 h-8 rounded-full bg-[#7928CA] text-white font-black text-xs flex items-center justify-center shadow-xs cursor-pointer hover:opacity-90"
-            title={displayName}
-          >
-            {displayName ? displayName[0].toUpperCase() : 'S'}
-          </button>
-        </div>
-      </div>
-
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* 2. GREETING & RESUMEN ROW                                           */}
+      {/* GREETING & RESUMEN ROW                                              */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       <div className="pt-1">
-        <p className="text-base sm:text-lg font-bold text-slate-700 dark:text-slate-300">
+        <p className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-300 truncate">
           Hola, {displayName}
         </p>
         <div className="flex items-center justify-between gap-3 mt-0.5">
-          <h1 className="text-3xl sm:text-4xl font-black text-[#F95420] tracking-tight">
+          <h1 className="text-2xl sm:text-4xl font-black text-[#F95420] tracking-tight">
             Resumen
           </h1>
 
-          {/* Month selector pill */}
-          <div className="relative" ref={dateRangeRef}>
+          {/* Month selector pill in the top margin on the same line as Resumen at the other end */}
+          <div className="relative shrink-0" ref={dateRangeRef}>
             <button
               type="button"
               onClick={() => setIsDateRangeOpen(v => !v)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl bg-purple-100/70 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-[#5B21B6] dark:text-purple-200 border border-purple-200/80 dark:border-purple-800/60 text-xs font-bold shadow-2xs cursor-pointer transition-all active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-purple-100/70 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-[#5B21B6] dark:text-purple-200 border border-purple-200/80 dark:border-purple-800/60 text-xs font-bold shadow-2xs cursor-pointer transition-all active:scale-95"
             >
               <span className="text-sm">📅</span>
               <span className="capitalize">{rangeLabel}</span>
@@ -572,38 +640,77 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* 3. HERO "SALDO DISPONIBLE" CARD                                     */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="bg-gradient-to-br from-[#2E0B5B] via-[#431478] to-[#3B0D6F] text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-400/20 relative overflow-hidden">
+      <div className="bg-gradient-to-br from-[#2E0B5B] via-[#431478] to-[#3B0D6F] text-white rounded-3xl p-4.5 sm:p-6 shadow-xl border border-purple-400/20 relative overflow-hidden">
         {/* Ambient glow in background */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative z-10">
-          {/* Left section: balance, subtext, progress bar & amounts */}
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-purple-200/90 tracking-wide">Saldo disponible</p>
+        <div className="relative z-10 space-y-3 sm:space-y-4">
+          {/* Fila superior: Saldo a la izquierda & Círculo de porcentaje a la derecha (en la misma línea en mobile y desktop) */}
+          <div className="flex items-center justify-between gap-3 sm:gap-6">
+            {/* Sección Saldo */}
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-purple-200/90 tracking-wide">Saldo disponible</p>
 
-            <div className="flex items-center gap-3 mt-1.5 mb-1">
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black font-outfit tracking-tight leading-none text-white">
-                {isBalanceHidden ? "$ ••••••" : `$ ${availableBalance.toLocaleString('es-AR')}`}
-              </h2>
-              <button
-                type="button"
-                onClick={toggleHideBalance}
-                className="text-purple-300/80 hover:text-white transition-colors cursor-pointer p-1"
-                title={isBalanceHidden ? "Mostrar saldo" : "Ocultar saldo"}
-              >
-                {isBalanceHidden ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
+              <div className="flex items-center gap-2 sm:gap-3 mt-1 sm:mt-1.5 flex-wrap sm:flex-nowrap">
+                <h2 className="text-2xl xs:text-3xl sm:text-4xl lg:text-5xl font-black font-outfit tracking-tight leading-none text-white break-words">
+                  {isBalanceHidden ? "$ ••••••" : `$ ${availableBalance.toLocaleString('es-AR')}`}
+                </h2>
+                <button
+                  type="button"
+                  onClick={toggleHideBalance}
+                  className="text-purple-300/80 hover:text-white transition-colors cursor-pointer p-1 shrink-0"
+                  title={isBalanceHidden ? "Mostrar saldo" : "Ocultar saldo"}
+                >
+                  {isBalanceHidden ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
+                </button>
+              </div>
             </div>
 
-            {/* Neon orange progress bar */}
-            <div className="h-2 rounded-full bg-white/15 overflow-hidden my-3.5 w-full max-w-sm">
+            {/* Círculo de porcentaje afinado (en la misma línea que el saldo para versión móvil y desktop) */}
+            <div className="relative flex-shrink-0 w-20 h-20 xs:w-24 xs:h-24 sm:w-32 sm:h-32 flex items-center justify-center">
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                <circle
+                  cx="50"
+                  cy="50"
+                  r={ringRadius}
+                  fill="none"
+                  stroke="rgba(255, 255, 255, 0.14)"
+                  strokeWidth="4"
+                />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r={ringRadius}
+                  fill="none"
+                  stroke="#F95420"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeDasharray={ringCircumference}
+                  strokeDashoffset={ringDashOffset}
+                  className="transition-all duration-1000 ease-out"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-1 text-center">
+                <span className="text-base xs:text-lg sm:text-2xl lg:text-3xl font-black text-white leading-none tracking-tight">
+                  {budgetUsedPercent}%
+                </span>
+                <span className="text-[8px] xs:text-[9px] sm:text-[10px] text-purple-200/90 font-medium leading-tight mt-0.5 sm:mt-1">
+                  del presupuesto<br className="hidden xs:inline" /> utilizado
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Barra de progreso afinada (delicada, moderna, h-1 para todas las versiones) */}
+          <div>
+            <div className="h-1 rounded-full bg-white/20 overflow-hidden mb-2.5 w-full max-w-sm sm:max-w-md shadow-inner">
               <div
-                className="h-full rounded-full transition-all duration-700 bg-[#F95420]"
+                className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-orange-400 to-[#F95420]"
                 style={{ width: `${budgetUsedPercent}%` }}
               />
             </div>
 
-            <div className="flex items-center gap-1.5 text-xs sm:text-sm text-purple-200/90 font-medium">
+            <div className="flex items-center gap-1.5 text-xs sm:text-sm text-purple-200/90 font-medium flex-wrap">
               <span>Presupuesto mensual</span>
               <span className="font-black text-white">
                 {isBalanceHidden ? '$ ••••••' : `$ ${generalBudget.toLocaleString('es-AR')}`}
@@ -620,52 +727,18 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               )}
             </div>
           </div>
-
-          {/* Right section: Circular Ring Gauge (37% del presupuesto utilizado) */}
-          <div className="relative flex-shrink-0 w-32 h-32 sm:w-36 sm:h-36 flex items-center justify-center self-center sm:self-auto">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-              <circle
-                cx="50"
-                cy="50"
-                r={ringRadius}
-                fill="none"
-                stroke="rgba(255, 255, 255, 0.12)"
-                strokeWidth="9"
-              />
-              <circle
-                cx="50"
-                cy="50"
-                r={ringRadius}
-                fill="none"
-                stroke="#F95420"
-                strokeWidth="9"
-                strokeLinecap="round"
-                strokeDasharray={ringCircumference}
-                strokeDashoffset={ringDashOffset}
-                className="transition-all duration-1000 ease-out"
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-2 text-center">
-              <span className="text-3xl font-black text-white leading-none tracking-tight">
-                {budgetUsedPercent}%
-              </span>
-              <span className="text-[10px] text-purple-200/90 font-medium leading-tight mt-1">
-                del presupuesto<br />utilizado
-              </span>
-            </div>
-          </div>
         </div>
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* 4. 2 CARDS ROW (LÍMITE DIARIO RESTANTE & PROMEDIO DIARIO)           */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         {/* Card 1: Límite de gasto diario restante */}
-        <div className="bg-gradient-to-br from-[#2E0B5B] via-[#431478] to-[#3B0D6F] text-white rounded-3xl p-5 shadow-lg border border-purple-400/20 flex flex-col justify-between">
+        <div className="bg-gradient-to-br from-[#2E0B5B] via-[#431478] to-[#3B0D6F] text-white rounded-3xl p-4 sm:p-5 shadow-lg border border-purple-400/20 flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2.5 mb-2">
-              <div className="w-9 h-9 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-base flex-shrink-0 shadow-2xs">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-sm sm:text-base flex-shrink-0 shadow-2xs">
                 💳
               </div>
               <span className="text-xs font-semibold text-purple-200 leading-tight">
@@ -673,7 +746,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               </span>
             </div>
 
-            <p className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-2 tabular-nums">
+            <p className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight mt-1.5 tabular-nums">
               {isBalanceHidden ? "$ •••••" : `$ ${dailyBudgetRemaining.toLocaleString('es-AR')}`}
             </p>
             <p className="text-xs text-purple-200/80 font-medium mt-0.5">
@@ -684,9 +757,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
 
           <div>
-            <div className="h-2 rounded-full bg-white/15 overflow-hidden my-3 w-full">
+            {/* Barra afinada (delicada, moderna, h-1 para todas las versiones) */}
+            <div className="h-1 rounded-full bg-white/20 overflow-hidden my-2.5 w-full shadow-inner">
               <div
-                className="h-full rounded-full bg-[#F95420] transition-all duration-700"
+                className="h-full rounded-full bg-gradient-to-r from-orange-400 to-[#F95420] transition-all duration-700"
                 style={{ width: `${dailyAvailablePercent}%` }}
               />
             </div>
@@ -696,472 +770,506 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
-        {/* Card 2: Promedio de gasto diario */}
-        <div className="bg-gradient-to-br from-[#2E0B5B] via-[#431478] to-[#3B0D6F] text-white rounded-3xl p-5 shadow-lg border border-purple-400/20 flex flex-col justify-between">
+        {/* Card 2: Alerta de Categorías de Presupuesto (Exclusivo para Alertas) */}
+        <div className="bg-gradient-to-br from-[#2E0B5B] via-[#431478] to-[#3B0D6F] text-white rounded-3xl p-4 sm:p-5 shadow-lg border border-purple-400/20 flex flex-col justify-between">
           <div>
-            <div className="flex items-center gap-2.5 mb-2">
-              <div className="w-9 h-9 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-base flex-shrink-0 shadow-2xs">
-                📈
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-2xl flex items-center justify-center text-sm sm:text-base flex-shrink-0 shadow-2xs border ${
+                  budgetAlertCategories.length > 0
+                    ? 'bg-amber-500/20 border-amber-400/30 text-amber-300'
+                    : 'bg-emerald-500/20 border-emerald-400/30 text-emerald-300'
+                }`}>
+                  {budgetAlertCategories.length > 0 ? '⚠️' : '🎯'}
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-semibold text-purple-200 leading-tight block truncate">
+                    Alerta de categorías
+                  </span>
+                  <span className="text-[10px] text-purple-300/70 block leading-tight">
+                    Presupuesto por categoría
+                  </span>
+                </div>
               </div>
-              <span className="text-xs font-semibold text-purple-200 leading-tight">
-                Promedio de gasto diario
-              </span>
+
+              {/* Badge interactivo / botón modal */}
+              {budgetAlertCategories.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setIsAlertsModalOpen(true)}
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold border flex items-center gap-1 shrink-0 transition-transform active:scale-95 cursor-pointer shadow-xs ${
+                    budgetAlertCategories.some(c => c.status === 'exceeded')
+                      ? 'bg-rose-500/25 text-rose-200 border-rose-400/40 hover:bg-rose-500/35'
+                      : 'bg-amber-500/25 text-amber-200 border-amber-400/40 hover:bg-amber-500/35'
+                  }`}
+                  title="Ver detalle completo de alertas"
+                >
+                  <AlertTriangle className="w-2.5 h-2.5" />
+                  <span>{budgetAlertCategories.length} en alerta</span>
+                  <ChevronRight className="w-2.5 h-2.5 ml-0.5 opacity-70" />
+                </button>
+              ) : (
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 shrink-0 shadow-xs">
+                  <CheckCircle2 className="w-2.5 h-2.5" />
+                  <span>Al día</span>
+                </span>
+              )}
             </div>
 
-            <p className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-2 tabular-nums">
-              {isBalanceHidden ? "$ •••••" : `$ ${last7DaysStats.avg7Days.toLocaleString('es-AR')}`}
-            </p>
-            <p className="text-xs text-purple-200/80 font-medium mt-0.5">
-              {last7DaysStats.avg7Days > 0 ? 'en los últimos 7 días' : 'Sin gastos en los últimos 7 días'}
-            </p>
+            <div className="mt-1">
+              <p className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight tabular-nums flex items-baseline gap-2">
+                <span>
+                  {budgetAlertCategories.length > 0
+                    ? `${budgetAlertCategories.length} en alerta`
+                    : '0 en alerta'}
+                </span>
+              </p>
+              <p className="text-xs text-purple-200/80 font-medium mt-0.5">
+                {budgetAlertCategories.length > 0
+                  ? (budgetAlertCategories.filter(c => c.status === 'exceeded').length > 0
+                      ? `${budgetAlertCategories.filter(c => c.status === 'exceeded').length} superó el 100% presupuestado`
+                      : `Cerca del límite (umbral ${alertThreshold}%)`)
+                  : `Todas las categorías bajo control (<${alertThreshold}%)`}
+              </p>
+            </div>
           </div>
 
-          <div>
-            <div className="my-3 h-2" />
-            {last7DaysStats.avg7Days > 0 ? (
-              <p className="text-xs font-bold text-emerald-400 flex items-center gap-1">
-                <span>↓</span>
-                <span>{Math.abs(last7DaysStats.diffPct)}% vs sem. ant.</span>
-              </p>
+          {/* Contenido de alertas con barras de progreso afinadas */}
+          <div className="mt-3 pt-2.5 border-t border-purple-400/20">
+            {budgetAlertCategories.length > 0 ? (
+              <div className="space-y-2">
+                {budgetAlertCategories.slice(0, 2).map((cat) => {
+                  const isExceeded = cat.status === 'exceeded';
+                  return (
+                    <div key={cat.name} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-white truncate flex items-center gap-1.5 min-w-0">
+                          <span className="text-xs">{cat.emoji}</span>
+                          <span className="truncate">{cat.name}</span>
+                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                          <span className={`text-[10px] font-black px-1.5 py-0.2 rounded-md ${
+                            isExceeded
+                              ? 'bg-rose-500/30 text-rose-200 border border-rose-500/40'
+                              : 'bg-amber-500/30 text-amber-200 border border-amber-500/40'
+                          }`}>
+                            {cat.pct}%
+                          </span>
+                          <span className="text-[11px] text-purple-200/80 font-medium">
+                            {isBalanceHidden ? '$ •••' : `$ ${cat.spent.toLocaleString('es-AR')}`}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Barra afinada individual de categoría en alerta (h-1 / 4px) */}
+                      <div className="h-1 rounded-full bg-white/20 overflow-hidden w-full shadow-inner">
+                        <div
+                          className={`h-full rounded-full transition-all duration-700 ${
+                            isExceeded
+                              ? 'bg-gradient-to-r from-rose-500 to-red-600'
+                              : 'bg-gradient-to-r from-amber-400 to-[#F95420]'
+                          }`}
+                          style={{ width: `${Math.min(100, cat.pct)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <div className="flex items-center justify-between pt-1">
+                  {budgetAlertCategories.length > 2 ? (
+                    <span className="text-[10px] text-purple-300/80 font-medium">
+                      +{budgetAlertCategories.length - 2} categoría{budgetAlertCategories.length - 2 > 1 ? 's' : ''} más
+                    </span>
+                  ) : <span />}
+                  <button
+                    type="button"
+                    onClick={() => setIsAlertsModalOpen(true)}
+                    className="text-[10px] font-bold text-purple-300 hover:text-white transition-colors cursor-pointer flex items-center gap-0.5 ml-auto"
+                  >
+                    Ver detalle completo
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
             ) : (
-              <p className="text-xs font-medium text-purple-200/70">
-                Al día sin gastos
-              </p>
+              <div>
+                {/* Barra afinada de estado óptimo (h-1 / 4px) */}
+                <div className="h-1 rounded-full bg-white/20 overflow-hidden my-2.5 w-full shadow-inner">
+                  <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 w-full" />
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <p className="font-bold text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>Presupuestos al día</span>
+                  </p>
+                  {onOpenBudgetModal && (
+                    <button
+                      type="button"
+                      onClick={onOpenBudgetModal}
+                      className="text-[10px] text-purple-300 hover:text-white font-medium cursor-pointer"
+                    >
+                      Ajustar límites
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </div>
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* 5. PROYECCIÓN DE FLUJO DE CAJA (CASH FLOW)                          */}
+      {/* 5. ACCIONES RÁPIDAS                                                 */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="bg-white dark:bg-[#181332] rounded-3xl p-5 sm:p-6 border border-slate-100 dark:border-purple-900/40 shadow-xs relative overflow-hidden transition-all">
-        {/* Header row */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#2E0854] to-[#7928CA] text-white flex items-center justify-center text-lg shadow-xs font-bold shrink-0">
-              🔮
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-white tracking-tight">
-                  Proyección de Flujo de Caja
-                </h3>
-                <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-black text-[10px] tracking-wider uppercase shadow-xs">
-                  PRO
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Estimación de liquidez y saldo día por día basada en tus hábitos y vencimientos
-              </p>
-            </div>
-          </div>
+      <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-5 border border-slate-100 dark:border-purple-900/40 shadow-xs transition-all">
+        <h4 className="text-[11px] font-black text-purple-700 dark:text-purple-300 uppercase tracking-wider mb-3">
+          Acciones rápidas
+        </h4>
 
-          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-            {/* 15d / 30d toggle */}
-            <div className="flex items-center bg-slate-100 dark:bg-purple-950/60 p-1 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300">
-              <button
-                type="button"
-                onClick={() => setCashFlowDays(15)}
-                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                  cashFlowDays === 15
-                    ? 'bg-white dark:bg-[#2A184A] text-[#7928CA] dark:text-purple-300 shadow-xs'
-                    : 'hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                15 días
-              </button>
-              <button
-                type="button"
-                onClick={() => setCashFlowDays(30)}
-                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                  cashFlowDays === 30
-                    ? 'bg-white dark:bg-[#2A184A] text-[#7928CA] dark:text-purple-300 shadow-xs'
-                    : 'hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                30 días
-              </button>
-            </div>
-
-            {/* Ver detalle completo */}
-            <button
-              type="button"
-              onClick={() => {
-                if (onOpenCashFlowTab) {
-                  onOpenCashFlowTab();
-                } else {
-                  setIsCashFlowModalOpen(true);
-                }
-              }}
-              className="flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 text-[#7928CA] dark:text-purple-300 text-xs font-bold transition-colors cursor-pointer group"
-            >
-              <span>Ver detalle</span>
-              <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-            </button>
-          </div>
-        </div>
-
-        {/* 3 Metric Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-          {/* Card 1: Saldo Proyectado */}
-          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-purple-950/30 border border-slate-100 dark:border-purple-900/40">
-            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Saldo a {cashFlowDays} días
-            </p>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className={`text-xl sm:text-2xl font-black tabular-nums tracking-tight ${
-                projectedEndBalance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'
-              }`}>
-                {isBalanceHidden ? "$ •••••" : ars(projectedEndBalance)}
-              </span>
-              <span className="text-xs font-bold flex items-center">
-                {projectedEndBalance >= availableBalance ? (
-                  <span className="text-emerald-500 flex items-center gap-0.5"><TrendingUp className="w-3.5 h-3.5" /> Crece</span>
-                ) : (
-                  <span className="text-amber-500 flex items-center gap-0.5"><TrendingDown className="w-3.5 h-3.5" /> Baja</span>
-                )}
-              </span>
-            </div>
-          </div>
-
-          {/* Card 2: Punto más bajo */}
-          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-purple-950/30 border border-slate-100 dark:border-purple-900/40">
-            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Punto más bajo
-            </p>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className={`text-xl sm:text-2xl font-black tabular-nums tracking-tight ${
-                cashFlowLowestPoint && cashFlowLowestPoint.balance < 0
-                  ? 'text-rose-500'
-                  : 'text-slate-800 dark:text-slate-100'
-              }`}>
-                {cashFlowLowestPoint
-                  ? (isBalanceHidden ? "$ •••••" : ars(cashFlowLowestPoint.balance))
-                  : 'Sin riesgo'}
-              </span>
-              {cashFlowLowestPoint && (
-                <span className="text-xs text-slate-500 font-semibold truncate">
-                  el {cashFlowLowestPoint.dayLabel}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Card 3: Estado de liquidez */}
-          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-purple-950/30 border border-slate-100 dark:border-purple-900/40 flex flex-col justify-between">
-            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Diagnóstico de liquidez
-            </p>
-            <div className="flex items-center gap-1.5 mt-1">
-              {cashFlowLowestPoint && cashFlowLowestPoint.balance < 0 ? (
-                <>
-                  <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
-                  <span className="text-xs font-black text-rose-500">Alerta de saldo negativo</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">Liquidez saludable</span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Chart Area */}
-        <div className="h-44 sm:h-52 w-full pt-1">
-          {cashFlowChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={cashFlowChartData} margin={{ top: 10, right: 8, left: 8, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="dashboardCashFlowGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#7928CA" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#7928CA" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <XAxis 
-                  dataKey="day" 
-                  stroke="#94a3b8" 
-                  fontSize={11} 
-                  tickLine={false}
-                  axisLine={{ stroke: '#e2e8f0', strokeDasharray: '3 3' }}
-                />
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (!active || !payload?.length) return null;
-                    const d = payload[0].payload;
-                    return (
-                      <div className="bg-slate-900 text-white rounded-xl p-2.5 text-xs shadow-xl border border-white/10">
-                        <p className="font-bold text-purple-300">{d.day}</p>
-                        <p className="text-sm font-black text-white mt-0.5">
-                          {isBalanceHidden ? "$ •••••" : ars(d.balance)}
-                        </p>
-                        {d.dailyIncome > 0 && (
-                          <p className="text-[11px] text-emerald-400 mt-0.5 font-semibold">
-                            + {ars(d.dailyIncome)} ingreso estimado
-                          </p>
-                        )}
-                        {d.dailyExpense > 0 && (
-                          <p className="text-[11px] text-rose-300 mt-0.5">
-                            - {ars(d.dailyExpense)} gasto estimado
-                          </p>
-                        )}
-                      </div>
-                    );
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="balance"
-                  stroke="#7928CA"
-                  strokeWidth={2.5}
-                  fillOpacity={1}
-                  fill="url(#dashboardCashFlowGrad)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-full flex items-center justify-center text-xs text-slate-400">
-              Cargando proyección...
-            </div>
-          )}
-        </div>
-
-        {/* Footer info strip */}
-        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-3 pt-2.5 border-t border-slate-100 dark:border-purple-900/30">
-          <span className="flex items-center gap-1.5">
-            <span>💳</span>
-            <span>Incluye vencimientos de tarjetas, servicios y tus gastos promedio diarios</span>
-          </span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+          {/* Card 1: Cuotas */}
           <button
             type="button"
-            onClick={() => {
-              if (onOpenCashFlowTab) onOpenCashFlowTab();
-              else setIsCashFlowModalOpen(true);
-            }}
-            className="text-[#7928CA] dark:text-purple-300 font-bold hover:underline cursor-pointer"
+            onClick={() => onNavigateTab?.('installments')}
+            className="bg-[#F8F5FF] hover:bg-[#F0EBFF] dark:bg-purple-950/40 dark:hover:bg-purple-900/50 border border-purple-100/80 dark:border-purple-900/50 rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between h-20 sm:h-22 transition-all cursor-pointer group text-left"
           >
-            Abrir simulador →
+            <div className="flex items-center justify-between w-full">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-purple-200/60 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 flex items-center justify-center">
+                <CreditCard className="w-4 h-4" />
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-purple-400 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+            <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white">
+              Cuotas
+            </span>
+          </button>
+
+          {/* Card 2: Metas */}
+          <button
+            type="button"
+            onClick={() => onNavigateTab?.('goals')}
+            className="bg-[#FFFDF5] hover:bg-[#FFF8E6] dark:bg-amber-950/30 dark:hover:bg-amber-900/40 border border-amber-100/80 dark:border-amber-900/50 rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between h-20 sm:h-22 transition-all cursor-pointer group text-left"
+          >
+            <div className="flex items-center justify-between w-full">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-200/60 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 flex items-center justify-center">
+                <Target className="w-4 h-4" />
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+            <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white">
+              Metas
+            </span>
+          </button>
+
+          {/* Card 3: Balance Dúo */}
+          <button
+            type="button"
+            onClick={() => onNavigateTab?.('balance')}
+            className="bg-[#FFF5F7] hover:bg-[#FFEBEF] dark:bg-rose-950/30 dark:hover:bg-rose-900/40 border border-rose-100/80 dark:border-rose-900/50 rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between h-20 sm:h-22 transition-all cursor-pointer group text-left"
+          >
+            <div className="flex items-center justify-between w-full">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-rose-200/60 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 flex items-center justify-center">
+                <Users className="w-4 h-4" />
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-rose-400 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+            <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white">
+              Balance Dúo
+            </span>
+          </button>
+
+          {/* Card 4: Liquidar */}
+          <button
+            type="button"
+            onClick={() => onNavigateTab?.('balance')}
+            className="bg-[#F5F9FF] hover:bg-[#EBF3FF] dark:bg-blue-950/30 dark:hover:bg-blue-900/40 border border-blue-100/80 dark:border-blue-900/50 rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between h-20 sm:h-22 transition-all cursor-pointer group text-left"
+          >
+            <div className="flex items-center justify-between w-full">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-blue-200/60 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 flex items-center justify-center">
+                <ArrowRightLeft className="w-4 h-4" />
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-blue-400 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+            <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white">
+              Liquidar
+            </span>
           </button>
         </div>
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* 6. BOTTOM 2-COLUMN GRID                                             */}
+      {/* 6. PRÓXIMOS VENCIMIENTOS                                            */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        
-        {/* ── COLUMN 1 (LEFT): Vencimientos & Score ── */}
-        <div className="space-y-4">
-          {/* Card: Próximos vencimientos */}
-          <div className="bg-white dark:bg-[#181332] rounded-2xl p-4 border border-slate-100 dark:border-purple-900/40 shadow-xs">
-            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-50 dark:border-purple-900/30">
-              <h3 className="text-xs font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
-                <span>🔔</span>
-                <span>Próximos vencimientos</span>
-              </h3>
-              {onNavigateTab && (
-                <button
-                  type="button"
-                  onClick={() => onNavigateTab('card_alerts')}
-                  className="text-xs font-semibold text-[#7928CA] dark:text-purple-400 hover:underline cursor-pointer"
-                >
-                  Ver todos →
-                </button>
-              )}
+      <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-6 border border-slate-100 dark:border-purple-900/40 shadow-xs transition-all">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 flex items-center justify-center text-xs">
+              📅
             </div>
-
-            <div className="divide-y divide-slate-50 dark:divide-purple-900/20">
-              {upcomingBills.length > 0 ? (
-                upcomingBills.map(bill => (
-                  <div
-                    key={bill.id}
-                    onClick={() => onNavigateTab ? onNavigateTab('card_alerts') : {}}
-                    className="py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-purple-950/20 rounded-xl px-1.5 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`w-8 h-8 rounded-xl ${bill.bg} flex items-center justify-center text-sm flex-shrink-0`}>
-                        {bill.icon}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{bill.title}</p>
-                        <p className={`text-[10px] font-semibold ${bill.color}`}>{bill.dueText}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-xs font-black text-slate-900 dark:text-white tabular-nums">
-                        ${bill.amount.toLocaleString('es-AR')}
-                      </span>
-                      <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="py-6 text-center">
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">No tenés vencimientos pendientes</p>
-                  {onNavigateTab && (
-                    <button
-                      type="button"
-                      onClick={() => onNavigateTab('card_alerts')}
-                      className="text-xs font-bold text-[#7928CA] dark:text-purple-300 hover:underline cursor-pointer"
-                    >
-                      + Agregar vencimiento
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+            <h3 className="text-sm sm:text-base font-black text-slate-800 dark:text-white tracking-tight">
+              Próximos vencimientos
+            </h3>
           </div>
+          {onNavigateTab && (
+            <button
+              type="button"
+              onClick={() => onNavigateTab('card_alerts')}
+              className="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline cursor-pointer flex items-center gap-0.5"
+            >
+              <span>Ver todos</span>
+              <span>→</span>
+            </button>
+          )}
+        </div>
 
-          {/* Card: Score financiero del mes */}
+        <div className="divide-y divide-slate-100 dark:divide-purple-900/30">
+          {upcomingBills.map(bill => (
+            <div
+              key={bill.id}
+              onClick={() => onNavigateTab ? onNavigateTab('card_alerts') : {}}
+              className="py-3 flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-purple-950/20 rounded-xl px-1.5 transition-colors cursor-pointer"
+            >
+              {/* Left: Icon, Title & Category */}
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`w-9 h-9 rounded-xl ${bill.bg} flex items-center justify-center text-sm flex-shrink-0 shadow-2xs`}>
+                  {bill.icon}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                    {bill.title}
+                  </p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate">
+                    {bill.cat}
+                  </p>
+                </div>
+              </div>
+
+              {/* Right: Amount & Date Pill */}
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white tabular-nums">
+                  {isBalanceHidden ? "$ •••••" : `$ ${bill.amount.toLocaleString('es-AR')}`}
+                </span>
+                <span className="px-2.5 py-1 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-[#7928CA] dark:text-purple-300 border border-purple-100/80 dark:border-purple-800/40 text-[11px] font-bold tracking-tight">
+                  {bill.duePill}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* 7. HERRAMIENTAS PRO                                                 */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-6 border border-slate-100 dark:border-purple-900/40 shadow-xs transition-all">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm sm:text-base font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-1.5">
+            <span>Herramientas</span>
+            <span className="text-[#7928CA] dark:text-purple-400">PRO</span>
+          </h3>
+          <button
+            type="button"
+            onClick={() => onNavigateTab ? onNavigateTab('subscriptions') : setIsScoreModalOpen(true)}
+            className="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:underline cursor-pointer flex items-center gap-0.5"
+          >
+            <span>Ver más</span>
+            <span>→</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
+          {/* Card 1: Score Financiero */}
           <div
             onClick={() => setIsScoreModalOpen(true)}
-            className="bg-white dark:bg-[#181332] rounded-2xl p-4 border border-slate-100 dark:border-purple-900/40 shadow-xs flex items-center justify-between cursor-pointer hover:border-purple-200 dark:hover:border-purple-700 transition-all group"
+            className="bg-[#FAF7FE] hover:bg-[#F4EEFD] dark:bg-purple-950/30 dark:hover:bg-purple-900/40 border border-purple-100/90 dark:border-purple-900/50 rounded-2xl p-4 transition-all cursor-pointer group flex items-center justify-between gap-3.5"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#7928CA] to-[#9333EA] text-white flex items-center justify-center text-xl font-black shadow-md shadow-purple-500/25">
-                {dailyScore?.total ?? 82}
+            <div className="flex items-center gap-3.5 min-w-0">
+              {/* Ring icon */}
+              <div className="relative w-11 h-11 flex-shrink-0 flex items-center justify-center">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 40 40">
+                  <circle cx="20" cy="20" r="15" fill="none" stroke="rgba(121, 40, 202, 0.15)" strokeWidth="3" />
+                  <circle
+                    cx="20"
+                    cy="20"
+                    r="15"
+                    fill="none"
+                    stroke="#7928CA"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 15}
+                    strokeDashoffset={2 * Math.PI * 15 * (1 - (dailyScore?.total ?? 82) / 100)}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center text-[11px] font-black text-[#7928CA] dark:text-purple-300">
+                  {dailyScore?.total ?? 82}
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-bold text-emerald-500 dark:text-emerald-400">¡Vas bien!</p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Tu gasto está 12% por debajo del promedio.
+
+              <div className="min-w-0">
+                <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
+                  Score financiero
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug line-clamp-2 mt-0.5">
+                  Conocé tu salud financiera, hábitos de gasto y recomendaciones.
                 </p>
               </div>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span className="px-2 py-0.5 rounded-full bg-[#7928CA] text-white text-[9px] font-black tracking-wider uppercase shadow-2xs">
+                PRO
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-purple-400 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+          </div>
+
+          {/* Card 2: Flujo de caja */}
+          <div
+            onClick={() => setIsCashFlowModalOpen(true)}
+            className="bg-[#FFFDF7] hover:bg-[#FFF9EA] dark:bg-amber-950/20 dark:hover:bg-amber-900/30 border border-amber-100/90 dark:border-amber-900/50 rounded-2xl p-4 transition-all cursor-pointer group flex items-center justify-between gap-3.5"
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-11 h-11 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0 text-lg shadow-2xs">
+                📊
+              </div>
+
+              <div className="min-w-0">
+                <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
+                  Flujo de caja
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug line-clamp-2 mt-0.5">
+                  Proyectá tus ingresos y gastos, anticipá tu saldo futuro y evitá sorpresas.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span className="px-2 py-0.5 rounded-full bg-[#7928CA] text-white text-[9px] font-black tracking-wider uppercase shadow-2xs">
+                PRO
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-purple-400 group-hover:translate-x-0.5 transition-transform" />
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* ── COLUMN 2 (RIGHT): Distribución & Últimos Movimientos ── */}
-        <div className="space-y-4">
-          {/* Card: Distribución de gastos */}
-          <div className="bg-white dark:bg-[#181332] rounded-2xl p-4 border border-slate-100 dark:border-purple-900/40 shadow-xs">
-            <h3 className="text-xs font-bold text-slate-800 dark:text-white mb-3">Distribución de gastos</h3>
-
-            {categoryPieData.length > 0 ? (
-              <div className="flex flex-col sm:flex-row items-center gap-4">
-                {/* Donut chart */}
-                <div className="relative w-36 h-36 flex-shrink-0 flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={categoryPieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={36}
-                        outerRadius={56}
-                        dataKey="value"
-                        strokeWidth={2}
-                        stroke={isDarkMode ? '#181332' : '#ffffff'}
-                      >
-                        {categoryPieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-                    <span className="text-xs font-black text-slate-900 dark:text-white leading-tight">
-                      {isBalanceHidden ? '$ •••' : ars(totalExpenses)}
-                    </span>
-                    <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">Gastados</span>
-                  </div>
-                </div>
-
-                {/* Legend with percentages */}
-                <div className="flex-1 grid grid-cols-2 gap-x-2 gap-y-1.5 text-[11px] w-full">
-                  {categoryPieData.map((item) => (
-                    <div key={item.name} className="flex items-center justify-between gap-1">
-                      <div className="flex items-center gap-1.5 truncate">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                        <span className="text-slate-600 dark:text-slate-300 truncate font-medium">{item.name}</span>
-                      </div>
-                      <span className="font-bold text-slate-900 dark:text-white tabular-nums flex-shrink-0">
-                        {item.pct}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="py-8 text-center">
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Sin gastos registrados en este período</p>
-                <button
-                  type="button"
-                  onClick={() => onOpenTransactionModal('gasto')}
-                  className="text-xs font-bold text-[#7928CA] dark:text-purple-300 hover:underline cursor-pointer"
-                >
-                  + Registrar primer gasto
-                </button>
-              </div>
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* 8. DISTRIBUCIÓN DE GASTOS & ÚLTIMOS MOVIMIENTOS                     */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Left Card: Distribución de gastos */}
+        <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-6 border border-slate-100 dark:border-purple-900/40 shadow-xs transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <span>📊</span>
+              <span>Distribución de gastos</span>
+            </h3>
+            {onOpenBudgetModal && (
+              <button
+                type="button"
+                onClick={onOpenBudgetModal}
+                className="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline cursor-pointer flex items-center gap-0.5"
+              >
+                <span>Ver detalle</span>
+                <span>→</span>
+              </button>
             )}
           </div>
 
-          {/* Card: Últimos movimientos */}
-          <div className="bg-white dark:bg-[#181332] rounded-2xl p-4 border border-slate-100 dark:border-purple-900/40 shadow-xs">
-            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-50 dark:border-purple-900/30">
-              <h3 className="text-xs font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
-                <span>⏱</span>
-                <span>Últimos movimientos</span>
-              </h3>
-              {onNavigateTab && (
-                <button
-                  type="button"
-                  onClick={() => onNavigateTab('transactions')}
-                  className="text-xs font-semibold text-[#7928CA] dark:text-purple-400 hover:underline cursor-pointer"
-                >
-                  Ver todos →
-                </button>
-              )}
+          <div className="flex flex-col sm:flex-row items-center gap-5 my-auto">
+            {/* Donut chart */}
+            <div className="relative w-36 h-36 flex-shrink-0 flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={categoryPieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={60}
+                    dataKey="value"
+                    strokeWidth={2}
+                    stroke={isDarkMode ? '#181332' : '#ffffff'}
+                  >
+                    {categoryPieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                <span className="text-xs font-black text-slate-900 dark:text-white leading-tight">
+                  {isBalanceHidden ? '$ •••' : `$ ${totalExpenses.toLocaleString('es-AR')}`}
+                </span>
+                <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">Total gastos</span>
+              </div>
             </div>
 
-            <div className="divide-y divide-slate-50 dark:divide-purple-900/20">
-              {recentMovements.length > 0 ? (
-                recentMovements.map((tx) => (
-                  <div
-                    key={tx.id}
-                    onClick={() => onNavigateTab ? onNavigateTab('transactions') : {}}
-                    className="py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-purple-950/20 rounded-xl px-1.5 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center text-sm flex-shrink-0">
-                        {tx.emoji}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{tx.title}</p>
-                        <p className="text-[10px] text-slate-400 font-medium">{tx.subtitle}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-xs font-black text-rose-500 dark:text-rose-400 tabular-nums">
-                        - ${tx.amount.toLocaleString('es-AR')}
-                      </span>
-                      <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                    </div>
+            {/* Legend with percentages */}
+            <div className="flex-1 space-y-2 text-xs w-full">
+              {categoryPieData.map((item) => (
+                <div key={item.name} className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 truncate min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                    <span className="text-slate-600 dark:text-slate-300 truncate font-medium">{item.name}</span>
                   </div>
-                ))
-              ) : (
-                <div className="py-8 text-center">
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">No registraste movimientos aún</p>
-                  <button
-                    type="button"
-                    onClick={() => onOpenTransactionModal('gasto')}
-                    className="text-xs font-bold text-[#F95420] hover:underline cursor-pointer"
-                  >
-                    + Cargar primer gasto
-                  </button>
+                  <span className="font-bold text-slate-900 dark:text-white tabular-nums flex-shrink-0">
+                    {item.pct}%
+                  </span>
                 </div>
-              )}
+              ))}
             </div>
           </div>
-
         </div>
 
+        {/* Right Card: Últimos movimientos */}
+        <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-6 border border-slate-100 dark:border-purple-900/40 shadow-xs transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <span>🕒</span>
+              <span>Últimos movimientos</span>
+            </h3>
+            {onNavigateTab && (
+              <button
+                type="button"
+                onClick={() => onNavigateTab('transactions')}
+                className="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline cursor-pointer flex items-center gap-0.5"
+              >
+                <span>Ver todos</span>
+                <span>→</span>
+              </button>
+            )}
+          </div>
+
+          <div className="divide-y divide-slate-100 dark:divide-purple-900/30">
+            {recentMovements.slice(0, 3).map((tx) => (
+              <div
+                key={tx.id}
+                onClick={() => onNavigateTab ? onNavigateTab('transactions') : {}}
+                className="py-3 flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-purple-950/20 rounded-xl px-1.5 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center text-sm flex-shrink-0">
+                    {tx.emoji}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{tx.title}</p>
+                    <p className="text-[10px] text-slate-400 font-medium truncate">{tx.subtitle}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className="text-xs font-black text-rose-500 tabular-nums">
+                    - ${tx.amount.toLocaleString('es-AR')}
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Modal de Score Diario */}
@@ -1196,6 +1304,19 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           setIsCashFlowModalOpen(false);
           if (onNavigateTab) onNavigateTab('card_alerts');
         }}
+      />
+
+      {/* Modal de Alertas Críticas de Presupuesto */}
+      <BudgetCriticalAlertsModal
+        isOpen={isAlertsModalOpen}
+        onClose={() => setIsAlertsModalOpen(false)}
+        budgets={budgets}
+        monthExpensesList={monthExpensesList}
+        categoryColors={categoryColors}
+        categoryMap={categoryMap}
+        isBalanceHidden={isBalanceHidden}
+        onOpenBudgetModal={onOpenBudgetModal}
+        onNavigateTab={onNavigateTab}
       />
 
     </div>

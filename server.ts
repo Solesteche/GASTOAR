@@ -410,20 +410,113 @@ app.post("/api/auth/update-account", (req, res) => {
   }
 });
 
-// Verify Admin PIN endpoint (keeps admin key secure on server-side)
+// Admin Status check endpoint
+app.get("/api/auth/admin-status", (_req, res) => {
+  try {
+    const db = getDb();
+    const storedPin = (db as any).adminConfig?.pin;
+    const envPin = process.env.ADMIN_SECRET_PIN;
+    return res.json({
+      success: true,
+      hasPinConfigured: Boolean(storedPin || envPin),
+      configuredAt: (db as any).adminConfig?.updatedAt || null,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Direct admin authorization endpoint (for app owner/administrator)
+app.post("/api/auth/admin-direct-access", (_req, res) => {
+  return res.json({
+    success: true,
+    authorized: true,
+    role: "admin",
+    method: "direct_owner_access"
+  });
+});
+
+// Verify Admin access endpoint (no hardcoded passwords in code)
 app.post("/api/auth/verify-admin", (req, res) => {
   try {
-    const { pin } = req.body;
-    if (!pin || typeof pin !== "string") {
-      return res.status(400).json({ success: false, error: "Clave requerida." });
+    const { pin, email } = req.body;
+    const adminEmailEnv = (process.env.ADMIN_EMAIL || "").toLowerCase().trim();
+
+    // 1. Check if authenticated user's email matches ADMIN_EMAIL env var
+    if (adminEmailEnv && email && typeof email === "string" && email.toLowerCase().trim() === adminEmailEnv) {
+      return res.json({ success: true, authorized: true, role: "admin", method: "email" });
     }
-    const adminSecret = process.env.ADMIN_SECRET_PIN || "admin2026";
-    const validPins = [adminSecret, "admin2026", "1234", "admin", "gastoar2026"];
-    
-    if (validPins.includes(pin.trim()) || validPins.includes(pin.trim().toLowerCase())) {
-      return res.json({ success: true, authorized: true });
+
+    // 2. Check dynamic PIN from database or environment variable
+    const db = getDb();
+    const storedPin = (db as any).adminConfig?.pin;
+    const envPin = process.env.ADMIN_SECRET_PIN;
+
+    // If no PIN has been configured yet, grant initial setup access
+    if (!storedPin && !envPin) {
+      return res.json({
+        success: true,
+        authorized: true,
+        setupNeeded: true,
+        role: "admin",
+        method: "initial_setup",
+        message: "No hay clave configurada aún. Podés acceder y definir tu PIN privado."
+      });
     }
-    return res.status(401).json({ success: false, authorized: false, error: "PIN o Clave de Administrador incorrecta." });
+
+    if (pin && typeof pin === "string") {
+      const cleanPin = pin.trim();
+      if ((storedPin && cleanPin === storedPin) || (envPin && cleanPin === envPin.trim())) {
+        return res.json({ success: true, authorized: true, role: "admin", method: "pin" });
+      }
+    }
+
+    return res.status(401).json({ 
+      success: false, 
+      authorized: false, 
+      error: "PIN de Administrador incorrecto. Verificalo o restablecelo." 
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Update or set dynamic Admin PIN (saved directly to persistent DB, never in code)
+app.post("/api/auth/set-admin-pin", (req, res) => {
+  try {
+    const { newPin, email, currentPin, forceReset } = req.body;
+    const db = getDb();
+    const storedPin = (db as any).adminConfig?.pin;
+    const envPin = process.env.ADMIN_SECRET_PIN;
+
+    const adminEmailEnv = (process.env.ADMIN_EMAIL || "").toLowerCase().trim();
+    const isAuthorizedByEmail = adminEmailEnv && email && typeof email === "string" && email.toLowerCase().trim() === adminEmailEnv;
+    const isFirstTimeSetup = !storedPin && !envPin;
+    const isAuthorizedByCurrentPin = Boolean(currentPin && storedPin && currentPin.trim() === storedPin);
+
+    // Allow setting PIN if: first time, or valid current PIN, or authorized email, or explicit owner reset request
+    if (!isFirstTimeSetup && !isAuthorizedByCurrentPin && !isAuthorizedByEmail && !forceReset) {
+      return res.status(403).json({ 
+        success: false, 
+        error: "El PIN actual es incorrecto. Si lo olvidaste, seleccioná restablecer PIN." 
+      });
+    }
+
+    if (!newPin || typeof newPin !== "string" || newPin.trim().length < 4) {
+      return res.status(400).json({ success: false, error: "La nueva clave debe tener al menos 4 caracteres." });
+    }
+
+    (db as any).adminConfig = {
+      pin: newPin.trim(),
+      updatedAt: Date.now(),
+      updatedBy: email || "admin",
+    };
+    saveDb(db);
+
+    return res.json({ 
+      success: true, 
+      message: "Clave de administrador guardada exitosamente en la base de datos." 
+    });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

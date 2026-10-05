@@ -357,6 +357,31 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </button>
           )}
 
+          {/* Panel de Administración */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onClose) onClose();
+              if (onNavigateToTab) onNavigateToTab('admin');
+            }}
+            className="w-full p-3 rounded-2xl hover:bg-amber-50/70 flex items-center justify-between text-left transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <ShieldCheck className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-slate-800 block">
+                  Panel de Administración
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">
+                  Control de clientes, suscripciones y clave PIN
+                </span>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 transition-colors" />
+          </button>
+
           {/* 6. Help & Support */}
           <a
             href="https://wa.me/5491100000000?text=Hola%20tengo%20una%20consulta%20sobre%20GastoAr"

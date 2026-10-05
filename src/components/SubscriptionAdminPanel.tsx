@@ -25,7 +25,11 @@ import {
   BadgePercent,
   Check,
   Zap,
-  ArrowUpRight
+  ArrowUpRight,
+  Lock,
+  KeyRound,
+  AlertCircle,
+  X
 } from 'lucide-react';
 import { BillingCycle, SubscriptionPlan, SubscriptionPlanId, SubscriptionStatus, UserSubscription } from '../types';
 import { SUBSCRIPTION_PLANS } from '../data/subscriptionPlans';
@@ -51,6 +55,57 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
   const [planFilter, setPlanFilter] = useState<string>('all');
   const [cycleFilter, setCycleFilter] = useState<string>('all');
   
+  // Security PIN Modal State
+  const [isSecurityModalOpen, setIsSecurityModalOpen] = useState<boolean>(false);
+  const [securityNewPin, setSecurityNewPin] = useState<string>('');
+  const [securityConfirmPin, setSecurityConfirmPin] = useState<string>('');
+  const [securityMsg, setSecurityMsg] = useState<string>('');
+  const [securityError, setSecurityError] = useState<string>('');
+  const [securityLoading, setSecurityLoading] = useState<boolean>(false);
+
+  const handleUpdateAdminPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSecurityError('');
+    setSecurityMsg('');
+
+    if (!securityNewPin.trim() || securityNewPin.trim().length < 4) {
+      setSecurityError('El PIN debe tener al menos 4 caracteres.');
+      return;
+    }
+    if (securityNewPin !== securityConfirmPin) {
+      setSecurityError('Los PINs no coinciden.');
+      return;
+    }
+
+    setSecurityLoading(true);
+    try {
+      const res = await fetch('/api/auth/set-admin-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          newPin: securityNewPin.trim(),
+          forceReset: true,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSecurityMsg('¡Clave de administrador actualizada correctamente en la base de datos!');
+        setSecurityNewPin('');
+        setSecurityConfirmPin('');
+        setTimeout(() => {
+          setIsSecurityModalOpen(false);
+          setSecurityMsg('');
+        }, 1200);
+      } else {
+        setSecurityError(data.error || 'No se pudo guardar la clave.');
+      }
+    } catch {
+      setSecurityError('Error al comunicar con el servidor.');
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
+
   // Modals inside Admin
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [editingSub, setEditingSub] = useState<UserSubscription | null>(null);
@@ -359,6 +414,22 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              setIsSecurityModalOpen(true);
+              setSecurityError('');
+              setSecurityMsg('');
+              setSecurityNewPin('');
+              setSecurityConfirmPin('');
+            }}
+            className="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="Configurar clave o PIN de administrador"
+          >
+            <KeyRound className="w-3.5 h-3.5 text-purple-600" />
+            <span>Clave de Acceso</span>
+          </button>
+
           <button
             type="button"
             onClick={exportSubsToCSV}
@@ -1156,6 +1227,100 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
                 Cerrar Comprobante
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CONFIGURACIÓN SEGURIDAD PIN DE ADMINISTRADOR */}
+      {isSecurityModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in">
+          <div className="relative w-full max-w-md bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 text-slate-800">
+            <button
+              onClick={() => setIsSecurityModalOpen(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-11 h-11 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                <KeyRound className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">
+                  Clave de Administrador
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Configurá o actualizá tu PIN privado de acceso
+                </p>
+              </div>
+            </div>
+
+            {securityError && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{securityError}</span>
+              </div>
+            )}
+
+            {securityMsg && (
+              <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{securityMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateAdminPin} className="space-y-4">
+              <div className="p-3 bg-purple-50/60 rounded-xl text-xs text-purple-900 border border-purple-100">
+                🔒 Esta clave se guarda de manera segura y persistente en la base de datos del servidor. Nunca figura en el código fuente.
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-700">
+                  Nuevo PIN Secreto (mínimo 4 caracteres)
+                </label>
+                <input
+                  type="password"
+                  required
+                  autoFocus
+                  value={securityNewPin}
+                  onChange={(e) => setSecurityNewPin(e.target.value)}
+                  placeholder="Tu nuevo PIN"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-700">
+                  Confirmar Nuevo PIN
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={securityConfirmPin}
+                  onChange={(e) => setSecurityConfirmPin(e.target.value)}
+                  placeholder="Confirmá tu nuevo PIN"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsSecurityModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={securityLoading}
+                  className="px-5 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-purple-700/20 active:scale-95 transition-all"
+                >
+                  {securityLoading ? 'Guardando...' : 'Guardar Clave'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
