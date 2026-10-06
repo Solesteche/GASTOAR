@@ -29,7 +29,10 @@ import {
   Lock,
   KeyRound,
   AlertCircle,
-  X
+  X,
+  Smartphone,
+  QrCode,
+  Copy
 } from 'lucide-react';
 import { BillingCycle, SubscriptionPlan, SubscriptionPlanId, SubscriptionStatus, UserSubscription } from '../types';
 import { SUBSCRIPTION_PLANS } from '../data/subscriptionPlans';
@@ -55,13 +58,54 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
   const [planFilter, setPlanFilter] = useState<string>('all');
   const [cycleFilter, setCycleFilter] = useState<string>('all');
   
-  // Security PIN Modal State
+  // Security PIN & Google Authenticator Modal State
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState<boolean>(false);
+  const [securityMode, setSecurityMode] = useState<'overview' | 'pin' | 'totp'>('overview');
+  const [hasPinConfigured, setHasPinConfigured] = useState<boolean>(true);
+  const [hasTotpConfigured, setHasTotpConfigured] = useState<boolean>(true);
   const [securityNewPin, setSecurityNewPin] = useState<string>('');
   const [securityConfirmPin, setSecurityConfirmPin] = useState<string>('');
+  const [securityTotpSecret, setSecurityTotpSecret] = useState<string>('');
+  const [securityTotpQrCode, setSecurityTotpQrCode] = useState<string>('');
+  const [securityTotpVerifyCode, setSecurityTotpVerifyCode] = useState<string>('');
+  const [copiedTotpSecret, setCopiedTotpSecret] = useState<boolean>(false);
   const [securityMsg, setSecurityMsg] = useState<string>('');
   const [securityError, setSecurityError] = useState<string>('');
   const [securityLoading, setSecurityLoading] = useState<boolean>(false);
+
+  const loadSecurityStatus = async () => {
+    try {
+      const res = await fetch('/api/auth/admin-status');
+      const data = await res.json();
+      if (data.success) {
+        setHasPinConfigured(Boolean(data.hasPinConfigured));
+        setHasTotpConfigured(Boolean(data.hasTotpConfigured));
+      }
+    } catch {}
+  };
+
+  const loadTotpSetupData = async () => {
+    setSecurityLoading(true);
+    setSecurityError('');
+    try {
+      const res = await fetch('/api/auth/setup-admin-totp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'admin@gastoar.app' }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSecurityTotpSecret(data.secret);
+        setSecurityTotpQrCode(data.qrCode);
+      } else {
+        setSecurityError(data.error || 'No se pudo generar el código QR.');
+      }
+    } catch {
+      setSecurityError('Error al contactar al servidor.');
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
 
   const handleUpdateAdminPin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,11 +133,12 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setSecurityMsg('¡Clave de administrador actualizada correctamente en la base de datos!');
+        setSecurityMsg('¡PIN de administrador actualizado correctamente!');
+        setHasPinConfigured(true);
         setSecurityNewPin('');
         setSecurityConfirmPin('');
         setTimeout(() => {
-          setIsSecurityModalOpen(false);
+          setSecurityMode('overview');
           setSecurityMsg('');
         }, 1200);
       } else {
@@ -101,6 +146,46 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
       }
     } catch {
       setSecurityError('Error al comunicar con el servidor.');
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
+
+  const handleVerifyTotp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSecurityError('');
+    setSecurityMsg('');
+
+    const cleanCode = securityTotpVerifyCode.replace(/\s+/g, '').trim();
+    if (!cleanCode || cleanCode.length !== 6) {
+      setSecurityError('Ingresá el código de 6 dígitos que muestra tu app.');
+      return;
+    }
+
+    setSecurityLoading(true);
+    try {
+      const res = await fetch('/api/auth/verify-and-activate-admin-totp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          secret: securityTotpSecret,
+          token: cleanCode,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSecurityMsg('¡Google Authenticator vinculado y activado con éxito!');
+        setHasTotpConfigured(true);
+        setSecurityTotpVerifyCode('');
+        setTimeout(() => {
+          setSecurityMode('overview');
+          setSecurityMsg('');
+        }, 1200);
+      } else {
+        setSecurityError(data.error || 'Código incorrecto o expirado.');
+      }
+    } catch {
+      setSecurityError('Error al verificar el código con el servidor.');
     } finally {
       setSecurityLoading(false);
     }
@@ -418,16 +503,19 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
             type="button"
             onClick={() => {
               setIsSecurityModalOpen(true);
+              setSecurityMode('overview');
               setSecurityError('');
               setSecurityMsg('');
               setSecurityNewPin('');
               setSecurityConfirmPin('');
+              setSecurityTotpVerifyCode('');
+              loadSecurityStatus();
             }}
             className="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-            title="Configurar clave o PIN de administrador"
+            title="Seguridad de acceso: PIN + Google Authenticator (2FA)"
           >
-            <KeyRound className="w-3.5 h-3.5 text-purple-600" />
-            <span>Clave de Acceso</span>
+            <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
+            <span>Seguridad & 2FA</span>
           </button>
 
           <button
@@ -1231,31 +1319,33 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
         </div>
       )}
 
-      {/* MODAL CONFIGURACIÓN SEGURIDAD PIN DE ADMINISTRADOR */}
+      {/* MODAL CONFIGURACIÓN SEGURIDAD Y 2FA DE ADMINISTRADOR */}
       {isSecurityModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in">
-          <div className="relative w-full max-w-md bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 text-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in overflow-y-auto">
+          <div className="relative w-full max-w-lg bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 text-slate-800 my-auto">
             <button
               onClick={() => setIsSecurityModalOpen(false)}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors"
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
 
+            {/* Header */}
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-11 h-11 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center">
-                <KeyRound className="w-5 h-5" />
+              <div className="w-11 h-11 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base font-black text-slate-900">
-                  Clave de Administrador
+                <h3 className="text-base font-black text-slate-900 leading-tight">
+                  Seguridad y Doble Factor (2FA)
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Configurá o actualizá tu PIN privado de acceso
+                  Acceso protegido con <strong className="text-purple-700">PIN + Google Authenticator juntos</strong>
                 </p>
               </div>
             </div>
 
+            {/* Feedback Messages */}
             {securityError && (
               <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -1270,57 +1360,270 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
               </div>
             )}
 
-            <form onSubmit={handleUpdateAdminPin} className="space-y-4">
-              <div className="p-3 bg-purple-50/60 rounded-xl text-xs text-purple-900 border border-purple-100">
-                🔒 Esta clave se guarda de manera segura y persistente en la base de datos del servidor. Nunca figura en el código fuente.
-              </div>
+            {/* Navigation Tabs */}
+            <div className="flex border-b border-slate-100 mb-4 gap-3 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => { setSecurityMode('overview'); setSecurityError(''); setSecurityMsg(''); }}
+                className={`pb-2.5 transition-colors cursor-pointer ${
+                  securityMode === 'overview' ? 'text-purple-700 border-b-2 border-purple-700' : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                Estado de Seguridad
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSecurityMode('pin'); setSecurityError(''); setSecurityMsg(''); }}
+                className={`pb-2.5 transition-colors cursor-pointer ${
+                  securityMode === 'pin' ? 'text-purple-700 border-b-2 border-purple-700' : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                Cambiar PIN
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSecurityMode('totp');
+                  setSecurityError('');
+                  setSecurityMsg('');
+                  if (!securityTotpSecret) loadTotpSetupData();
+                }}
+                className={`pb-2.5 transition-colors cursor-pointer ${
+                  securityMode === 'totp' ? 'text-purple-700 border-b-2 border-purple-700' : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                Google Authenticator (QR)
+              </button>
+            </div>
 
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">
-                  Nuevo PIN Secreto (mínimo 4 caracteres)
-                </label>
-                <input
-                  type="password"
-                  required
-                  autoFocus
-                  value={securityNewPin}
-                  onChange={(e) => setSecurityNewPin(e.target.value)}
-                  placeholder="Tu nuevo PIN"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
-                />
-              </div>
+            {/* VIEW 1: OVERVIEW */}
+            {securityMode === 'overview' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Factor 1: PIN */}
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                        <Lock className="w-4 h-4 text-purple-600" />
+                        <span>1. PIN Privado</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        <Check className="w-3 h-3" />
+                        <span>Activo</span>
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      PIN secreto configurado en el servidor para autorizar cada ingreso.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => { setSecurityMode('pin'); setSecurityError(''); setSecurityMsg(''); }}
+                      className="text-xs text-purple-700 hover:text-purple-900 font-bold underline cursor-pointer"
+                    >
+                      Actualizar PIN
+                    </button>
+                  </div>
 
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">
-                  Confirmar Nuevo PIN
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={securityConfirmPin}
-                  onChange={(e) => setSecurityConfirmPin(e.target.value)}
-                  placeholder="Confirmá tu nuevo PIN"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
-                />
-              </div>
+                  {/* Factor 2: Google Authenticator */}
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                        <Smartphone className="w-4 h-4 text-purple-600" />
+                        <span>2. Google Authenticator</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        <Check className="w-3 h-3" />
+                        <span>Vinculado</span>
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Generación de códigos TOTP de 6 dígitos con rotación cada 30 segundos.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSecurityMode('totp');
+                        setSecurityError('');
+                        setSecurityMsg('');
+                        if (!securityTotpSecret) loadTotpSetupData();
+                      }}
+                      className="text-xs text-purple-700 hover:text-purple-900 font-bold underline cursor-pointer"
+                    >
+                      Ver / Re-vincular QR
+                    </button>
+                  </div>
+                </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setIsSecurityModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={securityLoading}
-                  className="px-5 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-purple-700/20 active:scale-95 transition-all"
-                >
-                  {securityLoading ? 'Guardando...' : 'Guardar Clave'}
-                </button>
+                <div className="p-3.5 rounded-2xl bg-purple-50/70 border border-purple-100 text-xs text-purple-900 flex items-start gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-purple-700 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-bold">Política de Doble Factor Activa</p>
+                    <p className="text-[11px] text-purple-800/80 leading-relaxed">
+                      Para ingresar al panel de administración se requiere obligatoriamente ingresar tanto tu <strong>PIN</strong> como el <strong>código actual de Google Authenticator</strong> juntos en la misma pantalla.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setIsSecurityModalOpen(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    Cerrar
+                  </button>
+                </div>
               </div>
-            </form>
+            )}
+
+            {/* VIEW 2: CAMBIAR PIN */}
+            {securityMode === 'pin' && (
+              <form onSubmit={handleUpdateAdminPin} className="space-y-4">
+                <div className="p-3 bg-purple-50/60 rounded-xl text-xs text-purple-900 border border-purple-100">
+                  🔒 El PIN se almacena de forma cifrada y persistente en la base de datos de administración.
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Nuevo PIN Secreto (mínimo 4 caracteres)
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    autoFocus
+                    value={securityNewPin}
+                    onChange={(e) => setSecurityNewPin(e.target.value)}
+                    placeholder="Tu nuevo PIN"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Confirmar Nuevo PIN
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={securityConfirmPin}
+                    onChange={(e) => setSecurityConfirmPin(e.target.value)}
+                    placeholder="Confirmá tu nuevo PIN"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+                  />
+                </div>
+
+                <div className="pt-2 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => { setSecurityMode('overview'); setSecurityError(''); setSecurityMsg(''); }}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    Volver al resumen
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={securityLoading || securityNewPin.length < 4 || securityNewPin !== securityConfirmPin}
+                    className="px-5 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-purple-700/20 active:scale-95 transition-all cursor-pointer"
+                  >
+                    {securityLoading ? 'Guardando...' : 'Actualizar PIN'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* VIEW 3: VINCULAR GOOGLE AUTHENTICATOR QR */}
+            {securityMode === 'totp' && (
+              <form onSubmit={handleVerifyTotp} className="space-y-4">
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                  <div className="text-center space-y-1">
+                    <p className="text-xs font-black text-slate-800">
+                      Escaneá este código QR con Google Authenticator
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Abrí la app Google Authenticator en tu celular y seleccioná "Escanear un código QR".
+                    </p>
+                  </div>
+
+                  {/* QR Image */}
+                  <div className="flex flex-col items-center justify-center p-3 bg-white rounded-xl border border-slate-200 shadow-xs">
+                    {securityTotpQrCode ? (
+                      <img
+                        src={securityTotpQrCode}
+                        alt="Código QR de Google Authenticator"
+                        className="w-36 h-36 object-contain rounded"
+                      />
+                    ) : (
+                      <div className="w-36 h-36 flex items-center justify-center text-slate-400 text-xs font-medium">
+                        Cargando código QR...
+                      </div>
+                    )}
+                    <span className="text-[10px] text-slate-500 font-bold mt-1 tracking-wider uppercase">
+                      GastoAR Admin 2FA
+                    </span>
+                  </div>
+
+                  {/* Manual Key */}
+                  {securityTotpSecret && (
+                    <div className="flex items-center justify-between text-[11px] px-2 py-1 bg-white rounded-lg border border-slate-200">
+                      <span className="text-slate-600 truncate mr-2 font-mono text-[10px]">
+                        Clave: {securityTotpSecret}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(securityTotpSecret);
+                          setCopiedTotpSecret(true);
+                          setTimeout(() => setCopiedTotpSecret(false), 2000);
+                        }}
+                        className="text-purple-700 hover:text-purple-900 font-bold shrink-0 flex items-center gap-1 cursor-pointer"
+                      >
+                        {copiedTotpSecret ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedTotpSecret ? '¡Copiado!' : 'Copiar'}</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Validate 6 digits */}
+                  <div className="pt-2 border-t border-slate-200 space-y-1">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Código de 6 dígitos que muestra tu app
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      value={securityTotpVerifyCode}
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/\D/g, '').slice(0, 6);
+                        setSecurityTotpVerifyCode(clean);
+                        setSecurityError('');
+                      }}
+                      placeholder="000 000"
+                      className="w-full text-center tracking-[0.35em] py-2 bg-white border border-slate-200 rounded-xl text-lg font-black text-purple-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => { setSecurityMode('overview'); setSecurityError(''); setSecurityMsg(''); }}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    Volver al resumen
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={securityLoading || securityTotpVerifyCode.length !== 6}
+                    className="px-5 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-purple-700/20 active:scale-95 transition-all cursor-pointer"
+                  >
+                    {securityLoading ? 'Verificando...' : 'Confirmar y Activar'}
+                  </button>
+                </div>
+              </form>
+            )}
+
           </div>
         </div>
       )}

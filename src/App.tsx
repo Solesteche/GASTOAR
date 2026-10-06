@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronRight, Sparkles, ArrowRight } from 'lucide-react';
+import { ChevronRight, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { 
   Header 
@@ -2682,13 +2682,32 @@ export default function App() {
           )}
 
           {/* TAB 9: ADMIN PANEL FOR CLIENT SUBSCRIPTIONS */}
-          {activeTab === 'admin_subscriptions' && (
+          {activeTab === 'admin_subscriptions' && isAdmin && (
             <SubscriptionAdminPanel
               subscriptions={subscriptions}
               onUpdateSubscription={handleUpdateSubscription}
               onAddSubscription={handleAddSubscription}
               onDeleteSubscription={handleDeleteSubscription}
             />
+          )}
+
+          {activeTab === 'admin_subscriptions' && !isAdmin && (
+            <div className="max-w-md mx-auto my-12 p-8 bg-white rounded-3xl shadow-xl border border-purple-100 text-center space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto border border-amber-500/20">
+                <ShieldCheck className="w-8 h-8" />
+              </div>
+              <h2 className="text-xl font-black text-slate-900">Acceso Restringido a Administradores</h2>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                El panel de administración requiere autenticación de doble factor mediante <strong>PIN + Google Authenticator juntos</strong>.
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsAdminAuthModalOpen(true)}
+                className="w-full py-3 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs shadow-lg shadow-purple-700/20 transition-all cursor-pointer"
+              >
+                Ingresar con PIN + Google Authenticator
+              </button>
+            </div>
           )}
 
           {/* TAB: SUSCRIPCIÓN PRO (Pantalla 8) */}
@@ -3064,7 +3083,13 @@ export default function App() {
       {/* Global Admin Auth Modal */}
       <AdminAuthModal
         isOpen={isAdminAuthModalOpen}
-        onClose={() => setIsAdminAuthModalOpen(false)}
+        onClose={() => {
+          setIsAdminAuthModalOpen(false);
+          if (!isAdmin && activeTab === 'admin_subscriptions') {
+            setActiveTab('dashboard');
+            navigate('/dashboard', { replace: true });
+          }
+        }}
         onSuccess={() => {
           setIsAdminAuthModalOpen(false);
           handleOpenAdminPanel();

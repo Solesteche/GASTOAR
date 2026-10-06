@@ -61,5 +61,10 @@
   },
   "accountCodeToEmail": {
     "VERCEL-1234": "testvercel@example.com"
+  },
+  "adminConfig": {
+    "totpConfiguredAt": 1791309566015,
+    "updatedAt": 1791309573471,
+    "updatedBy": "estechesol@gmail.com"
   }
 }

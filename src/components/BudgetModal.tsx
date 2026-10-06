@@ -74,7 +74,8 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
 
       // If category has subcategories that sum to a positive value, ensure category budget is at least that sum
       Object.entries(categoryMap || {}).forEach(([cat, subs]) => {
-        const subSum = (subs || []).reduce((acc, s) => acc + (Number(initialSubs[s]) || 0), 0);
+        const subList = (subs as string[]) || [];
+        const subSum = subList.reduce((acc, s) => acc + (Number(initialSubs[s]) || 0), 0);
         if (subSum > 0 && (!initialCats[cat] || initialCats[cat] < subSum)) {
           initialCats[cat] = subSum;
         }
@@ -287,7 +288,8 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
     });
 
     Object.entries(categoryMap || {}).forEach(([cat, subs]) => {
-      const subSum = (subs || []).reduce((acc, s) => acc + (Number(finalSubcategories[s]) || 0), 0);
+      const subList = (subs as string[]) || [];
+      const subSum = subList.reduce((acc, s) => acc + (Number(finalSubcategories[s]) || 0), 0);
       const currentCatVal = Number(finalCategories[cat] || 0);
       if (subSum > 0 && (currentCatVal <= 0 || currentCatVal < subSum)) {
         finalCategories[cat] = subSum;
