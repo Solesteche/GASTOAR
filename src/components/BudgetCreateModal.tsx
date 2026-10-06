@@ -80,10 +80,13 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
     return Array.from(new Set([...Object.keys(categoryMap || {}), ...Object.keys(budgets?.categories || {})]));
   }, [categoryMap, budgets]);
 
-  const totalAssigned = useMemo(
-    () => Object.values(categories).reduce<number>((sum, value) => sum + (Number(value) || 0), 0),
-    [categories]
-  );
+  const totalAssigned = useMemo(() => {
+    return categoryList.reduce<number>((sum, cat) => {
+      const catVal = Number(categories[cat] || 0);
+      const subTotal = (categoryMap[cat] || []).reduce((s, sub) => s + Number(subcategories[sub] || 0), 0);
+      return sum + Math.max(catVal, subTotal);
+    }, 0);
+  }, [categoryList, categories, subcategories, categoryMap]);
 
   const suggestedByReal = useMemo(() => {
     const next: Record<string, number> = {};
@@ -153,8 +156,22 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
 
   const handleSubcategoryChange = (cat: string, sub: string, value: string) => {
     const numeric = value === '' ? 0 : Math.max(0, Math.round(Number(value) || 0));
-    setSubcategories((prev) => ({ ...prev, [sub]: numeric }));
+    const subs = categoryMap[cat] || [];
+    const oldSubTotal = subs.reduce((sum, s) => sum + Number(subcategories[s] || 0), 0);
+    const nextSubs = { ...subcategories, [sub]: numeric };
+    const newSubTotal = subs.reduce((sum, s) => sum + Number(nextSubs[s] || 0), 0);
+
+    setSubcategories(nextSubs);
     setRecentManualEdit({ cat, sub });
+
+    setCategories((prevCats) => {
+      const currentCatLimit = Number(prevCats[cat] || 0);
+      // Automatically keep category limit in sync when subcategories are defined:
+      if (currentCatLimit <= 0 || currentCatLimit === oldSubTotal || currentCatLimit < newSubTotal) {
+        return { ...prevCats, [cat]: newSubTotal };
+      }
+      return prevCats;
+    });
   };
 
   const toggleCategory = (cat: string) => {
@@ -250,14 +267,34 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
     const defaultStart = `${y}-${String(m + 1).padStart(2, '0')}-01`;
     const defaultEnd = `${y}-${String(m + 1).padStart(2, '0')}-${new Date(y, m + 1, 0).getDate()}`;
 
+    // Guarantee that all subcategories are saved AND that category limits reflect them
+    const finalCategories: Record<string, number> = { ...categories };
+    const finalSubcategories: Record<string, number> = {};
+
+    Object.entries(subcategories).forEach(([sub, val]) => {
+      const num = Number(val) || 0;
+      if (num > 0) {
+        finalSubcategories[sub] = num;
+      }
+    });
+
+    categoryList.forEach((cat) => {
+      const subs = categoryMap[cat] || [];
+      const subSum = subs.reduce((sum, s) => sum + Number(finalSubcategories[s] || 0), 0);
+      const catVal = Number(finalCategories[cat] || 0);
+      if (subSum > 0 && (catVal <= 0 || catVal < subSum)) {
+        finalCategories[cat] = subSum;
+      }
+    });
+
     const newBudgets: Budgets = {
       ...budgets,
       name: name.trim() || 'Presupuesto mensual',
       startDate: startDate || defaultStart,
       endDate: endDate || defaultEnd,
       income: Number(income) || 0,
-      categories,
-      subcategories,
+      categories: finalCategories,
+      subcategories: finalSubcategories,
       alertThresholdPercent: alertThreshold || 80,
       projectionGrowthPercent: budgets?.projectionGrowthPercent || 15,
       createdAt: new Date().toISOString(),
@@ -373,7 +410,8 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
                       const real = realExpensesByCategory[cat] || 0;
                       const subs = categoryMap[cat] || [];
                       const subTotal = getSubcategoryTotal(cat);
-                      const remaining = value - subTotal;
+                      const displayVal = value > 0 ? value : (subTotal > 0 ? subTotal : '');
+                      const remaining = (value || subTotal) - subTotal;
                       const hasError = value > 0 && subTotal > value;
                       const expanded = expandedCategories[cat] ?? false;
                       return (
@@ -382,18 +420,25 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
                             <div className="flex items-center gap-3">
                               <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: categoryColors[cat] || '#7928CA' }} />
                               <div className="min-w-0 flex-1">
-                                <p className="text-xs font-black truncate">{cat}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-xs font-black truncate">{cat}</p>
+                                  {subTotal > 0 && (
+                                    <span className="text-[10px] text-[#7928CA] dark:text-purple-300 font-extrabold flex items-center gap-0.5">
+                                      ✨ Suma subcat
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-[10px] text-slate-400 mt-0.5">{subs.length} subcategorías disponibles</p>
                               </div>
-                              <div className="w-32 sm:w-40 relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span><input type="number" min="0" step="1000" value={value || ''} onChange={(e) => handleChange(cat, e.target.value)} placeholder="Límite total" className="w-full rounded-xl border border-slate-200 dark:border-purple-900 bg-slate-50 dark:bg-[#1a0734] pl-8 pr-2 py-2.5 text-xs font-black outline-none focus:ring-2 focus:ring-purple-500/20" /></div>
+                              <div className="w-32 sm:w-40 relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span><input type="number" min="0" step="1000" value={displayVal} onChange={(e) => handleChange(cat, e.target.value)} placeholder="Límite total" className="w-full rounded-xl border border-slate-200 dark:border-purple-900 bg-slate-50 dark:bg-[#1a0734] pl-8 pr-2 py-2.5 text-xs font-black outline-none focus:ring-2 focus:ring-purple-500/20" /></div>
                               {subs.length > 0 && <div className="flex items-center gap-1">
-                                <button type="button" onClick={() => distributeCategoryAutomatically(cat)} disabled={value <= 0} className="p-2 rounded-xl text-[#7928CA] hover:bg-purple-50 dark:hover:bg-purple-950/40 disabled:opacity-30" title="Distribuir automáticamente" aria-label="Distribuir automáticamente"><Sparkles className="w-4 h-4" /></button>
+                                <button type="button" onClick={() => distributeCategoryAutomatically(cat)} disabled={(value || subTotal) <= 0} className="p-2 rounded-xl text-[#7928CA] hover:bg-purple-50 dark:hover:bg-purple-950/40 disabled:opacity-30" title="Distribuir automáticamente" aria-label="Distribuir automáticamente"><Sparkles className="w-4 h-4" /></button>
                                 <button type="button" onClick={() => toggleCategory(cat)} className="p-2 rounded-xl text-[#7928CA] hover:bg-purple-50 dark:hover:bg-purple-950/40" aria-label={expanded ? 'Ocultar subcategorías' : 'Mostrar subcategorías'}>{expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</button>
                               </div>}
                             </div>
                             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-[10px]">
                               <span className="text-slate-500">Subcategorías asignadas: <strong className="text-slate-700 dark:text-slate-200">{formatCurrency(subTotal, currency)}</strong></span>
-                              {value > 0 && <span className={remaining < 0 ? 'text-red-600 font-bold' : 'text-emerald-600 font-bold'}>{remaining >= 0 ? `Sin distribuir: ${formatCurrency(remaining, currency)}` : `Exceso: ${formatCurrency(Math.abs(remaining), currency)}`}</span>}
+                              {(value > 0 || subTotal > 0) && <span className={remaining < 0 ? 'text-red-600 font-bold' : 'text-emerald-600 font-bold'}>{remaining >= 0 ? `Sin distribuir: ${formatCurrency(remaining, currency)}` : `Exceso: ${formatCurrency(Math.abs(remaining), currency)}`}</span>}
                               {real > 0 && <span className="text-slate-400">Gasto real: <strong>{formatCurrency(real, currency)}</strong></span>}
                             </div>
                             {hasError && <p className="text-[10px] text-red-600 font-bold mt-2">La suma de las subcategorías no puede superar el límite de esta categoría.</p>}
@@ -443,16 +488,17 @@ export const BudgetCreateModal: React.FC<BudgetCreateModalProps> = ({
                   <div><h3 className="text-lg font-black text-[#2E0854] dark:text-white">3. Revisá antes de crear</h3><p className="text-xs text-slate-500 mt-1">Estos valores serán la base para alertas, comparativas y proyecciones.</p></div>
                   <div className="grid sm:grid-cols-3 gap-3">
                     <div className="rounded-2xl bg-purple-50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/40 p-4"><p className="text-[10px] uppercase font-black text-slate-400">Presupuesto</p><p className="text-lg font-black text-[#7928CA] mt-1">{formatCurrency(totalAssigned, currency)}</p></div>
-                    <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 p-4"><p className="text-[10px] uppercase font-black text-slate-400">Categorías</p><p className="text-lg font-black text-emerald-700 dark:text-emerald-300 mt-1">{Object.values(categories).filter(v => Number(v) > 0).length}</p></div>
+                    <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 p-4"><p className="text-[10px] uppercase font-black text-slate-400">Categorías</p><p className="text-lg font-black text-emerald-700 dark:text-emerald-300 mt-1">{categoryList.filter(cat => (categories[cat] || 0) > 0 || getSubcategoryTotal(cat) > 0).length}</p></div>
                     <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 p-4"><p className="text-[10px] uppercase font-black text-slate-400">Alerta</p><p className="text-lg font-black text-amber-700 dark:text-amber-300 mt-1">{alertThreshold}%</p></div>
                   </div>
                   <div className="rounded-3xl border border-slate-200 dark:border-purple-900/50 overflow-hidden">
                     <div className="px-4 py-3 bg-slate-50 dark:bg-[#190731] flex items-center justify-between"><span className="text-xs font-black">{name}</span><span className="text-[10px] text-slate-500">{startDate} → {endDate}</span></div>
                     <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-purple-900/30">
-                      {categoryList.filter(cat => (categories[cat] || 0) > 0).map(cat => {
+                      {categoryList.filter(cat => (categories[cat] || 0) > 0 || getSubcategoryTotal(cat) > 0).map(cat => {
                         const subTotal = getSubcategoryTotal(cat);
+                        const effectiveCatLimit = Math.max(Number(categories[cat] || 0), subTotal);
                         const assignedSubs = (categoryMap[cat] || []).filter(sub => Number(subcategories[sub] || 0) > 0);
-                        return <div key={cat} className="px-4 py-3"><div className="flex items-center justify-between"><span className="text-xs font-semibold">{cat}</span><strong className="text-xs">{formatCurrency(categories[cat], currency)}</strong></div>{assignedSubs.length > 0 && <div className="mt-2 pl-3 border-l-2 border-purple-100 dark:border-purple-900/50 space-y-1">{assignedSubs.map(sub => <div key={sub} className="flex items-center justify-between gap-3 text-[10px] text-slate-500"><span>{sub}</span><span className="font-bold">{formatCurrency(subcategories[sub], currency)}</span></div>)}<div className="flex justify-between text-[10px] font-black text-[#7928CA] pt-1"><span>Asignado a subcategorías</span><span>{formatCurrency(subTotal, currency)}</span></div></div>}</div>;
+                        return <div key={cat} className="px-4 py-3"><div className="flex items-center justify-between"><span className="text-xs font-semibold">{cat}</span><strong className="text-xs">{formatCurrency(effectiveCatLimit, currency)}</strong></div>{assignedSubs.length > 0 && <div className="mt-2 pl-3 border-l-2 border-purple-100 dark:border-purple-900/50 space-y-1">{assignedSubs.map(sub => <div key={sub} className="flex items-center justify-between gap-3 text-[10px] text-slate-500"><span>{sub}</span><span className="font-bold">{formatCurrency(subcategories[sub], currency)}</span></div>)}<div className="flex justify-between text-[10px] font-black text-[#7928CA] pt-1"><span>Asignado a subcategorías</span><span>{formatCurrency(subTotal, currency)}</span></div></div>}</div>;
                       })}
                     </div>
                   </div>

@@ -582,13 +582,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const ringDashOffset = ringCircumference - (budgetUsedPercent / 100) * ringCircumference;
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-4 sm:space-y-6 pb-20 font-sans transition-colors duration-300">
+    <div className="w-full max-w-5xl mx-auto space-y-4 sm:space-y-6 pb-20 font-sans transition-colors duration-300 bg-[#FFFFFF]">
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* GREETING & RESUMEN ROW                                              */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       <div className="pt-1">
-        <p className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-300 truncate">
+        <p className="text-xs sm:text-sm font-bold text-[#29344D] truncate">
           Hola, {displayName}
         </p>
         <div className="flex items-center justify-between gap-3 mt-0.5">
@@ -601,33 +601,33 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <button
               type="button"
               onClick={() => setIsDateRangeOpen(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-purple-100/70 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-[#5B21B6] dark:text-purple-200 border border-purple-200/80 dark:border-purple-800/60 text-xs font-bold shadow-2xs cursor-pointer transition-all active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-[#F7F3FC] hover:bg-[#EFE8FA] text-[#6A35E1] border border-[#E9E4F2] text-xs font-bold shadow-2xs cursor-pointer transition-all active:scale-95"
             >
               <span className="text-sm">📅</span>
               <span className="capitalize">{rangeLabel}</span>
-              <ChevronDown className="w-3.5 h-3.5 text-purple-600 dark:text-purple-300" />
+              <ChevronDown className="w-3.5 h-3.5 text-[#6A35E1]" />
             </button>
 
             {isDateRangeOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-[#181332] rounded-2xl p-2 shadow-xl border border-slate-100 dark:border-purple-900/50 z-50 text-xs font-semibold space-y-1">
+              <div className="absolute right-0 mt-2 w-48 bg-[#FFFFFF] rounded-2xl p-2 shadow-xl border border-[#E9E4F2] z-50 text-xs font-semibold space-y-1">
                 <button
                   type="button"
                   onClick={() => { setFilterMode('month'); setIsDateRangeOpen(false); }}
-                  className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-950/50 text-slate-700 dark:text-slate-200"
+                  className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-[#F7F3FC] text-[#29344D]"
                 >
                   Este mes ({monthName})
                 </button>
                 <button
                   type="button"
                   onClick={() => { setFilterMode('last7'); setIsDateRangeOpen(false); }}
-                  className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-950/50 text-slate-700 dark:text-slate-200"
+                  className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-[#F7F3FC] text-[#29344D]"
                 >
                   Últimos 7 días
                 </button>
                 <button
                   type="button"
                   onClick={() => { setFilterMode('today'); setIsDateRangeOpen(false); }}
-                  className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-950/50 text-slate-700 dark:text-slate-200"
+                  className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-[#F7F3FC] text-[#29344D]"
                 >
                   Hoy
                 </button>
@@ -640,16 +640,19 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* 3. HERO "SALDO DISPONIBLE" CARD                                     */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="bg-gradient-to-br from-[#2E0B5B] via-[#431478] to-[#3B0D6F] text-white rounded-3xl p-4.5 sm:p-6 shadow-xl border border-purple-400/20 relative overflow-hidden">
+      <div
+        style={{ background: 'linear-gradient(135deg, #5B29D6 0%, #6A35E1 50%, #713BE8 100%)' }}
+        className="text-white rounded-3xl p-4.5 sm:p-6 shadow-xl border border-[#6A35E1]/40 relative overflow-hidden"
+      >
         {/* Ambient glow in background */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 space-y-3 sm:space-y-4">
           {/* Fila superior: Saldo a la izquierda & Círculo de porcentaje a la derecha (en la misma línea en mobile y desktop) */}
           <div className="flex items-center justify-between gap-3 sm:gap-6">
             {/* Sección Saldo */}
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-purple-200/90 tracking-wide">Saldo disponible</p>
+              <p className="text-xs font-semibold text-purple-100 tracking-wide">Saldo disponible</p>
 
               <div className="flex items-center gap-2 sm:gap-3 mt-1 sm:mt-1.5 flex-wrap sm:flex-nowrap">
                 <h2 className="text-2xl xs:text-3xl sm:text-4xl lg:text-5xl font-black font-outfit tracking-tight leading-none text-white break-words">
@@ -658,7 +661,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 <button
                   type="button"
                   onClick={toggleHideBalance}
-                  className="text-purple-300/80 hover:text-white transition-colors cursor-pointer p-1 shrink-0"
+                  className="text-purple-200 hover:text-white transition-colors cursor-pointer p-1 shrink-0"
                   title={isBalanceHidden ? "Mostrar saldo" : "Ocultar saldo"}
                 >
                   {isBalanceHidden ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
@@ -674,7 +677,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   cy="50"
                   r={ringRadius}
                   fill="none"
-                  stroke="rgba(255, 255, 255, 0.14)"
+                  stroke="rgba(255, 255, 255, 0.16)"
                   strokeWidth="4"
                 />
                 <circle
@@ -694,7 +697,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 <span className="text-base xs:text-lg sm:text-2xl lg:text-3xl font-black text-white leading-none tracking-tight">
                   {budgetUsedPercent}%
                 </span>
-                <span className="text-[8px] xs:text-[9px] sm:text-[10px] text-purple-200/90 font-medium leading-tight mt-0.5 sm:mt-1">
+                <span className="text-[8px] xs:text-[9px] sm:text-[10px] text-purple-100 font-medium leading-tight mt-0.5 sm:mt-1">
                   del presupuesto<br className="hidden xs:inline" /> utilizado
                 </span>
               </div>
@@ -710,7 +713,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               />
             </div>
 
-            <div className="flex items-center gap-1.5 text-xs sm:text-sm text-purple-200/90 font-medium flex-wrap">
+            <div className="flex items-center gap-1.5 text-xs sm:text-sm text-purple-100 font-medium flex-wrap">
               <span>Presupuesto mensual</span>
               <span className="font-black text-white">
                 {isBalanceHidden ? '$ ••••••' : `$ ${generalBudget.toLocaleString('es-AR')}`}
@@ -719,7 +722,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 <button
                   type="button"
                   onClick={onOpenBudgetModal}
-                  className="text-purple-300 hover:text-white transition-colors p-0.5 cursor-pointer ml-0.5"
+                  className="text-purple-200 hover:text-white transition-colors p-0.5 cursor-pointer ml-0.5"
                   title="Configurar presupuesto mensual"
                 >
                   <Pencil className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -731,63 +734,73 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* 4. 2 CARDS ROW (LÍMITE DIARIO RESTANTE & PROMEDIO DIARIO)           */}
+      {/* 4. 2 CARDS ROW (LÍMITE DIARIO RESTANTE & ALERTA DE PRESUPUESTO)     */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
         {/* Card 1: Límite de gasto diario restante */}
-        <div className="bg-gradient-to-br from-[#2E0B5B] via-[#431478] to-[#3B0D6F] text-white rounded-3xl p-4 sm:p-5 shadow-lg border border-purple-400/20 flex flex-col justify-between">
+        <div
+          style={{ background: 'linear-gradient(135deg, #5B29D6 0%, #6A35E1 50%, #713BE8 100%)' }}
+          className="text-white rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-lg border border-[#6A35E1]/40 flex flex-col justify-between"
+        >
           <div>
-            <div className="flex items-center gap-2.5 mb-2">
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-sm sm:text-base flex-shrink-0 shadow-2xs">
+            <div className="flex items-center gap-2 sm:gap-2.5 mb-1.5 sm:mb-2">
+              <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-xs sm:text-base flex-shrink-0 shadow-2xs">
                 💳
               </div>
-              <span className="text-xs font-semibold text-purple-200 leading-tight">
-                Límite de gasto diario<br />restante
+              <span className="text-[11px] sm:text-xs font-semibold text-purple-100 leading-tight">
+                Límite de gasto diario<br className="hidden xs:inline" /> restante
               </span>
             </div>
 
-            <p className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight mt-1.5 tabular-nums">
+            <p className="text-base xs:text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight mt-1 sm:mt-1.5 tabular-nums truncate">
               {isBalanceHidden ? "$ •••••" : `$ ${dailyBudgetRemaining.toLocaleString('es-AR')}`}
             </p>
-            <p className="text-xs text-purple-200/80 font-medium mt-0.5">
+            <p className="text-[10px] sm:text-xs text-purple-200/90 font-medium mt-0.5 truncate">
               {dailyLimit > 0
                 ? `de ${isBalanceHidden ? '$ •••••' : `$ ${dailyLimit.toLocaleString('es-AR')}`}`
-                : (isDemoMode ? 'de $ 26.000' : 'Sin límite establecido')}
+                : (isDemoMode ? 'de $ 26.000' : 'Sin límite')}
             </p>
           </div>
 
-          <div>
-            {/* Barra afinada (delicada, moderna, h-1 para todas las versiones) */}
-            <div className="h-1 rounded-full bg-white/20 overflow-hidden my-2.5 w-full shadow-inner">
+          <div className="mt-2 sm:mt-0">
+            {/* Barra afinada con Verde de progreso (#20D878) */}
+            <div className="h-1 rounded-full bg-white/20 overflow-hidden my-1.5 sm:my-2.5 w-full shadow-inner">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-orange-400 to-[#F95420] transition-all duration-700"
+                className="h-full rounded-full bg-gradient-to-r from-[#20D878] to-[#16B563] transition-all duration-700"
                 style={{ width: `${dailyAvailablePercent}%` }}
               />
             </div>
-            <p className="text-xs font-bold text-emerald-400">
+            <p className="text-[11px] sm:text-xs font-bold text-[#20D878]">
               {dailyAvailablePercent}% disponible
             </p>
           </div>
         </div>
 
         {/* Card 2: Alerta de Categorías de Presupuesto (Exclusivo para Alertas) */}
-        <div className="bg-gradient-to-br from-[#2E0B5B] via-[#431478] to-[#3B0D6F] text-white rounded-3xl p-4 sm:p-5 shadow-lg border border-purple-400/20 flex flex-col justify-between">
+        <div
+          style={{ background: 'linear-gradient(135deg, #5B29D6 0%, #6A35E1 50%, #713BE8 100%)' }}
+          className="text-white rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-lg border border-[#6A35E1]/40 flex flex-col justify-between"
+        >
           <div>
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-2xl flex items-center justify-center text-sm sm:text-base flex-shrink-0 shadow-2xs border ${
+            <div className="flex items-center justify-between gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+              <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+                <div className={`w-7 h-7 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl flex items-center justify-center text-xs sm:text-base flex-shrink-0 shadow-2xs border ${
                   budgetAlertCategories.length > 0
                     ? 'bg-amber-500/20 border-amber-400/30 text-amber-300'
-                    : 'bg-emerald-500/20 border-emerald-400/30 text-emerald-300'
+                    : 'bg-[#20D878]/20 border-[#20D878]/30 text-[#20D878]'
                 }`}>
-                  {budgetAlertCategories.length > 0 ? '⚠️' : '🎯'}
+                  {budgetAlertCategories.length > 0 ? (
+                    <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300" />
+                  ) : (
+                    <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#20D878]" />
+                  )}
                 </div>
                 <div className="min-w-0">
-                  <span className="text-xs font-semibold text-purple-200 leading-tight block truncate">
-                    Alerta de categorías
+                  <span className="text-[11px] sm:text-xs font-semibold text-purple-100 leading-tight block truncate">
+                    Alerta de presupuesto
                   </span>
-                  <span className="text-[10px] text-purple-300/70 block leading-tight">
-                    Presupuesto por categoría
+                  <span className="text-[9px] sm:text-[10px] text-purple-200/80 block leading-tight truncate">
+                    Por categoría
                   </span>
                 </div>
               </div>
@@ -797,66 +810,66 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsAlertsModalOpen(true)}
-                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold border flex items-center gap-1 shrink-0 transition-transform active:scale-95 cursor-pointer shadow-xs ${
+                  className={`px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold border flex items-center gap-0.5 sm:gap-1 shrink-0 transition-transform active:scale-95 cursor-pointer shadow-xs ${
                     budgetAlertCategories.some(c => c.status === 'exceeded')
                       ? 'bg-rose-500/25 text-rose-200 border-rose-400/40 hover:bg-rose-500/35'
                       : 'bg-amber-500/25 text-amber-200 border-amber-400/40 hover:bg-amber-500/35'
                   }`}
                   title="Ver detalle completo de alertas"
                 >
-                  <AlertTriangle className="w-2.5 h-2.5" />
-                  <span>{budgetAlertCategories.length} en alerta</span>
-                  <ChevronRight className="w-2.5 h-2.5 ml-0.5 opacity-70" />
+                  <AlertTriangle className="w-2.5 h-2.5 hidden xs:inline" />
+                  <span>{budgetAlertCategories.length}</span>
+                  <ChevronRight className="w-2.5 h-2.5 opacity-70" />
                 </button>
               ) : (
-                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 shrink-0 shadow-xs">
-                  <CheckCircle2 className="w-2.5 h-2.5" />
+                <span className="px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold bg-[#20D878]/20 text-[#20D878] border border-[#20D878]/30 flex items-center gap-0.5 sm:gap-1 shrink-0 shadow-xs">
+                  <CheckCircle2 className="w-2.5 h-2.5 hidden xs:inline" />
                   <span>Al día</span>
                 </span>
               )}
             </div>
 
             <div className="mt-1">
-              <p className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight tabular-nums flex items-baseline gap-2">
+              <p className="text-base xs:text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight tabular-nums flex items-baseline gap-1.5">
                 <span>
                   {budgetAlertCategories.length > 0
                     ? `${budgetAlertCategories.length} en alerta`
                     : '0 en alerta'}
                 </span>
               </p>
-              <p className="text-xs text-purple-200/80 font-medium mt-0.5">
+              <p className="text-[10px] sm:text-xs text-purple-200/90 font-medium mt-0.5 truncate">
                 {budgetAlertCategories.length > 0
                   ? (budgetAlertCategories.filter(c => c.status === 'exceeded').length > 0
-                      ? `${budgetAlertCategories.filter(c => c.status === 'exceeded').length} superó el 100% presupuestado`
-                      : `Cerca del límite (umbral ${alertThreshold}%)`)
-                  : `Todas las categorías bajo control (<${alertThreshold}%)`}
+                      ? `${budgetAlertCategories.filter(c => c.status === 'exceeded').length} superó el 100%`
+                      : `Cerca del límite (${alertThreshold}%)`)
+                  : `Bajo control (<${alertThreshold}%)`}
               </p>
             </div>
           </div>
 
           {/* Contenido de alertas con barras de progreso afinadas */}
-          <div className="mt-3 pt-2.5 border-t border-purple-400/20">
+          <div className="mt-2 sm:mt-3 pt-2 sm:pt-2.5 border-t border-white/15">
             {budgetAlertCategories.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-1.5 sm:space-y-2">
                 {budgetAlertCategories.slice(0, 2).map((cat) => {
                   const isExceeded = cat.status === 'exceeded';
                   return (
                     <div key={cat.name} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-white truncate flex items-center gap-1.5 min-w-0">
-                          <span className="text-xs">{cat.emoji}</span>
+                      <div className="flex items-center justify-between text-[11px] sm:text-xs">
+                        <span className="font-semibold text-white truncate flex items-center gap-1 min-w-0">
+                          <span
+                            className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0"
+                            style={{ backgroundColor: cat.color }}
+                          />
                           <span className="truncate">{cat.name}</span>
                         </span>
-                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                          <span className={`text-[10px] font-black px-1.5 py-0.2 rounded-md ${
+                        <div className="flex items-center gap-1 shrink-0 ml-1.5">
+                          <span className={`text-[9px] sm:text-[10px] font-black px-1 sm:px-1.5 py-0.2 rounded-md ${
                             isExceeded
                               ? 'bg-rose-500/30 text-rose-200 border border-rose-500/40'
                               : 'bg-amber-500/30 text-amber-200 border border-amber-500/40'
                           }`}>
                             {cat.pct}%
-                          </span>
-                          <span className="text-[11px] text-purple-200/80 font-medium">
-                            {isBalanceHidden ? '$ •••' : `$ ${cat.spent.toLocaleString('es-AR')}`}
                           </span>
                         </div>
                       </div>
@@ -876,40 +889,40 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   );
                 })}
 
-                <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center justify-between pt-0.5 sm:pt-1">
                   {budgetAlertCategories.length > 2 ? (
-                    <span className="text-[10px] text-purple-300/80 font-medium">
-                      +{budgetAlertCategories.length - 2} categoría{budgetAlertCategories.length - 2 > 1 ? 's' : ''} más
+                    <span className="text-[9px] sm:text-[10px] text-purple-200/80 font-medium">
+                      +{budgetAlertCategories.length - 2} más
                     </span>
                   ) : <span />}
                   <button
                     type="button"
                     onClick={() => setIsAlertsModalOpen(true)}
-                    className="text-[10px] font-bold text-purple-300 hover:text-white transition-colors cursor-pointer flex items-center gap-0.5 ml-auto"
+                    className="text-[9px] sm:text-[10px] font-bold text-purple-200 hover:text-white transition-colors cursor-pointer flex items-center gap-0.5 ml-auto"
                   >
-                    Ver detalle completo
-                    <ChevronRight className="w-3 h-3" />
+                    Ver detalle
+                    <ChevronRight className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                   </button>
                 </div>
               </div>
             ) : (
               <div>
-                {/* Barra afinada de estado óptimo (h-1 / 4px) */}
-                <div className="h-1 rounded-full bg-white/20 overflow-hidden my-2.5 w-full shadow-inner">
-                  <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 w-full" />
+                {/* Barra afinada de estado óptimo (#20D878 Verde brillante) */}
+                <div className="h-1 rounded-full bg-white/20 overflow-hidden my-1.5 sm:my-2.5 w-full shadow-inner">
+                  <div className="h-full rounded-full bg-gradient-to-r from-[#20D878] to-[#16B563] w-full" />
                 </div>
-                <div className="flex items-center justify-between text-xs">
-                  <p className="font-bold text-emerald-400 flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                    <span>Presupuestos al día</span>
+                <div className="flex items-center justify-between text-[11px] sm:text-xs">
+                  <p className="font-bold text-[#20D878] flex items-center gap-1 truncate">
+                    <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                    <span className="truncate">Al día</span>
                   </p>
                   {onOpenBudgetModal && (
                     <button
                       type="button"
                       onClick={onOpenBudgetModal}
-                      className="text-[10px] text-purple-300 hover:text-white font-medium cursor-pointer"
+                      className="text-[9px] sm:text-[10px] text-purple-200 hover:text-white font-medium cursor-pointer shrink-0 ml-1"
                     >
-                      Ajustar límites
+                      Ajustar
                     </button>
                   )}
                 </div>
@@ -922,76 +935,76 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* 5. ACCIONES RÁPIDAS                                                 */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-5 border border-slate-100 dark:border-purple-900/40 shadow-xs transition-all">
-        <h4 className="text-[11px] font-black text-purple-700 dark:text-purple-300 uppercase tracking-wider mb-3">
+      <div className="bg-[#FFFFFF] rounded-3xl p-4 sm:p-5 border border-[#E9E4F2] shadow-xs transition-all">
+        <h4 className="text-[11px] font-black text-[#29344D] uppercase tracking-wider mb-3">
           Acciones rápidas
         </h4>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-          {/* Card 1: Cuotas */}
+          {/* Card 1: Cuotas (Lila muy pálido #F7F3FC) */}
           <button
             type="button"
             onClick={() => onNavigateTab?.('installments')}
-            className="bg-[#F8F5FF] hover:bg-[#F0EBFF] dark:bg-purple-950/40 dark:hover:bg-purple-900/50 border border-purple-100/80 dark:border-purple-900/50 rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between h-20 sm:h-22 transition-all cursor-pointer group text-left"
+            className="bg-[#F7F3FC] hover:bg-[#EFE8FA] border border-[#E9E4F2] rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between h-20 sm:h-22 transition-all cursor-pointer group text-left"
           >
             <div className="flex items-center justify-between w-full">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-purple-200/60 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 flex items-center justify-center">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-white/90 text-[#6A35E1] flex items-center justify-center shadow-2xs">
                 <CreditCard className="w-4 h-4" />
               </div>
-              <ChevronRight className="w-3.5 h-3.5 text-purple-400 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-3.5 h-3.5 text-[#6A35E1] group-hover:translate-x-0.5 transition-transform" />
             </div>
-            <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white">
+            <span className="text-xs sm:text-sm font-bold text-[#29344D]">
               Cuotas
             </span>
           </button>
 
-          {/* Card 2: Metas */}
+          {/* Card 2: Metas (Crema muy suave #FFF8E8) */}
           <button
             type="button"
             onClick={() => onNavigateTab?.('goals')}
-            className="bg-[#FFFDF5] hover:bg-[#FFF8E6] dark:bg-amber-950/30 dark:hover:bg-amber-900/40 border border-amber-100/80 dark:border-amber-900/50 rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between h-20 sm:h-22 transition-all cursor-pointer group text-left"
+            className="bg-[#FFF8E8] hover:bg-[#FFF2D4] border border-[#FBEEC9] rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between h-20 sm:h-22 transition-all cursor-pointer group text-left"
           >
             <div className="flex items-center justify-between w-full">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-200/60 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 flex items-center justify-center">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shadow-2xs">
                 <Target className="w-4 h-4" />
               </div>
-              <ChevronRight className="w-3.5 h-3.5 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-3.5 h-3.5 text-amber-500 group-hover:translate-x-0.5 transition-transform" />
             </div>
-            <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white">
+            <span className="text-xs sm:text-sm font-bold text-[#29344D]">
               Metas
             </span>
           </button>
 
-          {/* Card 3: Balance Dúo */}
+          {/* Card 3: Balance Dúo (Rosa muy pálido #FFF1F5) */}
           <button
             type="button"
             onClick={() => onNavigateTab?.('balance')}
-            className="bg-[#FFF5F7] hover:bg-[#FFEBEF] dark:bg-rose-950/30 dark:hover:bg-rose-900/40 border border-rose-100/80 dark:border-rose-900/50 rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between h-20 sm:h-22 transition-all cursor-pointer group text-left"
+            className="bg-[#FFF1F5] hover:bg-[#FFE4ED] border border-[#FCDCE7] rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between h-20 sm:h-22 transition-all cursor-pointer group text-left"
           >
             <div className="flex items-center justify-between w-full">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-rose-200/60 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 flex items-center justify-center">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shadow-2xs">
                 <Users className="w-4 h-4" />
               </div>
-              <ChevronRight className="w-3.5 h-3.5 text-rose-400 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-3.5 h-3.5 text-rose-500 group-hover:translate-x-0.5 transition-transform" />
             </div>
-            <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white">
+            <span className="text-xs sm:text-sm font-bold text-[#29344D]">
               Balance Dúo
             </span>
           </button>
 
-          {/* Card 4: Liquidar */}
+          {/* Card 4: Liquidar (Celeste muy pálido #F0F7FC) */}
           <button
             type="button"
             onClick={() => onNavigateTab?.('balance')}
-            className="bg-[#F5F9FF] hover:bg-[#EBF3FF] dark:bg-blue-950/30 dark:hover:bg-blue-900/40 border border-blue-100/80 dark:border-blue-900/50 rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between h-20 sm:h-22 transition-all cursor-pointer group text-left"
+            className="bg-[#F0F7FC] hover:bg-[#E2F0F9] border border-[#D9EAF7] rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between h-20 sm:h-22 transition-all cursor-pointer group text-left"
           >
             <div className="flex items-center justify-between w-full">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-blue-200/60 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 flex items-center justify-center">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shadow-2xs">
                 <ArrowRightLeft className="w-4 h-4" />
               </div>
-              <ChevronRight className="w-3.5 h-3.5 text-blue-400 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-3.5 h-3.5 text-blue-500 group-hover:translate-x-0.5 transition-transform" />
             </div>
-            <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white">
+            <span className="text-xs sm:text-sm font-bold text-[#29344D]">
               Liquidar
             </span>
           </button>
@@ -1001,13 +1014,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* 6. PRÓXIMOS VENCIMIENTOS                                            */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-6 border border-slate-100 dark:border-purple-900/40 shadow-xs transition-all">
+      <div className="bg-[#FFFFFF] rounded-3xl p-4 sm:p-6 border border-[#E9E4F2] shadow-xs transition-all">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 flex items-center justify-center text-xs">
+            <div className="w-7 h-7 rounded-lg bg-[#F7F3FC] text-[#6A35E1] flex items-center justify-center text-xs">
               📅
             </div>
-            <h3 className="text-sm sm:text-base font-black text-slate-800 dark:text-white tracking-tight">
+            <h3 className="text-sm sm:text-base font-black text-[#29344D] tracking-tight">
               Próximos vencimientos
             </h3>
           </div>
@@ -1015,7 +1028,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <button
               type="button"
               onClick={() => onNavigateTab('card_alerts')}
-              className="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline cursor-pointer flex items-center gap-0.5"
+              className="text-xs font-semibold text-[#F95420] hover:text-[#D84315] hover:underline cursor-pointer flex items-center gap-0.5"
             >
               <span>Ver todos</span>
               <span>→</span>
@@ -1023,12 +1036,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           )}
         </div>
 
-        <div className="divide-y divide-slate-100 dark:divide-purple-900/30">
+        <div className="divide-y divide-[#E9E4F2]">
           {upcomingBills.map(bill => (
             <div
               key={bill.id}
               onClick={() => onNavigateTab ? onNavigateTab('card_alerts') : {}}
-              className="py-3 flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-purple-950/20 rounded-xl px-1.5 transition-colors cursor-pointer"
+              className="py-3 flex items-center justify-between gap-3 hover:bg-[#F7F3FC]/50 rounded-xl px-1.5 transition-colors cursor-pointer"
             >
               {/* Left: Icon, Title & Category */}
               <div className="flex items-center gap-3 min-w-0">
@@ -1036,10 +1049,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   {bill.icon}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                  <p className="text-xs sm:text-sm font-bold text-[#29344D] truncate">
                     {bill.title}
                   </p>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate">
+                  <p className="text-[11px] text-[#7C8498] font-medium truncate">
                     {bill.cat}
                   </p>
                 </div>
@@ -1047,10 +1060,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
               {/* Right: Amount & Date Pill */}
               <div className="flex items-center gap-3 flex-shrink-0">
-                <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white tabular-nums">
+                <span className="text-xs sm:text-sm font-black text-[#29344D] tabular-nums">
                   {isBalanceHidden ? "$ •••••" : `$ ${bill.amount.toLocaleString('es-AR')}`}
                 </span>
-                <span className="px-2.5 py-1 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-[#7928CA] dark:text-purple-300 border border-purple-100/80 dark:border-purple-800/40 text-[11px] font-bold tracking-tight">
+                <span className="px-2.5 py-1 rounded-xl bg-[#F7F3FC] text-[#6A35E1] border border-[#E9E4F2] text-[11px] font-bold tracking-tight">
                   {bill.duePill}
                 </span>
               </div>
@@ -1062,16 +1075,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* 7. HERRAMIENTAS PRO                                                 */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-6 border border-slate-100 dark:border-purple-900/40 shadow-xs transition-all">
+      <div className="bg-[#FFFFFF] rounded-3xl p-4 sm:p-6 border border-[#E9E4F2] shadow-xs transition-all">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm sm:text-base font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-1.5">
+          <h3 className="text-sm sm:text-base font-black text-[#29344D] tracking-tight flex items-center gap-1.5">
             <span>Herramientas</span>
-            <span className="text-[#7928CA] dark:text-purple-400">PRO</span>
+            <span className="text-[#6A35E1]">PRO</span>
           </h3>
           <button
             type="button"
             onClick={() => onNavigateTab ? onNavigateTab('subscriptions') : setIsScoreModalOpen(true)}
-            className="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:underline cursor-pointer flex items-center gap-0.5"
+            className="text-xs font-semibold text-[#6A35E1] hover:underline cursor-pointer flex items-center gap-0.5"
           >
             <span>Ver más</span>
             <span>→</span>
@@ -1079,76 +1092,76 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
-          {/* Card 1: Score Financiero */}
+          {/* Card 1: Score Financiero (Lila muy pálido #F7F3FC) */}
           <div
             onClick={() => setIsScoreModalOpen(true)}
-            className="bg-[#FAF7FE] hover:bg-[#F4EEFD] dark:bg-purple-950/30 dark:hover:bg-purple-900/40 border border-purple-100/90 dark:border-purple-900/50 rounded-2xl p-4 transition-all cursor-pointer group flex items-center justify-between gap-3.5"
+            className="bg-[#F7F3FC] hover:bg-[#EFE8FA] border border-[#E9E4F2] rounded-2xl p-4 transition-all cursor-pointer group flex items-center justify-between gap-3.5"
           >
             <div className="flex items-center gap-3.5 min-w-0">
               {/* Ring icon */}
               <div className="relative w-11 h-11 flex-shrink-0 flex items-center justify-center">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 40 40">
-                  <circle cx="20" cy="20" r="15" fill="none" stroke="rgba(121, 40, 202, 0.15)" strokeWidth="3" />
+                  <circle cx="20" cy="20" r="15" fill="none" stroke="rgba(106, 53, 225, 0.15)" strokeWidth="3" />
                   <circle
                     cx="20"
                     cy="20"
                     r="15"
                     fill="none"
-                    stroke="#7928CA"
+                    stroke="#6A35E1"
                     strokeWidth="3"
                     strokeLinecap="round"
                     strokeDasharray={2 * Math.PI * 15}
                     strokeDashoffset={2 * Math.PI * 15 * (1 - (dailyScore?.total ?? 82) / 100)}
                   />
                 </svg>
-                <div className="absolute inset-0 flex items-center justify-center text-[11px] font-black text-[#7928CA] dark:text-purple-300">
+                <div className="absolute inset-0 flex items-center justify-center text-[11px] font-black text-[#6A35E1]">
                   {dailyScore?.total ?? 82}
                 </div>
               </div>
 
               <div className="min-w-0">
-                <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
+                <h4 className="text-xs sm:text-sm font-black text-[#29344D] truncate">
                   Score financiero
                 </h4>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug line-clamp-2 mt-0.5">
+                <p className="text-[11px] text-[#7C8498] leading-snug line-clamp-2 mt-0.5">
                   Conocé tu salud financiera, hábitos de gasto y recomendaciones.
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5 flex-shrink-0">
-              <span className="px-2 py-0.5 rounded-full bg-[#7928CA] text-white text-[9px] font-black tracking-wider uppercase shadow-2xs">
+              <span className="px-2 py-0.5 rounded-full bg-[#6A35E1] text-white text-[9px] font-black tracking-wider uppercase shadow-2xs">
                 PRO
               </span>
-              <ChevronRight className="w-3.5 h-3.5 text-purple-400 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-3.5 h-3.5 text-[#6A35E1] group-hover:translate-x-0.5 transition-transform" />
             </div>
           </div>
 
-          {/* Card 2: Flujo de caja */}
+          {/* Card 2: Flujo de caja (Crema muy suave #FFF8E8) */}
           <div
             onClick={() => setIsCashFlowModalOpen(true)}
-            className="bg-[#FFFDF7] hover:bg-[#FFF9EA] dark:bg-amber-950/20 dark:hover:bg-amber-900/30 border border-amber-100/90 dark:border-amber-900/50 rounded-2xl p-4 transition-all cursor-pointer group flex items-center justify-between gap-3.5"
+            className="bg-[#FFF8E8] hover:bg-[#FFF2D4] border border-[#FBEEC9] rounded-2xl p-4 transition-all cursor-pointer group flex items-center justify-between gap-3.5"
           >
             <div className="flex items-center gap-3.5 min-w-0">
-              <div className="w-11 h-11 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0 text-lg shadow-2xs">
+              <div className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0 text-lg shadow-2xs">
                 📊
               </div>
 
               <div className="min-w-0">
-                <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
+                <h4 className="text-xs sm:text-sm font-black text-[#29344D] truncate">
                   Flujo de caja
                 </h4>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug line-clamp-2 mt-0.5">
+                <p className="text-[11px] text-[#7C8498] leading-snug line-clamp-2 mt-0.5">
                   Proyectá tus ingresos y gastos, anticipá tu saldo futuro y evitá sorpresas.
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5 flex-shrink-0">
-              <span className="px-2 py-0.5 rounded-full bg-[#7928CA] text-white text-[9px] font-black tracking-wider uppercase shadow-2xs">
+              <span className="px-2 py-0.5 rounded-full bg-[#6A35E1] text-white text-[9px] font-black tracking-wider uppercase shadow-2xs">
                 PRO
               </span>
-              <ChevronRight className="w-3.5 h-3.5 text-purple-400 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-3.5 h-3.5 text-[#6A35E1] group-hover:translate-x-0.5 transition-transform" />
             </div>
           </div>
         </div>
@@ -1158,10 +1171,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* 8. DISTRIBUCIÓN DE GASTOS & ÚLTIMOS MOVIMIENTOS                     */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Left Card: Distribución de gastos */}
-        <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-6 border border-slate-100 dark:border-purple-900/40 shadow-xs transition-all flex flex-col justify-between">
+        {/* Left Card: Distribución de gastos (Blanco #FFFFFF con Borde #E9E4F2) */}
+        <div className="bg-[#FFFFFF] rounded-3xl p-4 sm:p-6 border border-[#E9E4F2] shadow-xs transition-all flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <h3 className="text-xs sm:text-sm font-bold text-[#29344D] flex items-center gap-2">
               <span>📊</span>
               <span>Distribución de gastos</span>
             </h3>
@@ -1169,7 +1182,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <button
                 type="button"
                 onClick={onOpenBudgetModal}
-                className="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline cursor-pointer flex items-center gap-0.5"
+                className="text-xs font-semibold text-[#F95420] hover:text-[#D84315] hover:underline cursor-pointer flex items-center gap-0.5"
               >
                 <span>Ver detalle</span>
                 <span>→</span>
@@ -1190,7 +1203,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     outerRadius={60}
                     dataKey="value"
                     strokeWidth={2}
-                    stroke={isDarkMode ? '#181332' : '#ffffff'}
+                    stroke="#FFFFFF"
                   >
                     {categoryPieData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
@@ -1200,10 +1213,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               </ResponsiveContainer>
 
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-                <span className="text-xs font-black text-slate-900 dark:text-white leading-tight">
+                <span className="text-xs font-black text-[#29344D] leading-tight">
                   {isBalanceHidden ? '$ •••' : `$ ${totalExpenses.toLocaleString('es-AR')}`}
                 </span>
-                <span className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">Total gastos</span>
+                <span className="text-[9px] text-[#7C8498] uppercase tracking-wider font-semibold">Total gastos</span>
               </div>
             </div>
 
@@ -1213,9 +1226,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 <div key={item.name} className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 truncate min-w-0">
                     <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                    <span className="text-slate-600 dark:text-slate-300 truncate font-medium">{item.name}</span>
+                    <span className="text-[#7C8498] truncate font-medium">{item.name}</span>
                   </div>
-                  <span className="font-bold text-slate-900 dark:text-white tabular-nums flex-shrink-0">
+                  <span className="font-bold text-[#29344D] tabular-nums flex-shrink-0">
                     {item.pct}%
                   </span>
                 </div>
@@ -1224,10 +1237,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
-        {/* Right Card: Últimos movimientos */}
-        <div className="bg-white dark:bg-[#181332] rounded-3xl p-4 sm:p-6 border border-slate-100 dark:border-purple-900/40 shadow-xs transition-all flex flex-col justify-between">
+        {/* Right Card: Últimos movimientos (Blanco #FFFFFF con Borde #E9E4F2) */}
+        <div className="bg-[#FFFFFF] rounded-3xl p-4 sm:p-6 border border-[#E9E4F2] shadow-xs transition-all flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <h3 className="text-xs sm:text-sm font-bold text-[#29344D] flex items-center gap-2">
               <span>🕒</span>
               <span>Últimos movimientos</span>
             </h3>
@@ -1235,7 +1248,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <button
                 type="button"
                 onClick={() => onNavigateTab('transactions')}
-                className="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline cursor-pointer flex items-center gap-0.5"
+                className="text-xs font-semibold text-[#F95420] hover:text-[#D84315] hover:underline cursor-pointer flex items-center gap-0.5"
               >
                 <span>Ver todos</span>
                 <span>→</span>
@@ -1243,28 +1256,28 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             )}
           </div>
 
-          <div className="divide-y divide-slate-100 dark:divide-purple-900/30">
+          <div className="divide-y divide-[#E9E4F2]">
             {recentMovements.slice(0, 3).map((tx) => (
               <div
                 key={tx.id}
                 onClick={() => onNavigateTab ? onNavigateTab('transactions') : {}}
-                className="py-3 flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-purple-950/20 rounded-xl px-1.5 transition-colors cursor-pointer"
+                className="py-3 flex items-center justify-between gap-3 hover:bg-[#F7F3FC]/50 rounded-xl px-1.5 transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center text-sm flex-shrink-0">
                     {tx.emoji}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{tx.title}</p>
-                    <p className="text-[10px] text-slate-400 font-medium truncate">{tx.subtitle}</p>
+                    <p className="text-xs font-bold text-[#29344D] truncate">{tx.title}</p>
+                    <p className="text-[10px] text-[#7C8498] font-medium truncate">{tx.subtitle}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <span className="text-xs font-black text-rose-500 tabular-nums">
+                  <span className="text-xs font-black text-[#F95420] tabular-nums">
                     - ${tx.amount.toLocaleString('es-AR')}
                   </span>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                  <ChevronRight className="w-3.5 h-3.5 text-[#7C8498]" />
                 </div>
               </div>
             ))}

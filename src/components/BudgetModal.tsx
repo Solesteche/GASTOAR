@@ -71,6 +71,15 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
     if (isOpen) {
       const initialCats = budgets?.categories ? { ...budgets.categories } : {};
       const initialSubs = budgets?.subcategories ? { ...budgets.subcategories } : {};
+
+      // If category has subcategories that sum to a positive value, ensure category budget is at least that sum
+      Object.entries(categoryMap || {}).forEach(([cat, subs]) => {
+        const subSum = (subs || []).reduce((acc, s) => acc + (Number(initialSubs[s]) || 0), 0);
+        if (subSum > 0 && (!initialCats[cat] || initialCats[cat] < subSum)) {
+          initialCats[cat] = subSum;
+        }
+      });
+
       const threshold = budgets?.alertThresholdPercent || 80;
       setLocalBudgets({
         categories: initialCats,
@@ -82,7 +91,7 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
       setPreviousBudgetsBackup(null);
       setProjectionAppliedNotice(null);
     }
-  }, [isOpen, budgets]);
+  }, [isOpen, budgets, categoryMap]);
 
   // Calculate real current expenses per category from transactions
   const realExpensesByCategory = useMemo(() => {
@@ -97,11 +106,13 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
 
   // Total current vs total calculated
   const totalCurrentBudget = useMemo(() => {
-    return (Object.values(localBudgets.categories || {}) as (number | undefined)[]).reduce<number>(
-      (acc, val) => acc + (val || 0),
-      0
-    );
-  }, [localBudgets.categories]);
+    return Object.keys(categoryMap || {}).reduce<number>((acc, cat) => {
+      const subs = categoryMap[cat] || [];
+      const subSum = subs.reduce((s, sub) => s + (Number(localBudgets.subcategories?.[sub]) || 0), 0);
+      const catVal = Number(localBudgets.categories?.[cat] || 0);
+      return acc + Math.max(catVal, subSum);
+    }, 0);
+  }, [localBudgets.categories, localBudgets.subcategories, categoryMap]);
 
   if (!isOpen) return null;
 
@@ -126,20 +137,31 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
 
   const handleSubcategoryBudgetChange = (cat: string, sub: string, val: string) => {
     setLocalBudgets(prev => {
-      const nextSubs = { ...prev.subcategories };
+      const nextSubs = { ...(prev.subcategories || {}) };
       if (val === '') {
         delete nextSubs[sub];
       } else {
         const num = parseFloat(val);
-        nextSubs[sub] = isNaN(num) ? 0 : num;
+        if (isNaN(num) || num <= 0) {
+          delete nextSubs[sub];
+        } else {
+          nextSubs[sub] = num;
+        }
       }
 
       // Automatically sum all subcategories of this category and set as category budget
       const catSubs = categoryMap[cat] || [];
-      const subSum = catSubs.reduce((acc, s) => acc + (nextSubs[s] || 0), 0);
-      const nextCats = { ...prev.categories };
-      if (subSum > 0) {
-        nextCats[cat] = subSum;
+      const oldSubSum = catSubs.reduce((acc, s) => acc + (Number(prev.subcategories?.[s]) || 0), 0);
+      const newSubSum = catSubs.reduce((acc, s) => acc + (Number(nextSubs[s]) || 0), 0);
+      const nextCats = { ...(prev.categories || {}) };
+      const currentCatVal = Number(nextCats[cat] || 0);
+
+      if (currentCatVal <= 0 || currentCatVal === oldSubSum || currentCatVal < newSubSum) {
+        if (newSubSum > 0) {
+          nextCats[cat] = newSubSum;
+        } else if (currentCatVal === oldSubSum) {
+          delete nextCats[cat];
+        }
       }
 
       return {
@@ -252,8 +274,30 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Clean and guarantee all subcategories and their category limits
+    const finalCategories: Record<string, number> = { ...(localBudgets.categories || {}) };
+    const finalSubcategories: Record<string, number> = {};
+
+    Object.entries(localBudgets.subcategories || {}).forEach(([sub, val]) => {
+      const num = Number(val) || 0;
+      if (num > 0) {
+        finalSubcategories[sub] = num;
+      }
+    });
+
+    Object.entries(categoryMap || {}).forEach(([cat, subs]) => {
+      const subSum = (subs || []).reduce((acc, s) => acc + (Number(finalSubcategories[s]) || 0), 0);
+      const currentCatVal = Number(finalCategories[cat] || 0);
+      if (subSum > 0 && (currentCatVal <= 0 || currentCatVal < subSum)) {
+        finalCategories[cat] = subSum;
+      }
+    });
+
     const finalBudgets: Budgets = {
       ...localBudgets,
+      categories: finalCategories,
+      subcategories: finalSubcategories,
       alertThresholdPercent: alertThreshold,
       projectionGrowthPercent: projectionPercent,
     };
