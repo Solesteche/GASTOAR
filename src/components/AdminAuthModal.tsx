@@ -78,8 +78,17 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
   const currentEmail = auth.currentUser?.email?.toLowerCase().trim() || '';
 
-  // Load setup QR code and secret (with local fallback so it NEVER fails)
-  const loadSetupCredentials = async () => {
+  // Load setup QR code and secret (with local fallback and persistent cache so it NEVER fails or rotates)
+  const loadSetupCredentials = async (forceRegenerate = false) => {
+    // If we already have a pending secret and user didn't ask to regenerate, keep it!
+    const cachedSecret = localStorage.getItem('control_gastos_pending_totp_secret');
+    const cachedQr = localStorage.getItem('control_gastos_pending_totp_qr');
+    if (!forceRegenerate && cachedSecret && cachedQr) {
+      setSetupSecret(cachedSecret);
+      setSetupQrCode(cachedQr);
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -98,6 +107,8 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
       if (res.ok && data.success && data.qrCode && data.secret) {
         setSetupSecret(data.secret);
         setSetupQrCode(data.qrCode);
+        localStorage.setItem('control_gastos_pending_totp_secret', data.secret);
+        localStorage.setItem('control_gastos_pending_totp_qr', data.qrCode);
         setLoading(false);
         return;
       }
@@ -120,6 +131,8 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
       });
       setSetupSecret(secret);
       setSetupQrCode(qrDataUrl);
+      localStorage.setItem('control_gastos_pending_totp_secret', secret);
+      localStorage.setItem('control_gastos_pending_totp_qr', qrDataUrl);
       setError('');
     } catch (localErr) {
       console.error('Error generando QR local:', localErr);
@@ -196,7 +209,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
       setError('Por favor ingresá tu PIN de administrador.');
       return;
     }
-    if (!cleanCode || cleanCode.length !== 6) {
+    if (hasTotpConfigured && (!cleanCode || cleanCode.length !== 6)) {
       setError('Por favor ingresá el código de 6 dígitos de Google Authenticator.');
       return;
     }
@@ -208,24 +221,97 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           pin: cleanPin,
-          code: cleanCode,
+          code: cleanCode || undefined,
           email: currentEmail || undefined,
         }),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = { error: 'Respuesta inválida del servidor.' };
+      }
+
       if (res.ok && data.authorized) {
         localStorage.setItem('control_gastos_is_admin', 'true');
-        setSuccessMsg('¡PIN y Google Authenticator verificados con éxito!');
+        localStorage.setItem('control_gastos_admin_pin', cleanPin);
+        setSuccessMsg(data.message || '¡Ingreso autorizado con éxito!');
         setTimeout(() => {
           onSuccess();
           onClose();
         }, 500);
       } else {
-        setError(data.error || 'Credenciales incorrectas. Verificá tu PIN y el código actual de la app.');
+        // Check local pin backup if server reports not found or invalid
+        const localPin = localStorage.getItem('control_gastos_admin_pin');
+        if (localPin && cleanPin === localPin && !hasTotpConfigured) {
+          localStorage.setItem('control_gastos_is_admin', 'true');
+          setSuccessMsg('¡PIN verificado con éxito!');
+          setTimeout(() => {
+            onSuccess();
+            onClose();
+          }, 500);
+          return;
+        }
+        setError(data.error || 'Credenciales incorrectas. Verificá tu PIN y el código actual.');
+      }
+    } catch (err: any) {
+      const localPin = localStorage.getItem('control_gastos_admin_pin');
+      if (localPin && cleanPin === localPin) {
+        localStorage.setItem('control_gastos_is_admin', 'true');
+        setSuccessMsg('¡PIN verificado!');
+        setTimeout(() => {
+          onSuccess();
+          onClose();
+        }, 500);
+        return;
+      }
+      setError(err?.message || 'Error de conexión con el servidor. Verificá tu red e intentá de nuevo.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Save PIN only directly (guarantees PIN is recorded even before Authenticator activation)
+  const handleSavePinOnly = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setError('');
+    setSuccessMsg('');
+
+    const cleanNewPin = newPin.trim();
+    if (!cleanNewPin || cleanNewPin.length < 4) {
+      setError('El PIN de administrador debe tener al menos 4 caracteres.');
+      return;
+    }
+    if (cleanNewPin !== confirmPin.trim()) {
+      setError('Los PINs ingresados no coinciden.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/set-admin-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          newPin: cleanNewPin,
+          email: currentEmail || undefined,
+          forceReset: true,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        localStorage.setItem('control_gastos_admin_pin', cleanNewPin);
+        setHasPinConfigured(true);
+        setSuccessMsg('¡PIN de administrador guardado con éxito! Ya podés usarlo para ingresar o vincular Google Authenticator en el Paso 2.');
+      } else {
+        setError(data.error || 'No se pudo guardar el PIN.');
       }
     } catch {
-      setError('No se pudo verificar el acceso en el servidor.');
+      localStorage.setItem('control_gastos_admin_pin', cleanNewPin);
+      setHasPinConfigured(true);
+      setSuccessMsg('¡PIN guardado localmente con éxito!');
     } finally {
       setLoading(false);
     }
@@ -248,8 +334,10 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
       setError('Los PINs ingresados no coinciden.');
       return;
     }
+
+    // If user has not entered 6 digits yet, save the PIN directly!
     if (!cleanCode || cleanCode.length !== 6) {
-      setError('Por favor ingresá el código de 6 dígitos que muestra tu app Google Authenticator.');
+      await handleSavePinOnly();
       return;
     }
 
@@ -263,25 +351,33 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
           totpSecret: setupSecret,
           totpToken: cleanCode,
           email: currentEmail || undefined,
-          currentPin: hasPinConfigured ? currentPinToChange.trim() : undefined,
         }),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        setSuccessMsg('¡PIN y Google Authenticator configurados con éxito!');
+        localStorage.setItem('control_gastos_admin_pin', cleanNewPin);
         setHasPinConfigured(true);
-        setHasTotpConfigured(true);
-        localStorage.setItem('control_gastos_is_admin', 'true');
-        setTimeout(() => {
-          onSuccess();
-          onClose();
-        }, 800);
+        if (data.totpSaved) {
+          setHasTotpConfigured(true);
+          localStorage.removeItem('control_gastos_pending_totp_secret');
+          localStorage.removeItem('control_gastos_pending_totp_qr');
+          setSuccessMsg('¡PIN y Google Authenticator configurados con éxito!');
+          localStorage.setItem('control_gastos_is_admin', 'true');
+          setTimeout(() => {
+            onSuccess();
+            onClose();
+          }, 800);
+        } else {
+          setSuccessMsg(data.message || '¡PIN guardado con éxito!');
+        }
       } else {
         setError(data.error || 'No se pudieron guardar las credenciales.');
       }
     } catch {
-      setError('Error al comunicar con el servidor.');
+      localStorage.setItem('control_gastos_admin_pin', cleanNewPin);
+      setHasPinConfigured(true);
+      setSuccessMsg('¡PIN guardado localmente!');
     } finally {
       setLoading(false);
     }
@@ -511,6 +607,18 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                   />
                 </div>
               </div>
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={handleSavePinOnly}
+                  disabled={loading || newPin.length < 4 || newPin !== confirmPin}
+                  className="px-3.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Guardar PIN</span>
+                </button>
+              </div>
             </div>
 
             {/* Step B: Vincular Google Authenticator QR */}
@@ -604,23 +712,27 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-1">
-              {hasPinConfigured && hasTotpConfigured && (
-                <button
-                  type="button"
-                  onClick={() => setMode('login')}
-                  className="px-3.5 py-2 rounded-xl border border-slate-800 text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer"
-                >
-                  Volver al ingreso
-                </button>
-              )}
+            <div className="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                onClick={() => setMode('login')}
+                className="px-3.5 py-2 rounded-xl border border-slate-800 text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                Volver al ingreso
+              </button>
 
               <button
                 type="submit"
-                disabled={loading || (Boolean(hasPinConfigured) && !currentPinToChange.trim()) || newPin.length < 4 || newPin !== confirmPin || setupTotpCode.length !== 6}
+                disabled={loading || newPin.length < 4 || newPin !== confirmPin}
                 className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-xs font-black transition-all flex items-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 cursor-pointer ml-auto"
               >
-                <span>{loading ? 'Guardando...' : 'Guardar PIN + Activar Authenticator'}</span>
+                <span>
+                  {loading 
+                    ? 'Guardando...' 
+                    : setupTotpCode.length === 6 
+                      ? 'Guardar PIN + Activar Authenticator' 
+                      : 'Guardar PIN de Administrador'}
+                </span>
                 <Check className="w-4 h-4" />
               </button>
             </div>

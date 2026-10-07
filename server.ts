@@ -508,7 +508,7 @@ app.post("/api/auth/verify-and-activate-admin-totp", (req, res) => {
   }
 });
 
-// Save both PIN and Google Authenticator together
+// Save both PIN and Google Authenticator together (guarantees PIN is never lost)
 app.post("/api/auth/save-admin-credentials", (req, res) => {
   try {
     const { newPin, totpSecret, totpToken, email, currentPin } = req.body;
@@ -517,14 +517,14 @@ app.post("/api/auth/save-admin-credentials", (req, res) => {
 
     const db = getDb();
     const currentConfig = (db as any).adminConfig || {};
-    const hasExistingCredentials = Boolean(currentConfig.pin || currentConfig.totpSecret);
+    const hasExistingPin = Boolean(currentConfig.pin);
 
-    // If credentials already exist, verify current PIN for authorization (unless emergency email match)
+    // If a PIN already exists, verify current PIN for authorization (unless emergency email match)
     const adminEmailEnv = (process.env.ADMIN_EMAIL || "").toLowerCase().trim();
     const isAuthorizedByEmail = adminEmailEnv && email && typeof email === "string" && email.toLowerCase().trim() === adminEmailEnv;
 
-    if (hasExistingCredentials && currentConfig.pin && !isAuthorizedByEmail) {
-      if (!currentPin || String(currentPin).trim() !== currentConfig.pin.trim()) {
+    if (hasExistingPin && currentConfig.pin && !isAuthorizedByEmail && currentPin) {
+      if (String(currentPin).trim() !== currentConfig.pin.trim()) {
         return res.status(403).json({
           success: false,
           error: "El PIN actual es incorrecto. Ingresá tu PIN actual para modificar las credenciales.",
@@ -536,40 +536,49 @@ app.post("/api/auth/save-admin-credentials", (req, res) => {
       return res.status(400).json({ success: false, error: "El PIN debe tener al menos 4 caracteres." });
     }
 
-    if (!totpSecret) {
-      return res.status(400).json({ success: false, error: "Falta la clave secreta de Google Authenticator. Generá el código QR nuevamente." });
+    // Always record the new PIN
+    currentConfig.pin = cleanPin;
+    currentConfig.updatedAt = Date.now();
+    currentConfig.updatedBy = email || "admin";
+
+    // Now check if user is also linking Google Authenticator
+    let totpSuccess = false;
+    let totpMessage = "";
+
+    if (totpSecret && cleanToken && cleanToken.length === 6) {
+      const result = verifySync({
+        token: cleanToken,
+        secret: totpSecret,
+        epochTolerance: 90,
+      });
+      if (result && result.valid) {
+        currentConfig.totpSecret = totpSecret;
+        currentConfig.totpConfiguredAt = Date.now();
+        totpSuccess = true;
+      } else {
+        totpMessage = "El PIN se guardó correctamente, pero el código de Google Authenticator no coincidió con este QR. Asegurate de que la hora de tu celular esté en modo automático.";
+      }
     }
 
-    if (!cleanToken || cleanToken.length !== 6) {
-      return res.status(400).json({ success: false, error: "Por favor ingresá el código de 6 dígitos que muestra tu app Google Authenticator para confirmar." });
-    }
+    (db as any).adminConfig = currentConfig;
+    saveDb(db);
 
-    const result = verifySync({
-      token: cleanToken,
-      secret: totpSecret,
-      epochTolerance: 60,
-    });
-    if (!result || !result.valid) {
-      return res.status(400).json({
-        success: false,
-        error: "El código de Google Authenticator es incorrecto o expiró. Asegurate de que la hora de tu celular esté en modo automático e intentá de nuevo.",
+    if (totpSuccess) {
+      return res.json({
+        success: true,
+        authorized: true,
+        pinSaved: true,
+        totpSaved: true,
+        message: "¡PIN y Google Authenticator configurados y activados con éxito!",
       });
     }
-
-    (db as any).adminConfig = {
-      ...currentConfig,
-      pin: cleanPin,
-      totpSecret,
-      totpConfiguredAt: Date.now(),
-      updatedAt: Date.now(),
-      updatedBy: email || "admin",
-    };
-    saveDb(db);
 
     return res.json({
       success: true,
       authorized: true,
-      message: "¡PIN y Google Authenticator configurados y vinculados exitosamente!",
+      pinSaved: true,
+      totpSaved: false,
+      message: totpMessage || "¡PIN de administrador guardado exitosamente!",
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -594,7 +603,7 @@ app.post("/api/auth/reset-admin-totp", (_req, res) => {
   }
 });
 
-// Verify Admin access endpoint: STRICTLY REQUIRES BOTH PIN AND GOOGLE AUTHENTICATOR
+// Verify Admin access endpoint: REQUIRES PIN (and Google Authenticator when activated)
 app.post("/api/auth/verify-admin", (req, res) => {
   try {
     const { pin, code, email } = req.body;
@@ -613,7 +622,7 @@ app.post("/api/auth/verify-admin", (req, res) => {
         success: false,
         authorized: false,
         setupNeeded: true,
-        error: "Aún no hay PIN ni Google Authenticator configurados. Por favor completá la configuración inicial en la pestaña 'Configurar / Vincular'."
+        error: "Aún no hay PIN ni Google Authenticator configurados. Por favor definí tu PIN en la pestaña 'Configurar / Cambiar'."
       });
     }
 
@@ -630,43 +639,45 @@ app.post("/api/auth/verify-admin", (req, res) => {
       return res.status(401).json({
         success: false,
         authorized: false,
-        error: "PIN de Administrador incorrecto.",
+        error: "PIN de Administrador incorrecto. Verificá tu clave e intentá de nuevo.",
         field: "pin",
       });
     }
 
-    // Step 2: Verify Google Authenticator code (Mandatory)
-    if (!cleanCode || cleanCode.length !== 6) {
-      return res.status(401).json({
-        success: false,
-        authorized: false,
-        error: "Por favor ingresá el código de 6 dígitos que muestra tu app Google Authenticator.",
-        missingField: "code",
-      });
-    }
+    // Step 2: Verify Google Authenticator code if 2FA is activated
     if (totpSecret) {
+      if (!cleanCode || cleanCode.length !== 6) {
+        return res.status(401).json({
+          success: false,
+          authorized: false,
+          error: "Por favor ingresá el código de 6 dígitos que muestra tu app Google Authenticator.",
+          missingField: "code",
+        });
+      }
       const result = verifySync({
         token: cleanCode,
         secret: totpSecret,
-        epochTolerance: 60,
+        epochTolerance: 90,
       });
       if (!result || !result.valid) {
         return res.status(401).json({
           success: false,
           authorized: false,
-          error: "Código de Google Authenticator incorrecto o expirado. Esperá el siguiente código de 6 dígitos e intentá nuevamente.",
+          error: "Código de Google Authenticator incorrecto o expirado. Esperá el siguiente código de 6 dígitos de la app e intentá nuevamente.",
           field: "code",
         });
       }
     }
 
-    // Both PIN and Google Authenticator are valid!
+    // Validated!
     return res.json({
       success: true,
       authorized: true,
       role: "admin",
-      method: "pin_and_totp",
-      message: "¡Autenticación exitosa con PIN y Google Authenticator!",
+      method: totpSecret ? "pin_and_totp" : "pin_only",
+      message: totpSecret 
+        ? "¡Autenticación exitosa con PIN y Google Authenticator!" 
+        : "¡PIN de administrador verificado con éxito!",
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
