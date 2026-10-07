@@ -10,7 +10,80 @@
       "currency": "ARS",
       "selectedPlanId": "individual",
       "createdAt": 1788609803762,
-      "updatedAt": 1788609803762
+      "updatedAt": 1791402400718
+    },
+    "sol.martinez@gastoar.com": {
+      "id": "usr-sol-001",
+      "email": "sol.martinez@gastoar.com",
+      "name": "Sol",
+      "lastName": "Martínez",
+      "phone": "+54 9 11 5521-8832",
+      "password": "password123",
+      "accountType": "pareja",
+      "partnerName": "Martín Gómez",
+      "accountCode": "COMPARTIDA-2026",
+      "currency": "ARS",
+      "selectedPlanId": "pro_ai",
+      "createdAt": 1788809929310,
+      "updatedAt": 1791401929310
+    },
+    "lucas.gonzalez@gmail.com": {
+      "id": "usr-lucas-002",
+      "email": "lucas.gonzalez@gmail.com",
+      "name": "Lucas",
+      "lastName": "González",
+      "phone": "+54 9 11 4402-1920",
+      "password": "password123",
+      "accountType": "pareja",
+      "partnerName": "Camila López",
+      "accountCode": "COMPARTIDA-8492",
+      "currency": "ARS",
+      "selectedPlanId": "pareja",
+      "createdAt": 1786217929310,
+      "updatedAt": 1791401929310
+    },
+    "mariano.silva@outlook.com": {
+      "id": "usr-mariano-003",
+      "email": "mariano.silva@outlook.com",
+      "name": "Mariano",
+      "lastName": "Silva",
+      "phone": "+54 9 11 6789-2211",
+      "password": "password123",
+      "accountType": "individual",
+      "accountCode": "IND-3391",
+      "currency": "ARS",
+      "selectedPlanId": "individual",
+      "createdAt": 1789673929310,
+      "updatedAt": 1791401929310
+    },
+    "valeria.fernandez@gmail.com": {
+      "id": "usr-valeria-004",
+      "email": "valeria.fernandez@gmail.com",
+      "name": "Valeria",
+      "lastName": "Fernández",
+      "phone": "+54 9 11 3911-7440",
+      "password": "password123",
+      "accountType": "pareja",
+      "partnerName": "Esteban Rossi",
+      "accountCode": "COMPARTIDA-5512",
+      "currency": "ARS",
+      "selectedPlanId": "pareja",
+      "createdAt": 1791142729310,
+      "updatedAt": 1791401929310
+    },
+    "franco.rodriguez@gmail.com": {
+      "id": "usr-franco-005",
+      "email": "franco.rodriguez@gmail.com",
+      "name": "Franco",
+      "lastName": "Rodríguez",
+      "phone": "+54 9 11 8820-1199",
+      "password": "password123",
+      "accountType": "individual",
+      "accountCode": "IND-9021",
+      "currency": "ARS",
+      "selectedPlanId": "individual",
+      "createdAt": 1791401929310,
+      "updatedAt": 1791401929310
     }
   },
   "accountsData": {
@@ -32,9 +105,32 @@
       },
       "settlementHistory": [],
       "goals": [],
-      "subscriptions": [],
+      "subscriptions": [
+        {
+          "id": "sub-testvercel",
+          "userId": "acc-1788609803762-659",
+          "userEmail": "testvercel@example.com",
+          "userName": "Test User",
+          "accountCode": "VERCEL-1234",
+          "planId": "individual",
+          "planName": "Plan Individual",
+          "status": "trial",
+          "billingCycle": "monthly",
+          "pricePaid": 0,
+          "currency": "ARS",
+          "paymentMethod": "Mercado Pago (Prueba 15 Días)",
+          "startDate": "2026-10-07",
+          "lastPaymentDate": "2026-10-07",
+          "nextRenewalDate": "2026-11-06",
+          "trialEndsDate": "2026-11-06",
+          "trialDaysGranted": 15,
+          "autoRenew": true,
+          "createdAt": 1791401929310,
+          "notes": "Cuenta de prueba restablecida con 15 días. | Prórroga de +15 días otorgada el 7/10/2026"
+        }
+      ],
       "alertItems": [],
-      "updatedAt": 1788609803762
+      "updatedAt": 1791402400735
     },
     "VERCEL-1234": {
       "transactions": [],
@@ -57,14 +153,763 @@
       "subscriptions": [],
       "alertItems": [],
       "updatedAt": 1788609803762
+    },
+    "sol.martinez@gastoar.com": {
+      "transactions": [
+        {
+          "id": "tx-s1",
+          "concepto": "Supermercado Coto",
+          "monto": 45200,
+          "categoria": "Supermercado",
+          "fecha": "2026-10-07",
+          "paidBy": "user1"
+        },
+        {
+          "id": "tx-s2",
+          "concepto": "Internet Fibertel",
+          "monto": 22000,
+          "categoria": "Servicios",
+          "fecha": "2026-10-07",
+          "paidBy": "user2"
+        },
+        {
+          "id": "tx-s3",
+          "concepto": "Combustible YPF",
+          "monto": 35000,
+          "categoria": "Transporte",
+          "fecha": "2026-10-07",
+          "paidBy": "user1"
+        }
+      ],
+      "categoryMap": null,
+      "categoryColors": null,
+      "budgets": {
+        "categories": {},
+        "subcategories": {}
+      },
+      "profile": {
+        "accountCode": "COMPARTIDA-2026",
+        "user1Name": "Sol",
+        "user2Name": "Martín Gómez",
+        "currentUser": "user1",
+        "currency": "ARS",
+        "defaultSplit": "50_50"
+      },
+      "settlementHistory": [],
+      "goals": [],
+      "subscriptions": [
+        {
+          "id": "sub-101",
+          "userId": "usr-sol-001",
+          "userEmail": "sol.martinez@gastoar.com",
+          "userName": "Sol Martínez",
+          "partnerName": "Martín Gómez",
+          "accountCode": "COMPARTIDA-2026",
+          "planId": "pro_ai",
+          "planName": "Plan Pro & Asistente IA",
+          "status": "active",
+          "billingCycle": "monthly",
+          "pricePaid": 12500,
+          "currency": "ARS",
+          "paymentMethod": "Mercado Pago",
+          "mercadopagoPaymentId": "MP-984321045",
+          "startDate": "2026-09-01",
+          "lastPaymentDate": "2026-10-07",
+          "nextRenewalDate": "2026-11-06",
+          "createdAt": 1788809929310,
+          "autoRenew": true,
+          "notes": "Cliente verificado. Pago automático mensual por Mercado Pago débito."
+        }
+      ],
+      "alertItems": [],
+      "updatedAt": 1791401929310
+    },
+    "COMPARTIDA-2026": {
+      "transactions": [
+        {
+          "id": "tx-s1",
+          "concepto": "Supermercado Coto",
+          "monto": 45200,
+          "categoria": "Supermercado",
+          "fecha": "2026-10-07",
+          "paidBy": "user1"
+        },
+        {
+          "id": "tx-s2",
+          "concepto": "Internet Fibertel",
+          "monto": 22000,
+          "categoria": "Servicios",
+          "fecha": "2026-10-07",
+          "paidBy": "user2"
+        },
+        {
+          "id": "tx-s3",
+          "concepto": "Combustible YPF",
+          "monto": 35000,
+          "categoria": "Transporte",
+          "fecha": "2026-10-07",
+          "paidBy": "user1"
+        }
+      ],
+      "categoryMap": null,
+      "categoryColors": null,
+      "budgets": {
+        "categories": {},
+        "subcategories": {}
+      },
+      "profile": {
+        "accountCode": "COMPARTIDA-2026",
+        "user1Name": "Sol",
+        "user2Name": "Martín Gómez",
+        "currentUser": "user1",
+        "currency": "ARS",
+        "defaultSplit": "50_50"
+      },
+      "settlementHistory": [],
+      "goals": [],
+      "subscriptions": [
+        {
+          "id": "sub-101",
+          "userId": "usr-sol-001",
+          "userEmail": "sol.martinez@gastoar.com",
+          "userName": "Sol Martínez",
+          "partnerName": "Martín Gómez",
+          "accountCode": "COMPARTIDA-2026",
+          "planId": "pro_ai",
+          "planName": "Plan Pro & Asistente IA",
+          "status": "active",
+          "billingCycle": "monthly",
+          "pricePaid": 12500,
+          "currency": "ARS",
+          "paymentMethod": "Mercado Pago",
+          "mercadopagoPaymentId": "MP-984321045",
+          "startDate": "2026-09-01",
+          "lastPaymentDate": "2026-10-07",
+          "nextRenewalDate": "2026-11-06",
+          "createdAt": 1788809929310,
+          "autoRenew": true,
+          "notes": "Cliente verificado. Pago automático mensual por Mercado Pago débito."
+        }
+      ],
+      "alertItems": [],
+      "updatedAt": 1791401929310
+    },
+    "lucas.gonzalez@gmail.com": {
+      "transactions": [
+        {
+          "id": "tx-l1",
+          "concepto": "Alquiler Depto",
+          "monto": 280000,
+          "categoria": "Vivienda",
+          "fecha": "2026-10-07",
+          "paidBy": "user1"
+        },
+        {
+          "id": "tx-l2",
+          "concepto": "Expensas",
+          "monto": 65000,
+          "categoria": "Vivienda",
+          "fecha": "2026-10-07",
+          "paidBy": "user2"
+        }
+      ],
+      "categoryMap": null,
+      "categoryColors": null,
+      "budgets": {
+        "categories": {},
+        "subcategories": {}
+      },
+      "profile": {
+        "accountCode": "COMPARTIDA-8492",
+        "user1Name": "Lucas",
+        "user2Name": "Camila López",
+        "currentUser": "user1",
+        "currency": "ARS",
+        "defaultSplit": "50_50"
+      },
+      "settlementHistory": [],
+      "goals": [],
+      "subscriptions": [
+        {
+          "id": "sub-102",
+          "userId": "usr-lucas-002",
+          "userEmail": "lucas.gonzalez@gmail.com",
+          "userName": "Lucas González",
+          "partnerName": "Camila López",
+          "accountCode": "COMPARTIDA-8492",
+          "planId": "pareja",
+          "planName": "Plan Parejas Dúo",
+          "status": "active",
+          "billingCycle": "annual",
+          "pricePaid": 63000,
+          "currency": "ARS",
+          "paymentMethod": "Mercado Pago",
+          "mercadopagoPaymentId": "MP-983190822",
+          "startDate": "2026-08-15",
+          "lastPaymentDate": "2026-08-15",
+          "nextRenewalDate": "2027-10-07",
+          "createdAt": 1786217929310,
+          "autoRenew": true,
+          "notes": "Suscripción anual abonada con dinero en cuenta Mercado Pago."
+        }
+      ],
+      "alertItems": [],
+      "updatedAt": 1791401929310
+    },
+    "COMPARTIDA-8492": {
+      "transactions": [
+        {
+          "id": "tx-l1",
+          "concepto": "Alquiler Depto",
+          "monto": 280000,
+          "categoria": "Vivienda",
+          "fecha": "2026-10-07",
+          "paidBy": "user1"
+        },
+        {
+          "id": "tx-l2",
+          "concepto": "Expensas",
+          "monto": 65000,
+          "categoria": "Vivienda",
+          "fecha": "2026-10-07",
+          "paidBy": "user2"
+        }
+      ],
+      "categoryMap": null,
+      "categoryColors": null,
+      "budgets": {
+        "categories": {},
+        "subcategories": {}
+      },
+      "profile": {
+        "accountCode": "COMPARTIDA-8492",
+        "user1Name": "Lucas",
+        "user2Name": "Camila López",
+        "currentUser": "user1",
+        "currency": "ARS",
+        "defaultSplit": "50_50"
+      },
+      "settlementHistory": [],
+      "goals": [],
+      "subscriptions": [
+        {
+          "id": "sub-102",
+          "userId": "usr-lucas-002",
+          "userEmail": "lucas.gonzalez@gmail.com",
+          "userName": "Lucas González",
+          "partnerName": "Camila López",
+          "accountCode": "COMPARTIDA-8492",
+          "planId": "pareja",
+          "planName": "Plan Parejas Dúo",
+          "status": "active",
+          "billingCycle": "annual",
+          "pricePaid": 63000,
+          "currency": "ARS",
+          "paymentMethod": "Mercado Pago",
+          "mercadopagoPaymentId": "MP-983190822",
+          "startDate": "2026-08-15",
+          "lastPaymentDate": "2026-08-15",
+          "nextRenewalDate": "2027-10-07",
+          "createdAt": 1786217929310,
+          "autoRenew": true,
+          "notes": "Suscripción anual abonada con dinero en cuenta Mercado Pago."
+        }
+      ],
+      "alertItems": [],
+      "updatedAt": 1791401929310
+    },
+    "mariano.silva@outlook.com": {
+      "transactions": [
+        {
+          "id": "tx-m1",
+          "concepto": "Gimnasio Megatlon",
+          "monto": 28000,
+          "categoria": "Salud",
+          "fecha": "2026-10-07",
+          "paidBy": "user1"
+        }
+      ],
+      "categoryMap": null,
+      "categoryColors": null,
+      "budgets": {
+        "categories": {},
+        "subcategories": {}
+      },
+      "profile": {
+        "accountCode": "IND-3391",
+        "user1Name": "Mariano",
+        "user2Name": "Mi Pareja",
+        "currentUser": "user1",
+        "currency": "ARS",
+        "defaultSplit": "50_50"
+      },
+      "settlementHistory": [],
+      "goals": [],
+      "subscriptions": [
+        {
+          "id": "sub-103",
+          "userId": "usr-mariano-003",
+          "userEmail": "mariano.silva@outlook.com",
+          "userName": "Mariano Silva",
+          "accountCode": "IND-3391",
+          "planId": "individual",
+          "planName": "Plan Individual",
+          "status": "active",
+          "billingCycle": "monthly",
+          "pricePaid": 4900,
+          "currency": "ARS",
+          "paymentMethod": "Mercado Pago",
+          "mercadopagoPaymentId": "MP-981204910",
+          "startDate": "2026-09-10",
+          "lastPaymentDate": "2026-10-07",
+          "nextRenewalDate": "2026-11-06",
+          "createdAt": 1789673929310,
+          "autoRenew": true,
+          "notes": "Cobro recurrente mensual activo."
+        }
+      ],
+      "alertItems": [],
+      "updatedAt": 1791401929310
+    },
+    "IND-3391": {
+      "transactions": [
+        {
+          "id": "tx-m1",
+          "concepto": "Gimnasio Megatlon",
+          "monto": 28000,
+          "categoria": "Salud",
+          "fecha": "2026-10-07",
+          "paidBy": "user1"
+        }
+      ],
+      "categoryMap": null,
+      "categoryColors": null,
+      "budgets": {
+        "categories": {},
+        "subcategories": {}
+      },
+      "profile": {
+        "accountCode": "IND-3391",
+        "user1Name": "Mariano",
+        "user2Name": "Mi Pareja",
+        "currentUser": "user1",
+        "currency": "ARS",
+        "defaultSplit": "50_50"
+      },
+      "settlementHistory": [],
+      "goals": [],
+      "subscriptions": [
+        {
+          "id": "sub-103",
+          "userId": "usr-mariano-003",
+          "userEmail": "mariano.silva@outlook.com",
+          "userName": "Mariano Silva",
+          "accountCode": "IND-3391",
+          "planId": "individual",
+          "planName": "Plan Individual",
+          "status": "active",
+          "billingCycle": "monthly",
+          "pricePaid": 4900,
+          "currency": "ARS",
+          "paymentMethod": "Mercado Pago",
+          "mercadopagoPaymentId": "MP-981204910",
+          "startDate": "2026-09-10",
+          "lastPaymentDate": "2026-10-07",
+          "nextRenewalDate": "2026-11-06",
+          "createdAt": 1789673929310,
+          "autoRenew": true,
+          "notes": "Cobro recurrente mensual activo."
+        }
+      ],
+      "alertItems": [],
+      "updatedAt": 1791401929310
+    },
+    "valeria.fernandez@gmail.com": {
+      "transactions": [
+        {
+          "id": "tx-v1",
+          "concepto": "Cena Restaurante",
+          "monto": 38000,
+          "categoria": "Salidas",
+          "fecha": "2026-10-07",
+          "paidBy": "user1"
+        },
+        {
+          "id": "tx-v2",
+          "concepto": "Farmacia Farmacity",
+          "monto": 14500,
+          "categoria": "Salud",
+          "fecha": "2026-10-07",
+          "paidBy": "user2"
+        }
+      ],
+      "categoryMap": null,
+      "categoryColors": null,
+      "budgets": {
+        "categories": {},
+        "subcategories": {}
+      },
+      "profile": {
+        "accountCode": "COMPARTIDA-5512",
+        "user1Name": "Valeria",
+        "user2Name": "Esteban Rossi",
+        "currentUser": "user1",
+        "currency": "ARS",
+        "defaultSplit": "50_50"
+      },
+      "settlementHistory": [],
+      "goals": [],
+      "subscriptions": [
+        {
+          "id": "sub-104",
+          "userId": "usr-valeria-004",
+          "userEmail": "valeria.fernandez@gmail.com",
+          "userName": "Valeria Fernández",
+          "partnerName": "Esteban Rossi",
+          "accountCode": "COMPARTIDA-5512",
+          "planId": "pareja",
+          "planName": "Plan Parejas Dúo",
+          "status": "trial",
+          "billingCycle": "monthly",
+          "pricePaid": 0,
+          "currency": "ARS",
+          "paymentMethod": "Mercado Pago (Prueba 15 Días)",
+          "mercadopagoPaymentId": "MP-980041233",
+          "startDate": "2026-10-07",
+          "lastPaymentDate": "2026-10-07",
+          "nextRenewalDate": "2026-10-22",
+          "trialEndsDate": "2026-10-22",
+          "trialDaysGranted": 15,
+          "createdAt": 1791142729310,
+          "autoRenew": true,
+          "notes": "Período de prueba vigente por 15 días."
+        }
+      ],
+      "alertItems": [],
+      "updatedAt": 1791401929310
+    },
+    "COMPARTIDA-5512": {
+      "transactions": [
+        {
+          "id": "tx-v1",
+          "concepto": "Cena Restaurante",
+          "monto": 38000,
+          "categoria": "Salidas",
+          "fecha": "2026-10-07",
+          "paidBy": "user1"
+        },
+        {
+          "id": "tx-v2",
+          "concepto": "Farmacia Farmacity",
+          "monto": 14500,
+          "categoria": "Salud",
+          "fecha": "2026-10-07",
+          "paidBy": "user2"
+        }
+      ],
+      "categoryMap": null,
+      "categoryColors": null,
+      "budgets": {
+        "categories": {},
+        "subcategories": {}
+      },
+      "profile": {
+        "accountCode": "COMPARTIDA-5512",
+        "user1Name": "Valeria",
+        "user2Name": "Esteban Rossi",
+        "currentUser": "user1",
+        "currency": "ARS",
+        "defaultSplit": "50_50"
+      },
+      "settlementHistory": [],
+      "goals": [],
+      "subscriptions": [
+        {
+          "id": "sub-104",
+          "userId": "usr-valeria-004",
+          "userEmail": "valeria.fernandez@gmail.com",
+          "userName": "Valeria Fernández",
+          "partnerName": "Esteban Rossi",
+          "accountCode": "COMPARTIDA-5512",
+          "planId": "pareja",
+          "planName": "Plan Parejas Dúo",
+          "status": "trial",
+          "billingCycle": "monthly",
+          "pricePaid": 0,
+          "currency": "ARS",
+          "paymentMethod": "Mercado Pago (Prueba 15 Días)",
+          "mercadopagoPaymentId": "MP-980041233",
+          "startDate": "2026-10-07",
+          "lastPaymentDate": "2026-10-07",
+          "nextRenewalDate": "2026-10-22",
+          "trialEndsDate": "2026-10-22",
+          "trialDaysGranted": 15,
+          "createdAt": 1791142729310,
+          "autoRenew": true,
+          "notes": "Período de prueba vigente por 15 días."
+        }
+      ],
+      "alertItems": [],
+      "updatedAt": 1791401929310
+    },
+    "franco.rodriguez@gmail.com": {
+      "transactions": [
+        {
+          "id": "tx-f1",
+          "concepto": "Café Starbucks",
+          "monto": 4500,
+          "categoria": "Salidas",
+          "fecha": "2026-10-07",
+          "paidBy": "user1"
+        }
+      ],
+      "categoryMap": null,
+      "categoryColors": null,
+      "budgets": {
+        "categories": {},
+        "subcategories": {}
+      },
+      "profile": {
+        "accountCode": "IND-9021",
+        "user1Name": "Franco",
+        "user2Name": "Mi Pareja",
+        "currentUser": "user1",
+        "currency": "ARS",
+        "defaultSplit": "50_50"
+      },
+      "settlementHistory": [],
+      "goals": [],
+      "subscriptions": [
+        {
+          "id": "sub-105",
+          "userId": "usr-franco-005",
+          "userEmail": "franco.rodriguez@gmail.com",
+          "userName": "Franco Rodríguez",
+          "accountCode": "IND-9021",
+          "planId": "individual",
+          "planName": "Plan Individual",
+          "status": "trial",
+          "billingCycle": "monthly",
+          "pricePaid": 0,
+          "currency": "ARS",
+          "paymentMethod": "Mercado Pago (Prueba 15 Días)",
+          "mercadopagoPaymentId": "MP-979920144",
+          "startDate": "2026-10-07",
+          "lastPaymentDate": "2026-10-07",
+          "nextRenewalDate": "2026-10-22",
+          "trialEndsDate": "2026-10-22",
+          "trialDaysGranted": 15,
+          "createdAt": 1791401929310,
+          "autoRenew": true,
+          "notes": "Nueva cuenta registrada hoy. Prueba de 15 días activa."
+        }
+      ],
+      "alertItems": [],
+      "updatedAt": 1791401929310
+    },
+    "IND-9021": {
+      "transactions": [
+        {
+          "id": "tx-f1",
+          "concepto": "Café Starbucks",
+          "monto": 4500,
+          "categoria": "Salidas",
+          "fecha": "2026-10-07",
+          "paidBy": "user1"
+        }
+      ],
+      "categoryMap": null,
+      "categoryColors": null,
+      "budgets": {
+        "categories": {},
+        "subcategories": {}
+      },
+      "profile": {
+        "accountCode": "IND-9021",
+        "user1Name": "Franco",
+        "user2Name": "Mi Pareja",
+        "currentUser": "user1",
+        "currency": "ARS",
+        "defaultSplit": "50_50"
+      },
+      "settlementHistory": [],
+      "goals": [],
+      "subscriptions": [
+        {
+          "id": "sub-105",
+          "userId": "usr-franco-005",
+          "userEmail": "franco.rodriguez@gmail.com",
+          "userName": "Franco Rodríguez",
+          "accountCode": "IND-9021",
+          "planId": "individual",
+          "planName": "Plan Individual",
+          "status": "trial",
+          "billingCycle": "monthly",
+          "pricePaid": 0,
+          "currency": "ARS",
+          "paymentMethod": "Mercado Pago (Prueba 15 Días)",
+          "mercadopagoPaymentId": "MP-979920144",
+          "startDate": "2026-10-07",
+          "lastPaymentDate": "2026-10-07",
+          "nextRenewalDate": "2026-10-22",
+          "trialEndsDate": "2026-10-22",
+          "trialDaysGranted": 15,
+          "createdAt": 1791401929310,
+          "autoRenew": true,
+          "notes": "Nueva cuenta registrada hoy. Prueba de 15 días activa."
+        }
+      ],
+      "alertItems": [],
+      "updatedAt": 1791401929310
     }
   },
   "accountCodeToEmail": {
-    "VERCEL-1234": "testvercel@example.com"
+    "VERCEL-1234": "testvercel@example.com",
+    "COMPARTIDA-2026": "sol.martinez@gastoar.com",
+    "COMPARTIDA-8492": "lucas.gonzalez@gmail.com",
+    "IND-3391": "mariano.silva@outlook.com",
+    "COMPARTIDA-5512": "valeria.fernandez@gmail.com",
+    "IND-9021": "franco.rodriguez@gmail.com"
   },
   "adminConfig": {
     "totpConfiguredAt": 1791390061112,
     "updatedAt": 1791391965469,
     "updatedBy": "admin"
+  },
+  "subscriptions": {
+    "sol.martinez@gastoar.com": {
+      "id": "sub-101",
+      "userId": "usr-sol-001",
+      "userEmail": "sol.martinez@gastoar.com",
+      "userName": "Sol Martínez",
+      "partnerName": "Martín Gómez",
+      "accountCode": "COMPARTIDA-2026",
+      "planId": "pro_ai",
+      "planName": "Plan Pro & Asistente IA",
+      "status": "active",
+      "billingCycle": "monthly",
+      "pricePaid": 12500,
+      "currency": "ARS",
+      "paymentMethod": "Mercado Pago",
+      "mercadopagoPaymentId": "MP-984321045",
+      "startDate": "2026-09-01",
+      "lastPaymentDate": "2026-10-07",
+      "nextRenewalDate": "2026-11-06",
+      "createdAt": 1788809929310,
+      "autoRenew": true,
+      "notes": "Cliente verificado. Pago automático mensual por Mercado Pago débito."
+    },
+    "lucas.gonzalez@gmail.com": {
+      "id": "sub-102",
+      "userId": "usr-lucas-002",
+      "userEmail": "lucas.gonzalez@gmail.com",
+      "userName": "Lucas González",
+      "partnerName": "Camila López",
+      "accountCode": "COMPARTIDA-8492",
+      "planId": "pareja",
+      "planName": "Plan Parejas Dúo",
+      "status": "active",
+      "billingCycle": "annual",
+      "pricePaid": 63000,
+      "currency": "ARS",
+      "paymentMethod": "Mercado Pago",
+      "mercadopagoPaymentId": "MP-983190822",
+      "startDate": "2026-08-15",
+      "lastPaymentDate": "2026-08-15",
+      "nextRenewalDate": "2027-10-07",
+      "createdAt": 1786217929310,
+      "autoRenew": true,
+      "notes": "Suscripción anual abonada con dinero en cuenta Mercado Pago."
+    },
+    "mariano.silva@outlook.com": {
+      "id": "sub-103",
+      "userId": "usr-mariano-003",
+      "userEmail": "mariano.silva@outlook.com",
+      "userName": "Mariano Silva",
+      "accountCode": "IND-3391",
+      "planId": "individual",
+      "planName": "Plan Individual",
+      "status": "active",
+      "billingCycle": "monthly",
+      "pricePaid": 4900,
+      "currency": "ARS",
+      "paymentMethod": "Mercado Pago",
+      "mercadopagoPaymentId": "MP-981204910",
+      "startDate": "2026-09-10",
+      "lastPaymentDate": "2026-10-07",
+      "nextRenewalDate": "2026-11-06",
+      "createdAt": 1789673929310,
+      "autoRenew": true,
+      "notes": "Cobro recurrente mensual activo."
+    },
+    "valeria.fernandez@gmail.com": {
+      "id": "sub-104",
+      "userId": "usr-valeria-004",
+      "userEmail": "valeria.fernandez@gmail.com",
+      "userName": "Valeria Fernández",
+      "partnerName": "Esteban Rossi",
+      "accountCode": "COMPARTIDA-5512",
+      "planId": "pareja",
+      "planName": "Plan Parejas Dúo",
+      "status": "trial",
+      "billingCycle": "monthly",
+      "pricePaid": 0,
+      "currency": "ARS",
+      "paymentMethod": "Mercado Pago (Prueba 15 Días)",
+      "mercadopagoPaymentId": "MP-980041233",
+      "startDate": "2026-10-07",
+      "lastPaymentDate": "2026-10-07",
+      "nextRenewalDate": "2026-10-22",
+      "trialEndsDate": "2026-10-22",
+      "trialDaysGranted": 15,
+      "createdAt": 1791142729310,
+      "autoRenew": true,
+      "notes": "Período de prueba vigente por 15 días."
+    },
+    "franco.rodriguez@gmail.com": {
+      "id": "sub-105",
+      "userId": "usr-franco-005",
+      "userEmail": "franco.rodriguez@gmail.com",
+      "userName": "Franco Rodríguez",
+      "accountCode": "IND-9021",
+      "planId": "individual",
+      "planName": "Plan Individual",
+      "status": "trial",
+      "billingCycle": "monthly",
+      "pricePaid": 0,
+      "currency": "ARS",
+      "paymentMethod": "Mercado Pago (Prueba 15 Días)",
+      "mercadopagoPaymentId": "MP-979920144",
+      "startDate": "2026-10-07",
+      "lastPaymentDate": "2026-10-07",
+      "nextRenewalDate": "2026-10-22",
+      "trialEndsDate": "2026-10-22",
+      "trialDaysGranted": 15,
+      "createdAt": 1791401929310,
+      "autoRenew": true,
+      "notes": "Nueva cuenta registrada hoy. Prueba de 15 días activa."
+    },
+    "testvercel@example.com": {
+      "id": "sub-testvercel",
+      "userId": "acc-1788609803762-659",
+      "userEmail": "testvercel@example.com",
+      "userName": "Test User",
+      "accountCode": "VERCEL-1234",
+      "planId": "individual",
+      "planName": "Plan Individual",
+      "status": "trial",
+      "billingCycle": "monthly",
+      "pricePaid": 0,
+      "currency": "ARS",
+      "paymentMethod": "Mercado Pago (Prueba 15 Días)",
+      "startDate": "2026-10-07",
+      "lastPaymentDate": "2026-10-07",
+      "nextRenewalDate": "2026-11-06",
+      "trialEndsDate": "2026-11-06",
+      "trialDaysGranted": 15,
+      "autoRenew": true,
+      "createdAt": 1791401929310,
+      "notes": "Cuenta de prueba restablecida con 15 días. | Prórroga de +15 días otorgada el 7/10/2026"
+    }
   }
 }

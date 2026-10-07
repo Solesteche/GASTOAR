@@ -55,6 +55,305 @@ interface DatabaseSchema {
   users: Record<string, UserRecord>; // Key: email in lowerCase
   accountsData: Record<string, UserDataPayload>; // Key: email in lowerCase or accountCode
   accountCodeToEmail: Record<string, string>; // Map accountCode -> primary email
+  subscriptions?: Record<string, any>; // Key: email in lowerCase -> UserSubscription
+  adminConfig?: any;
+}
+
+function seedDefaultUsersIfNeeded(db: DatabaseSchema): boolean {
+  if (!db.users) db.users = {};
+  if (!db.accountsData) db.accountsData = {};
+  if (!db.accountCodeToEmail) db.accountCodeToEmail = {};
+  if (!db.subscriptions) db.subscriptions = {};
+
+  let changed = false;
+  const now = Date.now();
+  const todayStr = new Date(now).toISOString().split("T")[0];
+  const trial15d = new Date(now + 15 * 86400000).toISOString().split("T")[0];
+  const nextMonth = new Date(now + 30 * 86400000).toISOString().split("T")[0];
+  const nextYear = new Date(now + 365 * 86400000).toISOString().split("T")[0];
+
+  const defaultUsers: Array<{
+    user: UserRecord;
+    sub: any;
+    sampleTxs: any[];
+  }> = [
+    {
+      user: {
+        id: "usr-sol-001",
+        email: "sol.martinez@gastoar.com",
+        name: "Sol",
+        lastName: "Martínez",
+        phone: "+54 9 11 5521-8832",
+        password: "password123",
+        accountType: "pareja",
+        partnerName: "Martín Gómez",
+        accountCode: "COMPARTIDA-2026",
+        currency: "ARS",
+        selectedPlanId: "pro_ai",
+        createdAt: now - 30 * 86400000,
+        updatedAt: now,
+      },
+      sub: {
+        id: "sub-101",
+        userId: "usr-sol-001",
+        userEmail: "sol.martinez@gastoar.com",
+        userName: "Sol Martínez",
+        partnerName: "Martín Gómez",
+        accountCode: "COMPARTIDA-2026",
+        planId: "pro_ai",
+        planName: "Plan Pro & Asistente IA",
+        status: "active",
+        billingCycle: "monthly",
+        pricePaid: 12500,
+        currency: "ARS",
+        paymentMethod: "Mercado Pago",
+        mercadopagoPaymentId: "MP-984321045",
+        startDate: "2026-09-01",
+        lastPaymentDate: todayStr,
+        nextRenewalDate: nextMonth,
+        createdAt: now - 30 * 86400000,
+        autoRenew: true,
+        notes: "Cliente verificado. Pago automático mensual por Mercado Pago débito.",
+      },
+      sampleTxs: [
+        { id: "tx-s1", concepto: "Supermercado Coto", monto: 45200, categoria: "Supermercado", fecha: todayStr, paidBy: "user1" },
+        { id: "tx-s2", concepto: "Internet Fibertel", monto: 22000, categoria: "Servicios", fecha: todayStr, paidBy: "user2" },
+        { id: "tx-s3", concepto: "Combustible YPF", monto: 35000, categoria: "Transporte", fecha: todayStr, paidBy: "user1" },
+      ],
+    },
+    {
+      user: {
+        id: "usr-lucas-002",
+        email: "lucas.gonzalez@gmail.com",
+        name: "Lucas",
+        lastName: "González",
+        phone: "+54 9 11 4402-1920",
+        password: "password123",
+        accountType: "pareja",
+        partnerName: "Camila López",
+        accountCode: "COMPARTIDA-8492",
+        currency: "ARS",
+        selectedPlanId: "pareja",
+        createdAt: now - 60 * 86400000,
+        updatedAt: now,
+      },
+      sub: {
+        id: "sub-102",
+        userId: "usr-lucas-002",
+        userEmail: "lucas.gonzalez@gmail.com",
+        userName: "Lucas González",
+        partnerName: "Camila López",
+        accountCode: "COMPARTIDA-8492",
+        planId: "pareja",
+        planName: "Plan Parejas Dúo",
+        status: "active",
+        billingCycle: "annual",
+        pricePaid: 63000,
+        currency: "ARS",
+        paymentMethod: "Mercado Pago",
+        mercadopagoPaymentId: "MP-983190822",
+        startDate: "2026-08-15",
+        lastPaymentDate: "2026-08-15",
+        nextRenewalDate: nextYear,
+        createdAt: now - 60 * 86400000,
+        autoRenew: true,
+        notes: "Suscripción anual abonada con dinero en cuenta Mercado Pago.",
+      },
+      sampleTxs: [
+        { id: "tx-l1", concepto: "Alquiler Depto", monto: 280000, categoria: "Vivienda", fecha: todayStr, paidBy: "user1" },
+        { id: "tx-l2", concepto: "Expensas", monto: 65000, categoria: "Vivienda", fecha: todayStr, paidBy: "user2" },
+      ],
+    },
+    {
+      user: {
+        id: "usr-mariano-003",
+        email: "mariano.silva@outlook.com",
+        name: "Mariano",
+        lastName: "Silva",
+        phone: "+54 9 11 6789-2211",
+        password: "password123",
+        accountType: "individual",
+        accountCode: "IND-3391",
+        currency: "ARS",
+        selectedPlanId: "individual",
+        createdAt: now - 20 * 86400000,
+        updatedAt: now,
+      },
+      sub: {
+        id: "sub-103",
+        userId: "usr-mariano-003",
+        userEmail: "mariano.silva@outlook.com",
+        userName: "Mariano Silva",
+        accountCode: "IND-3391",
+        planId: "individual",
+        planName: "Plan Individual",
+        status: "active",
+        billingCycle: "monthly",
+        pricePaid: 4900,
+        currency: "ARS",
+        paymentMethod: "Mercado Pago",
+        mercadopagoPaymentId: "MP-981204910",
+        startDate: "2026-09-10",
+        lastPaymentDate: todayStr,
+        nextRenewalDate: nextMonth,
+        createdAt: now - 20 * 86400000,
+        autoRenew: true,
+        notes: "Cobro recurrente mensual activo.",
+      },
+      sampleTxs: [
+        { id: "tx-m1", concepto: "Gimnasio Megatlon", monto: 28000, categoria: "Salud", fecha: todayStr, paidBy: "user1" },
+      ],
+    },
+    {
+      user: {
+        id: "usr-valeria-004",
+        email: "valeria.fernandez@gmail.com",
+        name: "Valeria",
+        lastName: "Fernández",
+        phone: "+54 9 11 3911-7440",
+        password: "password123",
+        accountType: "pareja",
+        partnerName: "Esteban Rossi",
+        accountCode: "COMPARTIDA-5512",
+        currency: "ARS",
+        selectedPlanId: "pareja",
+        createdAt: now - 3 * 86400000,
+        updatedAt: now,
+      },
+      sub: {
+        id: "sub-104",
+        userId: "usr-valeria-004",
+        userEmail: "valeria.fernandez@gmail.com",
+        userName: "Valeria Fernández",
+        partnerName: "Esteban Rossi",
+        accountCode: "COMPARTIDA-5512",
+        planId: "pareja",
+        planName: "Plan Parejas Dúo",
+        status: "trial",
+        billingCycle: "monthly",
+        pricePaid: 0,
+        currency: "ARS",
+        paymentMethod: "Mercado Pago (Prueba 15 Días)",
+        mercadopagoPaymentId: "MP-980041233",
+        startDate: todayStr,
+        lastPaymentDate: todayStr,
+        nextRenewalDate: trial15d,
+        trialEndsDate: trial15d,
+        trialDaysGranted: 15,
+        createdAt: now - 3 * 86400000,
+        autoRenew: true,
+        notes: "Período de prueba vigente por 15 días.",
+      },
+      sampleTxs: [
+        { id: "tx-v1", concepto: "Cena Restaurante", monto: 38000, categoria: "Salidas", fecha: todayStr, paidBy: "user1" },
+        { id: "tx-v2", concepto: "Farmacia Farmacity", monto: 14500, categoria: "Salud", fecha: todayStr, paidBy: "user2" },
+      ],
+    },
+    {
+      user: {
+        id: "usr-franco-005",
+        email: "franco.rodriguez@gmail.com",
+        name: "Franco",
+        lastName: "Rodríguez",
+        phone: "+54 9 11 8820-1199",
+        password: "password123",
+        accountType: "individual",
+        accountCode: "IND-9021",
+        currency: "ARS",
+        selectedPlanId: "individual",
+        createdAt: now,
+        updatedAt: now,
+      },
+      sub: {
+        id: "sub-105",
+        userId: "usr-franco-005",
+        userEmail: "franco.rodriguez@gmail.com",
+        userName: "Franco Rodríguez",
+        accountCode: "IND-9021",
+        planId: "individual",
+        planName: "Plan Individual",
+        status: "trial",
+        billingCycle: "monthly",
+        pricePaid: 0,
+        currency: "ARS",
+        paymentMethod: "Mercado Pago (Prueba 15 Días)",
+        mercadopagoPaymentId: "MP-979920144",
+        startDate: todayStr,
+        lastPaymentDate: todayStr,
+        nextRenewalDate: trial15d,
+        trialEndsDate: trial15d,
+        trialDaysGranted: 15,
+        createdAt: now,
+        autoRenew: true,
+        notes: "Nueva cuenta registrada hoy. Prueba de 15 días activa.",
+      },
+      sampleTxs: [
+        { id: "tx-f1", concepto: "Café Starbucks", monto: 4500, categoria: "Salidas", fecha: todayStr, paidBy: "user1" },
+      ],
+    },
+  ];
+
+  for (const item of defaultUsers) {
+    const email = item.user.email.toLowerCase();
+    if (!db.users[email]) {
+      db.users[email] = item.user;
+      db.accountCodeToEmail[item.user.accountCode] = email;
+      db.subscriptions[email] = item.sub;
+      db.accountsData[email] = {
+        transactions: item.sampleTxs,
+        categoryMap: null,
+        categoryColors: null,
+        budgets: { categories: {}, subcategories: {} },
+        profile: {
+          accountCode: item.user.accountCode,
+          user1Name: item.user.name,
+          user2Name: item.user.partnerName || "Mi Pareja",
+          currentUser: "user1",
+          currency: "ARS",
+          defaultSplit: "50_50",
+        },
+        settlementHistory: [],
+        goals: [],
+        subscriptions: [item.sub],
+        alertItems: [],
+        updatedAt: now,
+      };
+      db.accountsData[item.user.accountCode] = db.accountsData[email];
+      changed = true;
+    }
+  }
+
+  // Also ensure testvercel has active trial dates if needed
+  if (db.users["testvercel@example.com"]) {
+    const sub = db.subscriptions["testvercel@example.com"];
+    if (!sub || (sub.nextRenewalDate && sub.nextRenewalDate < todayStr)) {
+      db.subscriptions["testvercel@example.com"] = {
+        id: "sub-testvercel",
+        userId: "acc-1788609803762-659",
+        userEmail: "testvercel@example.com",
+        userName: "Test User",
+        accountCode: "VERCEL-1234",
+        planId: "individual",
+        planName: "Plan Individual",
+        status: "trial",
+        billingCycle: "monthly",
+        pricePaid: 0,
+        currency: "ARS",
+        paymentMethod: "Mercado Pago (Prueba 15 Días)",
+        startDate: todayStr,
+        lastPaymentDate: todayStr,
+        nextRenewalDate: trial15d,
+        trialEndsDate: trial15d,
+        trialDaysGranted: 15,
+        autoRenew: true,
+        createdAt: now,
+        notes: "Cuenta de prueba restablecida con 15 días.",
+      };
+      changed = true;
+    }
+  }
+
+  return changed;
 }
 
 function getDb(): DatabaseSchema {
@@ -65,12 +364,22 @@ function getDb(): DatabaseSchema {
     }
     if (fs.existsSync(DB_FILE)) {
       const raw = fs.readFileSync(DB_FILE, "utf-8");
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (!parsed.subscriptions) parsed.subscriptions = {};
+      if (!parsed.adminConfig) parsed.adminConfig = {};
+      const seeded = seedDefaultUsersIfNeeded(parsed);
+      if (seeded) {
+        saveDb(parsed);
+      }
+      return parsed;
     }
   } catch (err) {
     console.error("Error reading persistent database:", err);
   }
-  return { users: {}, accountsData: {}, accountCodeToEmail: {} };
+  const fresh: DatabaseSchema = { users: {}, accountsData: {}, accountCodeToEmail: {}, subscriptions: {}, adminConfig: {} };
+  seedDefaultUsersIfNeeded(fresh);
+  saveDb(fresh);
+  return fresh;
 }
 
 function saveDb(db: DatabaseSchema) {
@@ -197,6 +506,35 @@ app.post("/api/auth/register", (req, res) => {
     // Check if there was existing data under accountCode (e.g. partner had created it)
     const existingSharedData = db.accountsData[finalAccountCode];
 
+    const trialDays = 15;
+    const renewalDateStr = new Date(now + trialDays * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const todayStr = new Date(now).toISOString().split("T")[0];
+    const userPlan = selectedPlanId || (accountType === "individual" ? "individual" : "pareja");
+
+    const userInitialSubscription = initialData?.subscriptions?.[0] || {
+      id: `sub-${now}`,
+      userId: newUser.id,
+      userEmail: cleanEmail,
+      userName: `${name.trim()}${lastName ? " " + String(lastName).trim() : ""}`.trim(),
+      partnerName: partnerName ? String(partnerName).trim() : undefined,
+      accountCode: finalAccountCode,
+      planId: userPlan,
+      planName: userPlan === "pro_ai" ? "Plan Pro & IA" : (userPlan === "individual" ? "Plan Individual" : "Plan Parejas Dúo"),
+      status: "trial",
+      billingCycle: "monthly",
+      pricePaid: 0,
+      currency,
+      paymentMethod: "Mercado Pago (Prueba 15 Días)",
+      startDate: todayStr,
+      lastPaymentDate: todayStr,
+      nextRenewalDate: renewalDateStr,
+      trialEndsDate: renewalDateStr,
+      trialDaysGranted: trialDays,
+      autoRenew: true,
+      createdAt: now,
+      notes: "Período de prueba de 15 días concedido al registrarse.",
+    };
+
     const newUserData: UserDataPayload = existingSharedData || {
       transactions: initialData?.transactions || [],
       categoryMap: initialData?.categoryMap || null,
@@ -212,13 +550,15 @@ app.post("/api/auth/register", (req, res) => {
       },
       settlementHistory: initialData?.settlementHistory || [],
       goals: initialData?.goals || [],
-      subscriptions: initialData?.subscriptions || [],
+      subscriptions: initialData?.subscriptions?.length ? initialData.subscriptions : [userInitialSubscription],
       alertItems: initialData?.alertItems || [],
       updatedAt: now,
     };
 
     db.accountsData[cleanEmail] = newUserData;
     db.accountsData[finalAccountCode] = newUserData;
+    if (!db.subscriptions) db.subscriptions = {};
+    db.subscriptions[cleanEmail] = userInitialSubscription;
 
     saveDb(db);
 
@@ -722,6 +1062,461 @@ app.post("/api/auth/set-admin-pin", (req, res) => {
       message: "Clave de administrador guardada exitosamente en la base de datos." 
     });
   } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// ADMIN PANEL - CUENTAS CREADAS & SUSCRIPCIONES
+// ==========================================
+
+// Helper: Ensure user has a subscription object and normalize
+function getOrBuildSubscriptionForUser(user: UserRecord, db: DatabaseSchema): any {
+  const cleanEmail = user.email.toLowerCase().trim();
+  const existingSub = db.subscriptions?.[cleanEmail] || db.accountsData[cleanEmail]?.subscriptions?.[0];
+  if (existingSub) {
+    return existingSub;
+  }
+
+  const now = Date.now();
+  const trialDays = 15;
+  const createdAtTime = user.createdAt || now;
+  const trialEndTime = createdAtTime + trialDays * 24 * 60 * 60 * 1000;
+  const trialEndStr = new Date(trialEndTime).toISOString().split("T")[0];
+  const startStr = new Date(createdAtTime).toISOString().split("T")[0];
+  const userPlan = user.selectedPlanId || (user.accountType === "individual" ? "individual" : "pareja");
+
+  const builtSub = {
+    id: `sub-${user.id || now}`,
+    userId: user.id || `usr-${now}`,
+    userEmail: cleanEmail,
+    userName: `${user.name || "Usuario"} ${user.lastName || ""}`.trim(),
+    partnerName: user.partnerName || undefined,
+    accountCode: user.accountCode || `ACC-${Math.floor(1000 + Math.random() * 9000)}`,
+    planId: userPlan,
+    planName: userPlan === "pro_ai" ? "Plan Pro & IA" : (userPlan === "individual" ? "Plan Individual" : "Plan Parejas Dúo"),
+    status: trialEndTime < now ? "trial" : "trial",
+    billingCycle: "monthly",
+    pricePaid: 0,
+    currency: user.currency || "ARS",
+    paymentMethod: "Mercado Pago (Prueba 15 Días)",
+    startDate: startStr,
+    lastPaymentDate: startStr,
+    nextRenewalDate: trialEndStr,
+    trialEndsDate: trialEndStr,
+    trialDaysGranted: trialDays,
+    autoRenew: true,
+    createdAt: createdAtTime,
+    notes: "Cuenta registrada en GastoAR.",
+  };
+
+  if (!db.subscriptions) db.subscriptions = {};
+  db.subscriptions[cleanEmail] = builtSub;
+  return builtSub;
+}
+
+// 1. List all registered user accounts and subscriptions
+app.get("/api/admin/accounts", (_req, res) => {
+  try {
+    const db = getDb();
+    let hasChanges = false;
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    const usersList: any[] = [];
+    const subsMap = new Map<string, any>();
+
+    // Scan all registered users
+    const userEmails = Object.keys(db.users || {});
+    for (const email of userEmails) {
+      const user = db.users[email];
+      if (!user) continue;
+
+      const sub = getOrBuildSubscriptionForUser(user, db);
+      if (!db.subscriptions?.[email]) {
+        hasChanges = true;
+      }
+
+      // Check transactions count
+      const accData = db.accountsData[email] || (user.accountCode ? db.accountsData[user.accountCode] : undefined);
+      const txCount = Array.isArray(accData?.transactions) ? accData.transactions.length : 0;
+
+      // Calculate trial / active state
+      const renewalDate = sub.nextRenewalDate || sub.trialEndsDate || "";
+      const isTrialExpired = sub.status === "trial" && renewalDate < todayStr;
+      const isTrialActive = sub.status === "trial" && renewalDate >= todayStr;
+
+      let remainingTrialDays = 0;
+      if (renewalDate) {
+        const diffMs = new Date(renewalDate).getTime() - new Date(todayStr).getTime();
+        remainingTrialDays = Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+      }
+
+      const userCard = {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        lastName: user.lastName || "",
+        fullName: `${user.name || ""} ${user.lastName || ""}`.trim() || user.email,
+        phone: user.phone || "",
+        password: user.password || "",
+        accountType: user.accountType || "individual",
+        partnerName: user.partnerName || "",
+        accountCode: user.accountCode,
+        currency: user.currency || "ARS",
+        selectedPlanId: user.selectedPlanId || sub.planId || "individual",
+        createdAt: user.createdAt || Date.now(),
+        updatedAt: user.updatedAt || Date.now(),
+        transactionCount: txCount,
+        hasTransactions: txCount > 0,
+        status: isTrialExpired ? "trial_expired" : sub.status,
+        remainingTrialDays,
+        subscription: sub,
+      };
+
+      usersList.push(userCard);
+      subsMap.set(sub.id, sub);
+    }
+
+    // Also include any standalone subscriptions that don't directly map to a registered user
+    if (db.subscriptions) {
+      for (const [subEmail, sub] of Object.entries(db.subscriptions)) {
+        if (!subsMap.has(sub.id)) {
+          subsMap.set(sub.id, sub);
+        }
+      }
+    }
+
+    if (hasChanges) {
+      saveDb(db);
+    }
+
+    // Sort accounts: newest first
+    usersList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const allSubs = Array.from(subsMap.values());
+
+    return res.json({
+      success: true,
+      users: usersList,
+      subscriptions: allSubs,
+      count: usersList.length,
+      stats: {
+        totalAccounts: usersList.length,
+        individualAccounts: usersList.filter(u => u.accountType === "individual").length,
+        coupleAccounts: usersList.filter(u => u.accountType === "pareja").length,
+        activeAccounts: usersList.filter(u => u.subscription?.status === "active").length,
+        trialAccounts: usersList.filter(u => u.subscription?.status === "trial" && (u.subscription?.nextRenewalDate || "") >= todayStr).length,
+        trialExpiredAccounts: usersList.filter(u => u.subscription?.status === "trial" && (u.subscription?.nextRenewalDate || "") < todayStr).length,
+      },
+    });
+  } catch (err: any) {
+    console.error("Error in /api/admin/accounts:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2. Sync client-side accounts (e.g. from localStorage known accounts) into server DB
+app.post("/api/admin/accounts/sync", (req, res) => {
+  try {
+    const { accounts } = req.body;
+    if (!Array.isArray(accounts) || accounts.length === 0) {
+      return res.json({ success: true, syncedCount: 0 });
+    }
+
+    const db = getDb();
+    let addedCount = 0;
+    const now = Date.now();
+
+    for (const item of accounts) {
+      if (!item || !item.email) continue;
+      const cleanEmail = String(item.email).trim().toLowerCase();
+      if (!db.users[cleanEmail]) {
+        const finalCode = item.accountCode || `ACC-${Math.floor(1000 + Math.random() * 9000)}`;
+        const newUser: UserRecord = {
+          id: item.id || `acc-${now}-${Math.floor(Math.random() * 1000)}`,
+          email: cleanEmail,
+          name: item.name || "Usuario",
+          lastName: item.lastName || "",
+          phone: item.phone || "",
+          password: item.password || "gastoar123",
+          partnerName: item.partnerName || undefined,
+          accountType: item.accountType === "individual" ? "individual" : "pareja",
+          accountCode: finalCode,
+          currency: item.currency || "ARS",
+          selectedPlanId: item.selectedPlanId || item.planId || "individual",
+          createdAt: item.createdAt || now,
+          updatedAt: now,
+        };
+
+        db.users[cleanEmail] = newUser;
+        db.accountCodeToEmail[finalCode] = cleanEmail;
+
+        if (!db.accountsData[cleanEmail]) {
+          db.accountsData[cleanEmail] = {
+            transactions: [],
+            categoryMap: null,
+            categoryColors: null,
+            budgets: { categories: {}, subcategories: {} },
+            profile: {
+              accountCode: finalCode,
+              user1Name: newUser.name,
+              user2Name: newUser.partnerName || (newUser.accountType === "individual" ? "Fondo Ahorro" : "Mi Pareja"),
+              currentUser: "user1",
+              currency: newUser.currency,
+              defaultSplit: "50_50",
+            },
+            settlementHistory: [],
+            goals: [],
+            subscriptions: [],
+            alertItems: [],
+            updatedAt: now,
+          };
+        }
+        getOrBuildSubscriptionForUser(newUser, db);
+        addedCount++;
+      }
+    }
+
+    if (addedCount > 0) {
+      saveDb(db);
+    }
+
+    return res.json({ success: true, syncedCount: addedCount });
+  } catch (err: any) {
+    console.error("Error in /api/admin/accounts/sync:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 3. Create new user account directly from Admin Panel
+app.post("/api/admin/accounts/create", (req, res) => {
+  try {
+    const {
+      name,
+      lastName,
+      email,
+      phone,
+      password = "password123",
+      accountType = "individual",
+      partnerName,
+      selectedPlanId = "individual",
+      currency = "ARS",
+      trialDays = 15,
+      status = "trial",
+      notes = "",
+    } = req.body;
+
+    if (!email || !name) {
+      return res.status(400).json({ success: false, error: "Nombre y correo son requeridos." });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const db = getDb();
+
+    if (db.users[cleanEmail]) {
+      return res.status(409).json({ success: false, error: "Ya existe una cuenta con este correo electrónico." });
+    }
+
+    const now = Date.now();
+    const finalCode = `ACC-${Math.floor(1000 + Math.random() * 9000)}`;
+    const renewalDateStr = new Date(now + Number(trialDays) * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const todayStr = new Date(now).toISOString().split("T")[0];
+
+    const newUser: UserRecord = {
+      id: `acc-${now}-${Math.floor(Math.random() * 1000)}`,
+      email: cleanEmail,
+      name: name.trim(),
+      lastName: lastName ? String(lastName).trim() : undefined,
+      phone: phone ? String(phone).trim() : undefined,
+      password: password ? String(password).trim() : undefined,
+      partnerName: partnerName ? String(partnerName).trim() : undefined,
+      accountType: accountType === "individual" ? "individual" : "pareja",
+      accountCode: finalCode,
+      currency: currency || "ARS",
+      selectedPlanId,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const newSub = {
+      id: `sub-${now}`,
+      userId: newUser.id,
+      userEmail: cleanEmail,
+      userName: `${name.trim()}${lastName ? " " + String(lastName).trim() : ""}`.trim(),
+      partnerName: partnerName ? String(partnerName).trim() : undefined,
+      accountCode: finalCode,
+      planId: selectedPlanId,
+      planName: selectedPlanId === "pro_ai" ? "Plan Pro & IA" : (selectedPlanId === "individual" ? "Plan Individual" : "Plan Parejas Dúo"),
+      status: status,
+      billingCycle: "monthly",
+      pricePaid: status === "active" ? (selectedPlanId === "pro_ai" ? 6900 : (selectedPlanId === "pareja" ? 4900 : 2900)) : 0,
+      currency: currency || "ARS",
+      paymentMethod: status === "active" ? "Administrador (Alta Directa)" : "Mercado Pago (Prueba)",
+      startDate: todayStr,
+      lastPaymentDate: todayStr,
+      nextRenewalDate: renewalDateStr,
+      trialEndsDate: renewalDateStr,
+      trialDaysGranted: Number(trialDays),
+      autoRenew: true,
+      createdAt: now,
+      notes: notes || "Cuenta creada desde el Panel de Administración.",
+    };
+
+    db.users[cleanEmail] = newUser;
+    db.accountCodeToEmail[finalCode] = cleanEmail;
+    if (!db.subscriptions) db.subscriptions = {};
+    db.subscriptions[cleanEmail] = newSub;
+
+    db.accountsData[cleanEmail] = {
+      transactions: [],
+      categoryMap: null,
+      categoryColors: null,
+      budgets: { categories: {}, subcategories: {} },
+      profile: {
+        accountCode: finalCode,
+        user1Name: newUser.name,
+        user2Name: newUser.partnerName || (newUser.accountType === "individual" ? "Fondo Ahorro" : "Mi Pareja"),
+        currentUser: "user1",
+        currency: newUser.currency,
+        defaultSplit: "50_50",
+      },
+      settlementHistory: [],
+      goals: [],
+      subscriptions: [newSub],
+      alertItems: [],
+      updatedAt: now,
+    };
+
+    saveDb(db);
+
+    return res.json({
+      success: true,
+      user: newUser,
+      subscription: newSub,
+      message: "Cuenta creada exitosamente.",
+    });
+  } catch (err: any) {
+    console.error("Error creating account in admin:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4. Update user account and subscription from Admin Panel
+app.post("/api/admin/accounts/update", (req, res) => {
+  try {
+    const { email, updates } = req.body;
+    if (!email || !updates) {
+      return res.status(400).json({ success: false, error: "Email y datos a actualizar requeridos." });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const db = getDb();
+    const user = db.users[cleanEmail];
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: "Cuenta no encontrada en la base de datos." });
+    }
+
+    // Apply updates to user record
+    if (updates.name !== undefined) user.name = updates.name.trim();
+    if (updates.lastName !== undefined) user.lastName = updates.lastName ? updates.lastName.trim() : "";
+    if (updates.phone !== undefined) user.phone = updates.phone ? updates.phone.trim() : "";
+    if (updates.password !== undefined && updates.password) user.password = updates.password.trim();
+    if (updates.partnerName !== undefined) user.partnerName = updates.partnerName ? updates.partnerName.trim() : "";
+    if (updates.accountType !== undefined) user.accountType = updates.accountType;
+    if (updates.selectedPlanId !== undefined) user.selectedPlanId = updates.selectedPlanId;
+    user.updatedAt = Date.now();
+
+    // Apply updates to subscription
+    const sub = getOrBuildSubscriptionForUser(user, db);
+    if (updates.name !== undefined || updates.lastName !== undefined) {
+      sub.userName = `${user.name} ${user.lastName || ""}`.trim();
+    }
+    if (updates.partnerName !== undefined) sub.partnerName = user.partnerName || undefined;
+    if (updates.selectedPlanId !== undefined) {
+      sub.planId = updates.selectedPlanId;
+      sub.planName = updates.selectedPlanId === "pro_ai" ? "Plan Pro & IA" : (updates.selectedPlanId === "individual" ? "Plan Individual" : "Plan Parejas Dúo");
+    }
+    if (updates.status !== undefined) sub.status = updates.status;
+    if (updates.billingCycle !== undefined) sub.billingCycle = updates.billingCycle;
+    if (updates.nextRenewalDate !== undefined) sub.nextRenewalDate = updates.nextRenewalDate;
+    if (updates.trialEndsDate !== undefined) sub.trialEndsDate = updates.trialEndsDate;
+    if (updates.notes !== undefined) sub.notes = updates.notes;
+
+    // Handle trial extension (extendDays)
+    if (updates.extendDays && Number(updates.extendDays) > 0) {
+      const days = Number(updates.extendDays);
+      const baseDate = sub.nextRenewalDate ? new Date(sub.nextRenewalDate) : new Date();
+      if (baseDate < new Date()) {
+        baseDate.setTime(Date.now());
+      }
+      baseDate.setDate(baseDate.getDate() + days);
+      const newRenewalStr = baseDate.toISOString().split("T")[0];
+      sub.nextRenewalDate = newRenewalStr;
+      sub.trialEndsDate = newRenewalStr;
+      sub.status = updates.asActiveStatus ? "active" : "trial";
+      sub.notes = `${sub.notes ? sub.notes + " | " : ""}Prórroga de +${days} días otorgada el ${new Date().toLocaleDateString("es-AR")}`;
+    }
+
+    if (!db.subscriptions) db.subscriptions = {};
+    db.subscriptions[cleanEmail] = sub;
+
+    // Also update accountsData
+    const accData = db.accountsData[cleanEmail] || (user.accountCode ? db.accountsData[user.accountCode] : undefined);
+    if (accData) {
+      accData.subscriptions = [sub];
+      if (accData.profile) {
+        accData.profile.user1Name = user.name;
+        if (user.partnerName) accData.profile.user2Name = user.partnerName;
+      }
+      accData.updatedAt = Date.now();
+    }
+
+    saveDb(db);
+
+    return res.json({
+      success: true,
+      user,
+      subscription: sub,
+      message: "Cuenta actualizada correctamente.",
+    });
+  } catch (err: any) {
+    console.error("Error updating account in admin:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5. Delete user account and associated data
+app.post("/api/admin/accounts/delete", (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, error: "Email requerido." });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const db = getDb();
+    const user = db.users[cleanEmail];
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: "Cuenta no encontrada." });
+    }
+
+    const code = user.accountCode;
+    delete db.users[cleanEmail];
+    if (code) {
+      delete db.accountCodeToEmail[code];
+      delete db.accountsData[code];
+    }
+    delete db.accountsData[cleanEmail];
+    if (db.subscriptions) {
+      delete db.subscriptions[cleanEmail];
+    }
+
+    saveDb(db);
+
+    return res.json({ success: true, message: `Cuenta ${cleanEmail} eliminada correctamente.` });
+  } catch (err: any) {
+    console.error("Error deleting account in admin:", err);
     return res.status(500).json({ success: false, error: err.message });
   }
 });

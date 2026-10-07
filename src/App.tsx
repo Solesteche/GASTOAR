@@ -2054,6 +2054,17 @@ export default function App() {
       await syncUserProfileToFirestore(firebaseUser.uid, newAcc);
       await syncAppStateToFirestore(firebaseUser.uid, payload.initialData);
 
+      // Also persist to server database so Admin Panel immediately recognizes the created account
+      try {
+        await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } catch (srvErr) {
+        console.warn('Server registration sync notice:', srvErr);
+      }
+
       setCurrentUserAccount(newAcc);
       localStorage.setItem('control_gastos_account_v1', JSON.stringify(newAcc));
 
