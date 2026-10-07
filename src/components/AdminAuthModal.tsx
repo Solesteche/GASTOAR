@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
 import { 
   X, 
   ShieldCheck, 
@@ -19,6 +20,16 @@ import {
   EyeOff
 } from 'lucide-react';
 import { auth } from '../lib/firebase';
+
+function generateBase32Secret(length = 32): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const array = new Uint8Array(length);
+    crypto.getRandomValues(array);
+    return Array.from(array, byte => chars[byte % chars.length]).join('');
+  }
+  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
 
 interface AdminAuthModalProps {
   isOpen: boolean;
@@ -67,25 +78,52 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
   const currentEmail = auth.currentUser?.email?.toLowerCase().trim() || '';
 
-  // Load setup QR code and secret
+  // Load setup QR code and secret (with local fallback so it NEVER fails)
   const loadSetupCredentials = async () => {
     setLoading(true);
     setError('');
+
+    // 1. Try server endpoint first
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
       const res = await fetch('/api/auth/setup-admin-totp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: currentEmail || 'admin@gastoar.app' }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       const data = await res.json();
-      if (res.ok && data.success) {
+      if (res.ok && data.success && data.qrCode && data.secret) {
         setSetupSecret(data.secret);
         setSetupQrCode(data.qrCode);
-      } else {
-        setError(data.error || 'No se pudo generar el código QR de Google Authenticator.');
+        setLoading(false);
+        return;
       }
-    } catch {
-      setError('Error al comunicar con el servidor para generar el código QR.');
+    } catch (err) {
+      console.warn('Servidor no disponible para QR, generando de forma local:', err);
+    }
+
+    // 2. High-reliability local fallback: generate QR code and RFC-compliant Base32 secret directly
+    try {
+      const email = currentEmail || 'admin@gastoar.app';
+      const secret = generateBase32Secret(32);
+      const otpauth = `otpauth://totp/GastoAR:${encodeURIComponent(email)}?secret=${secret}&issuer=GastoAR`;
+      const qrDataUrl = await QRCode.toDataURL(otpauth, {
+        margin: 1,
+        width: 260,
+        color: {
+          dark: '#1e1b4b',
+          light: '#ffffff',
+        },
+      });
+      setSetupSecret(secret);
+      setSetupQrCode(qrDataUrl);
+      setError('');
+    } catch (localErr) {
+      console.error('Error generando QR local:', localErr);
+      setError('No se pudo generar el código QR automáticamente. Hacé clic en "Reintentar QR".');
     } finally {
       setLoading(false);
     }
@@ -477,22 +515,44 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
             {/* Step B: Vincular Google Authenticator QR */}
             <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
-                <QrCode className="w-3.5 h-3.5" />
-                <span>Paso 2: Escaneá el QR en Google Authenticator</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                  <QrCode className="w-3.5 h-3.5" />
+                  <span>Paso 2: Escaneá el QR en Google Authenticator</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadSetupCredentials}
+                  disabled={loading}
+                  className="text-[10px] text-amber-400 hover:text-amber-300 flex items-center gap-1 font-semibold cursor-pointer transition-colors"
+                  title="Generar un nuevo código QR"
+                >
+                  <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+                  <span>{loading ? 'Generando...' : 'Reintentar QR'}</span>
+                </button>
               </div>
 
               {/* QR Image */}
-              <div className="flex flex-col items-center justify-center p-3 bg-white rounded-xl border border-slate-700/80 shadow-md">
+              <div className="flex flex-col items-center justify-center p-3 bg-white rounded-xl border border-slate-700/80 shadow-md min-h-[160px]">
                 {setupQrCode ? (
                   <img
                     src={setupQrCode}
                     alt="Código QR de Google Authenticator"
-                    className="w-36 h-36 object-contain rounded"
+                    className="w-36 h-36 object-contain rounded animate-in fade-in"
                   />
                 ) : (
-                  <div className="w-36 h-36 flex items-center justify-center text-slate-500 text-xs font-medium">
-                    Generando QR...
+                  <div className="w-36 h-36 flex flex-col items-center justify-center text-slate-500 text-xs font-medium gap-2 text-center">
+                    <RefreshCw className={`w-5 h-5 text-amber-500 ${loading ? 'animate-spin' : ''}`} />
+                    <span>{loading ? 'Generando código QR...' : 'Hacé clic para generar el código'}</span>
+                    {!loading && (
+                      <button
+                        type="button"
+                        onClick={loadSetupCredentials}
+                        className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] rounded-lg cursor-pointer transition-colors shadow-sm"
+                      >
+                        Generar QR
+                      </button>
+                    )}
                   </div>
                 )}
                 <span className="text-[10px] text-slate-600 font-bold mt-1 tracking-wider uppercase">
@@ -502,18 +562,23 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
               {/* Manual Secret Key Fallback */}
               {setupSecret && (
-                <div className="flex items-center justify-between text-[11px] pt-1">
-                  <span className="text-slate-400 truncate mr-2 font-mono text-[10px] text-amber-300">
-                    Clave: {setupSecret}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleCopySecret}
-                    className="text-amber-400 hover:text-amber-300 font-bold shrink-0 flex items-center gap-1 cursor-pointer"
-                  >
-                    {copiedSecret ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedSecret ? '¡Copiado!' : 'Copiar'}</span>
-                  </button>
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400 text-[10px] font-medium">
+                      O escribí la clave manual en tu app:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleCopySecret}
+                      className="text-amber-400 hover:text-amber-300 font-bold shrink-0 flex items-center gap-1 cursor-pointer bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded-lg border border-amber-500/20 transition-colors"
+                    >
+                      {copiedSecret ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedSecret ? '¡Copiado!' : 'Copiar clave'}</span>
+                    </button>
+                  </div>
+                  <div className="font-mono text-xs text-amber-300 font-bold tracking-widest bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-800 text-center select-all">
+                    {setupSecret.match(/.{1,4}/g)?.join(' ') || setupSecret}
+                  </div>
                 </div>
               )}
 
