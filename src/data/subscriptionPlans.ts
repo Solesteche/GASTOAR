@@ -27,8 +27,8 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   },
   {
     id: 'pareja',
-    name: 'Plan Parejas Dúo',
-    tagline: 'Sincronización en tiempo real para 2 personas y finanzas de pareja. ¡15 días de prueba gratis!',
+    name: 'Plan Cuenta Compartida Dúo',
+    tagline: 'Sincronización en tiempo real para 2 personas y cuenta compartida. ¡15 días de prueba gratis!',
     badge: 'Más Elegido ⭐ (15 Días Gratis)',
     priceMonthly: 7900,
     priceAnnual: 63000, // Equivale a $5.250/mes (-34%)
@@ -43,11 +43,11 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       '2 Cuentas vinculadas sincronizadas en tiempo real',
       'Todo lo incluido en el Plan Individual',
       'Creación y edición ilimitada de categorías y subcategorías propias',
-      'Metas de ahorro compartidas y alcancías de pareja',
+      'Metas de ahorro compartidas y alcancías conjuntas',
       'División inteligente: 50/50, 60/40, % personalizado o montos exactos',
       'Cálculo de balances y liquidaciones: quién le debe a quién',
-      'Historial de acuerdos y pagos de saldos en pareja',
-      'Filtro instantáneo entre gastos propios y de la pareja'
+      'Historial de acuerdos y pagos de saldos compartidos',
+      'Filtro instantáneo entre gastos propios y compartidos'
     ]
   },
   {
@@ -65,7 +65,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     hasInstallmentManager: true,
     features: [
       '✨ 15 días de prueba GRATIS con registro por voz ilimitado',
-      'Todo lo incluido en el Plan Parejas Dúo',
+      'Todo lo incluido en el Plan Cuenta Compartida Dúo',
       'Creación y personalización total de categorías y subcategorías',
       'Registro ultra-rápido de gastos por voz o audios de WhatsApp con IA',
       'Categorización inteligente automática (ej: "Gasté 50000 en Coto" → Alimentación Supermercado)',
@@ -109,7 +109,7 @@ export const INITIAL_USER_SUBSCRIPTIONS: UserSubscription[] = [
     partnerName: 'Camila',
     accountCode: 'COMPARTIDA-8492',
     planId: 'pareja',
-    planName: 'Plan Parejas Dúo',
+    planName: 'Plan Cuenta Compartida Dúo',
     status: 'active',
     billingCycle: 'annual',
     pricePaid: 63000,
@@ -151,7 +151,7 @@ export const INITIAL_USER_SUBSCRIPTIONS: UserSubscription[] = [
     partnerName: 'Esteban',
     accountCode: 'COMPARTIDA-5512',
     planId: 'pareja',
-    planName: 'Plan Parejas Dúo',
+    planName: 'Plan Cuenta Compartida Dúo',
     status: 'pending_payment',
     billingCycle: 'monthly',
     pricePaid: 7900,
@@ -195,7 +195,7 @@ export const INITIAL_USER_SUBSCRIPTIONS: UserSubscription[] = [
     partnerName: 'Tomás',
     accountCode: 'COMPARTIDA-3109',
     planId: 'pareja',
-    planName: 'Plan Parejas Dúo',
+    planName: 'Plan Cuenta Compartida Dúo',
     status: 'trial',
     billingCycle: 'monthly',
     pricePaid: 0,

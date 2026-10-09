@@ -1730,7 +1730,7 @@ export default function App() {
     if (currentUserAccount) {
       handleUpdateAccount({ accountCode: cleanCode });
     }
-    showToast(`¡Cuenta vinculada con el código de pareja ${cleanCode}!`, 'success');
+    showToast(`¡Cuenta vinculada con el código de cuenta compartida ${cleanCode}!`, 'success');
   };
 
   // Auth Handlers (Cloud-enabled for seamless Mobile <-> PC sync)
@@ -3016,7 +3016,7 @@ export default function App() {
         profile={profile}
         onSaveProfile={(newProfile) => {
           setProfile(newProfile);
-          showToast('Configuración de pareja actualizada', 'success');
+          showToast('Configuración de cuenta compartida actualizada', 'success');
         }}
         onGenerateNewCode={handleGenerateNewCode}
         onJoinAccount={handleJoinAccount}

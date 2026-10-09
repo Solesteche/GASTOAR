@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -67,7 +67,7 @@ const ONBOARDING_SLIDES = [
   },
   {
     id: 'couple',
-    title: 'Finanzas Compartidas y en Pareja',
+    title: 'Finanzas con Cuenta Compartida',
     description: 'Dividí gastos equitativamente, conocé en todo momento quién le debe a quién y liquidá saldos con un solo toque.',
     badge: 'Cuenta Compartida',
     icon: Users,
@@ -83,8 +83,8 @@ const ONBOARDING_SLIDES = [
           <div className="w-10 h-10 rounded-full bg-white shadow-md border border-purple-100 flex items-center justify-center z-20 text-[#7928CA]">
             <Users className="w-5 h-5" />
           </div>
-          <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-orange-500 to-pink-500 p-1 shadow-lg text-white flex items-center justify-center font-black text-xl">
-            Pareja
+          <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-orange-500 to-pink-500 p-1 shadow-lg text-white flex items-center justify-center font-black text-sm text-center px-1">
+            Cuenta Compartida
           </div>
         </div>
       </div>
@@ -121,6 +121,11 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
 
+  // Swipe handling
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
+  const isDragging = useRef<boolean>(false);
+
   const slide = ONBOARDING_SLIDES[currentSlide];
   const isLast = currentSlide === ONBOARDING_SLIDES.length - 1;
 
@@ -142,8 +147,66 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
     }
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartX.current === null || touchEndX.current === null) return;
+    const diffX = touchStartX.current - touchEndX.current;
+    const threshold = 40;
+
+    if (diffX > threshold && !isLast) {
+      handleNext();
+    } else if (diffX < -threshold && currentSlide > 0) {
+      handlePrev();
+    }
+
+    touchStartX.current = null;
+    touchEndX.current = null;
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    isDragging.current = true;
+    touchStartX.current = e.clientX;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current) return;
+    touchEndX.current = e.clientX;
+  };
+
+  const handleMouseUp = () => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    if (touchStartX.current === null || touchEndX.current === null) return;
+    const diffX = touchStartX.current - touchEndX.current;
+    const threshold = 40;
+
+    if (diffX > threshold && !isLast) {
+      handleNext();
+    } else if (diffX < -threshold && currentSlide > 0) {
+      handlePrev();
+    }
+
+    touchStartX.current = null;
+    touchEndX.current = null;
+  };
+
   return (
-    <div className="relative w-full h-full min-h-[580px] bg-white text-slate-800 flex flex-col justify-between p-5 sm:p-6 select-none overflow-y-auto">
+    <div 
+      className="relative w-full h-full min-h-[580px] bg-white text-slate-800 flex flex-col justify-between p-5 sm:p-6 select-none overflow-y-auto"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+    >
       {/* Top Header with Back / Skip */}
       <div className="flex items-center justify-between pt-1">
         {currentSlide > 0 ? (

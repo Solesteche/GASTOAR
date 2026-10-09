@@ -283,7 +283,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
       return;
     }
     if (regAccountType === 'pareja' && !regPartnerName.trim()) {
-      setErrorMsg('Por favor ingresá el nombre de tu pareja para vincular la cuenta.');
+      setErrorMsg('Por favor ingresá el nombre del otro miembro para vincular la cuenta compartida.');
       return;
     }
 
@@ -486,7 +486,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
       phone: regPhone.trim() || undefined,
       email: emailToUse,
       accountType: details.planId === 'individual' ? 'individual' : 'pareja',
-      partnerName: details.planId === 'individual' ? undefined : (regPartnerName.trim() || 'Mi Pareja'),
+      partnerName: details.planId === 'individual' ? undefined : (regPartnerName.trim() || 'Cuenta Compartida'),
       currency: 'ARS',
       accountCode: regAccountCode,
       selectedPlanId: details.planId as SubscriptionPlanId,
@@ -693,7 +693,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
           <div className="space-y-4">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300 text-xs font-bold uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-              <span>Finanzas en Pareja & Control de Gastos Inteligente</span>
+              <span>Cuenta Compartida & Control de Gastos Inteligente</span>
             </div>
 
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1]">
@@ -701,7 +701,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
             </h1>
 
             <p className="text-sm sm:text-base text-slate-300 max-w-xl font-normal leading-relaxed">
-              Registrá tus gastos diarios, dividí cuentas con tu pareja en tiempo real, proyectá cuotas de tarjetas de crédito y escaneá comprobantes al instante con Inteligencia Artificial.
+              Registrá tus gastos diarios, dividí cuentas con tu cuenta compartida en tiempo real, proyectá cuotas de tarjetas de crédito y escaneá comprobantes al instante con Inteligencia Artificial.
             </p>
           </div>
 
@@ -1247,8 +1247,8 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
                             : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200'
                         }`}
                       >
-                        <Heart className="w-3.5 h-3.5" />
-                        <span>En Pareja (Dúo)</span>
+                        <Users className="w-3.5 h-3.5" />
+                        <span>Cuenta Compartida (Dúo)</span>
                       </button>
 
                       <button
@@ -1269,16 +1269,16 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
                   {regAccountType === 'pareja' && (
                     <div className="space-y-1 animate-in fade-in duration-200">
                       <label className="block text-xs font-semibold text-slate-300">
-                        Nombre de tu Pareja
+                        Nombre del Otro Miembro (Cuenta Compartida)
                       </label>
                       <div className="relative">
-                        <Heart className="w-4 h-4 text-pink-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <Users className="w-4 h-4 text-purple-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                         <input
                           type="text"
                           required
                           value={regPartnerName}
                           onChange={(e) => setRegPartnerName(e.target.value)}
-                          placeholder="ej. Martín"
+                          placeholder="ej. Sofía o Martín"
                           className="w-full pl-10 pr-3.5 py-2 bg-slate-950/70 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all"
                         />
                       </div>
@@ -1528,7 +1528,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
         <div className="flex items-center gap-2">
           <span>© {new Date().getFullYear()} GastoAR</span>
           <span>•</span>
-          <span>Finanzas para Parejas & Control Personal</span>
+          <span>Cuenta Compartida & Control Personal</span>
         </div>
 
         <div className="flex items-center gap-3">
@@ -1556,7 +1556,7 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
             id: 'usr-new',
             name: regName.trim() || 'Nuevo Usuario',
             email: regEmail.trim() || 'ejemplo@ejemplo.com',
-            partnerName: regPartnerName.trim() || 'Mi Pareja',
+            partnerName: regPartnerName.trim() || 'Cuenta Compartida',
             accountType: regAccountType,
             accountCode: regAccountCode,
             currency: 'ARS',

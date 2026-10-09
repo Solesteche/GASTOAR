@@ -73,7 +73,7 @@ export const MobileRegisterScreen: React.FC<MobileRegisterScreenProps> = ({
       return;
     }
     if (accountType === 'pareja' && !partnerName.trim()) {
-      setError('Ingresá el nombre de tu pareja o elegí cuenta individual');
+      setError('Ingresá el nombre del otro miembro o elegí cuenta individual');
       return;
     }
     if (!acceptTerms) {
@@ -184,11 +184,11 @@ export const MobileRegisterScreen: React.FC<MobileRegisterScreenProps> = ({
                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                   accountType === 'pareja' ? 'bg-[#7928CA] text-white' : 'bg-slate-200 text-slate-600'
                 }`}>
-                  <Heart className="w-3.5 h-3.5" />
+                  <Users className="w-3.5 h-3.5" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-slate-900 leading-tight">En Pareja</p>
-                  <p className="text-[10px] text-slate-500 truncate">Finanzas 50/50</p>
+                  <p className="text-xs font-bold text-slate-900 leading-tight">Cuenta Compartida</p>
+                  <p className="text-[10px] text-slate-500 truncate">Finanzas 2 personas</p>
                 </div>
               </button>
 
@@ -248,12 +248,12 @@ export const MobileRegisterScreen: React.FC<MobileRegisterScreenProps> = ({
             </div>
           </div>
 
-          {/* Partner Name (if pareja) */}
+          {/* Partner Name (if pareja / cuenta compartida) */}
           {accountType === 'pareja' && (
             <div className="space-y-1 animate-in fade-in duration-200">
               <label className="text-xs font-bold text-purple-900 block flex items-center gap-1.5">
-                <Heart className="w-3.5 h-3.5 text-pink-500" />
-                <span>Nombre de tu Pareja *</span>
+                <Users className="w-3.5 h-3.5 text-purple-600" />
+                <span>Nombre del otro miembro (Cuenta Compartida) *</span>
               </label>
               <input
                 type="text"

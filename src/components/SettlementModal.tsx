@@ -87,7 +87,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-sm sm:text-base leading-tight">
-                Liquidación de Cuentas en Pareja
+                Liquidación de Cuenta Compartida
               </h3>
               <p className="text-[10px] text-pink-100">
                 Detalle exacto de aportes y saldos pendientes
@@ -136,7 +136,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
               {/* Grand Total banner */}
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="text-slate-500">Gasto Total en Pareja:</span>
+                  <span className="text-slate-500">Gasto Total Compartido:</span>
                   <span className="font-bold text-slate-900 text-sm">
                     {formatCurrency(debtInfo.totalCoupleSpent, currency)}
                   </span>
