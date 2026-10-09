@@ -15,6 +15,8 @@ import {
 interface OnboardingScreenProps {
   onFinish: () => void;
   onSkip: () => void;
+  onGoToRegister?: () => void;
+  onGoToLogin?: () => void;
 }
 
 const ONBOARDING_SLIDES = [
@@ -113,7 +115,9 @@ const ONBOARDING_SLIDES = [
 
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
   onFinish,
-  onSkip
+  onSkip,
+  onGoToRegister,
+  onGoToLogin
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
 
@@ -122,7 +126,11 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
 
   const handleNext = () => {
     if (isLast) {
-      onFinish();
+      if (onGoToRegister) {
+        onGoToRegister();
+      } else {
+        onFinish();
+      }
     } else {
       setCurrentSlide(prev => prev + 1);
     }
@@ -135,7 +143,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
   };
 
   return (
-    <div className="relative w-full h-full min-h-[580px] bg-white text-slate-800 flex flex-col justify-between p-6 select-none overflow-y-auto">
+    <div className="relative w-full h-full min-h-[580px] bg-white text-slate-800 flex flex-col justify-between p-5 sm:p-6 select-none overflow-y-auto">
       {/* Top Header with Back / Skip */}
       <div className="flex items-center justify-between pt-1">
         {currentSlide > 0 ? (
@@ -151,7 +159,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
           <div className="w-9 h-9" />
         )}
 
-        <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-100">
+        <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-3 py-1 rounded-full border border-purple-100 shadow-xs">
           Guía Rápida GastoAR
         </span>
 
@@ -165,7 +173,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
       </div>
 
       {/* Main Slide Presentation */}
-      <div className="my-auto py-6 flex flex-col items-center text-center space-y-6 animate-in fade-in zoom-in-95 duration-300 key={currentSlide}">
+      <div className="my-auto py-5 flex flex-col items-center text-center space-y-5 animate-in fade-in zoom-in-95 duration-300">
         {/* Dynamic Graphic */}
         <div>{slide.illustration}</div>
 
@@ -176,7 +184,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
         </span>
 
         {/* Text */}
-        <div className="space-y-2 max-w-sm px-2">
+        <div className="space-y-1.5 max-w-sm px-2">
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-snug">
             {slide.title}
           </h2>
@@ -186,34 +194,63 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({
         </div>
       </div>
 
-      {/* Bottom Progress Dots & Next Action */}
-      <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-        {/* Carousel Dots */}
-        <div className="flex items-center gap-1.5">
-          {ONBOARDING_SLIDES.map((_, idx) => (
+      {/* Bottom Progress & Action Controls */}
+      <div className="pt-3 border-t border-slate-100 space-y-3">
+        {/* On the last slide, present both Register and Login buttons */}
+        {isLast ? (
+          <div className="space-y-2 animate-in fade-in duration-200">
             <button
-              key={idx}
               type="button"
-              onClick={() => setCurrentSlide(idx)}
-              className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                idx === currentSlide
-                  ? 'w-7 bg-[#7928CA]'
-                  : 'w-2 bg-slate-200 hover:bg-slate-300'
-              }`}
-              title={`Ir al paso ${idx + 1}`}
-            />
-          ))}
-        </div>
+              onClick={() => {
+                if (onGoToRegister) onGoToRegister();
+                else onFinish();
+              }}
+              className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#7928CA] to-[#9B30FF] hover:from-[#6B21B2] hover:to-[#8824E3] text-white text-xs sm:text-sm font-bold shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <span>Crear cuenta gratis</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
 
-        {/* Primary Action Button */}
-        <button
-          type="button"
-          onClick={handleNext}
-          className="py-3 px-5 rounded-2xl bg-[#7928CA] hover:bg-[#6818B8] text-white text-xs sm:text-sm font-bold shadow-lg shadow-purple-500/25 flex items-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
-        >
-          <span>{isLast ? '¡Comenzar ahora!' : 'Siguiente'}</span>
-          <ArrowRight className="w-4 h-4" />
-        </button>
+            {onGoToLogin && (
+              <button
+                type="button"
+                onClick={onGoToLogin}
+                className="w-full py-2.5 px-4 rounded-xl border border-slate-200 hover:border-purple-300 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                ¿Ya tenés cuenta? Iniciar Sesión
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            {/* Carousel Dots */}
+            <div className="flex items-center gap-1.5">
+              {ONBOARDING_SLIDES.map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setCurrentSlide(idx)}
+                  className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                    idx === currentSlide
+                      ? 'w-7 bg-[#7928CA]'
+                      : 'w-2 bg-slate-200 hover:bg-slate-300'
+                  }`}
+                  title={`Ir al paso ${idx + 1}`}
+                />
+              ))}
+            </div>
+
+            {/* Primary Action Button */}
+            <button
+              type="button"
+              onClick={handleNext}
+              className="py-3 px-5 rounded-2xl bg-[#7928CA] hover:bg-[#6818B8] text-white text-xs sm:text-sm font-bold shadow-lg shadow-purple-500/25 flex items-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <span>Siguiente</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

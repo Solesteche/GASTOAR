@@ -62,7 +62,7 @@ export const MobileLoginScreen: React.FC<MobileLoginScreenProps> = ({
     <div className="relative w-full h-full min-h-[580px] bg-white text-slate-800 flex flex-col justify-between p-6 select-none overflow-y-auto">
       {/* Top Header */}
       <div>
-        <div className="flex items-center justify-between pt-1 pb-4">
+        <div className="flex items-center justify-between pt-1 pb-3">
           {onBack ? (
             <button
               type="button"
@@ -75,19 +75,36 @@ export const MobileLoginScreen: React.FC<MobileLoginScreenProps> = ({
           ) : (
             <div className="w-9 h-9" />
           )}
-          <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-100">
-            Acceso Seguro
+          <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-3 py-1 rounded-full border border-purple-100 shadow-xs">
+            Acceso Oficial GastoAR
           </span>
           <div className="w-9 h-9" />
         </div>
 
+        {/* Tab Toggle: Iniciar Sesión / Registrarse */}
+        <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-2xl mb-4 border border-slate-200/80">
+          <button
+            type="button"
+            className="py-2 text-xs font-bold rounded-xl bg-white text-[#7928CA] shadow-sm transition-all cursor-default"
+          >
+            Iniciar Sesión
+          </button>
+          <button
+            type="button"
+            onClick={onGoToRegister}
+            className="py-2 text-xs font-bold rounded-xl text-slate-600 hover:text-slate-900 transition-all cursor-pointer"
+          >
+            Registrarse
+          </button>
+        </div>
+
         {/* Title & Subtitle */}
-        <div className="space-y-1.5 pt-2">
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
             ¡Bienvenido de nuevo!
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500">
-            Iniciá sesión para acceder a tu panel de finanzas.
+          <p className="text-xs text-slate-500">
+            Iniciá sesión para acceder a tu panel de finanzas y tarjetas.
           </p>
         </div>
 

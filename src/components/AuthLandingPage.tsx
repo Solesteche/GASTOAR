@@ -41,6 +41,7 @@ import { AdminAuthModal } from './AdminAuthModal';
 import { WelcomeScreen } from './mobileScreens/WelcomeScreen';
 import { MobileLoginScreen } from './mobileScreens/MobileLoginScreen';
 import { OnboardingScreen } from './mobileScreens/OnboardingScreen';
+import { MobileRegisterScreen } from './mobileScreens/MobileRegisterScreen';
 import { 
   registerWithEmailFirebase, 
   sendVerificationEmailFirebase, 
@@ -122,8 +123,8 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
   // Billing Cycle Toggle for Plans
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
 
-  // Mobile Native Screens Flow Mode (Screen 2: Welcome, Screen 3: MobileLogin, Screen 4: Onboarding)
-  const [mobileViewMode, setMobileViewMode] = useState<'welcome' | 'onboarding' | 'login' | 'classic'>(() => {
+  // Mobile Native Screens Flow Mode (Screen 2: Welcome, Screen 3: MobileLogin, Screen 4: Onboarding, Screen 5: MobileRegister)
+  const [mobileViewMode, setMobileViewMode] = useState<'welcome' | 'onboarding' | 'login' | 'register' | 'classic'>(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       const onboardingDone = localStorage.getItem('gastoar_onboarding_completed');
       return onboardingDone ? 'login' : 'welcome';
@@ -499,8 +500,10 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
         <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden min-h-[580px] flex flex-col border border-purple-900/30">
           <WelcomeScreen
             onGetStarted={() => setMobileViewMode('onboarding')}
+            onCreateAccount={() => setMobileViewMode('register')}
             onLogin={() => setMobileViewMode('login')}
             onExploreDemo={onGuestDemo}
+            onGoogleLogin={handleGoogleSignIn}
           />
         </div>
         <div className="flex items-center gap-3 mt-4">
@@ -524,9 +527,17 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
           <OnboardingScreen
             onFinish={() => {
               localStorage.setItem('gastoar_onboarding_completed', 'true');
-              setMobileViewMode('login');
+              setMobileViewMode('register');
             }}
             onSkip={() => {
+              localStorage.setItem('gastoar_onboarding_completed', 'true');
+              setMobileViewMode('welcome');
+            }}
+            onGoToRegister={() => {
+              localStorage.setItem('gastoar_onboarding_completed', 'true');
+              setMobileViewMode('register');
+            }}
+            onGoToLogin={() => {
               localStorage.setItem('gastoar_onboarding_completed', 'true');
               setMobileViewMode('login');
             }}
@@ -564,12 +575,49 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
               const res = await onLogin(email, pass);
               return res;
             }}
-            onGoogleLogin={onGoogleLogin}
-            onGoToRegister={() => {
-              handleTabSwitch('register');
-              setMobileViewMode('classic');
-            }}
+            onGoogleLogin={handleGoogleSignIn}
+            onGoToRegister={() => setMobileViewMode('register')}
             onForgotPassword={() => setIsForgotModalOpen(true)}
+            onDemoLogin={onGuestDemo}
+          />
+        </div>
+        <div className="flex items-center gap-3 mt-4">
+          <button
+            type="button"
+            onClick={() => setMobileViewMode('welcome')}
+            className="text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            ← Volver a Bienvenida
+          </button>
+          <span className="text-slate-600">•</span>
+          <button
+            type="button"
+            onClick={() => setMobileViewMode('classic')}
+            className="text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            Ver versión web completa
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Screen 5: Mobile Register Screen (Mobile Flow)
+  if (mobileViewMode === 'register') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-3 sm:p-4">
+        <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden min-h-[580px] flex flex-col border border-purple-900/30">
+          <MobileRegisterScreen
+            onBack={() => setMobileViewMode('welcome')}
+            onRegister={async (data) => {
+              const res = await onRegister({
+                ...data,
+                emailVerified: false,
+              });
+              return res;
+            }}
+            onGoogleLogin={handleGoogleSignIn}
+            onGoToLogin={() => setMobileViewMode('login')}
             onDemoLogin={onGuestDemo}
           />
         </div>
