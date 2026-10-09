@@ -21,7 +21,7 @@ import {
   AlertCircle,
   Trash2,
 } from 'lucide-react';
-import { CategoryMap, CoupleProfile, PaymentMethod, SplitType, Transaction } from '../types';
+import { CategoryMap, CoupleProfile, ExpenseMode, PaymentMethod, SplitType, Transaction } from '../types';
 import { BankCardSelect } from './BankCardSelect';
 
 interface TransactionModalProps {
@@ -34,6 +34,7 @@ interface TransactionModalProps {
   profile: CoupleProfile;
   initialIsCuotas?: boolean;
   initialTransactionType?: 'gasto' | 'ingreso';
+  activeMode?: ExpenseMode;
 }
 
 const COMMON_INSTALLMENTS = [1, 3, 6, 9, 12, 18, 24];
@@ -73,11 +74,12 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   profile,
   initialIsCuotas = false,
   initialTransactionType = 'gasto',
+  activeMode = 'individual',
 }) => {
 
   // ── Estado del formulario ─────────────────────────────────────────────────
   const [tipoTransaccion, setTipoTransaccion] = useState<'gasto' | 'ingreso'>('gasto');
-  const [tipo, setTipo]                         = useState<'individual' | 'pareja'>('pareja');
+  const [tipo, setTipo]                         = useState<'individual' | 'pareja'>(activeMode === 'pareja' ? 'pareja' : 'individual');
   const [concepto, setConcepto]                 = useState('');
   const [descripcion, setDescripcion]           = useState('');
   const [monto, setMonto]                       = useState<string>('');
@@ -147,7 +149,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     } else {
       const mode = initialTransactionType || 'gasto';
       setTipoTransaccion(mode);
-      setTipo(mode === 'ingreso' ? 'individual' : 'pareja');
+      const defaultTipo = activeMode === 'pareja' ? 'pareja' : (mode === 'ingreso' ? 'individual' : 'pareja');
+      setTipo(defaultTipo);
       setConcepto(mode === 'ingreso' ? 'Sueldo' : '');
       setDescripcion('');
       setMonto('');
@@ -174,7 +177,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     // ─── FIX 3: limpiar errores al abrir ─────────────────────────────────
     setFormErrors({});
     setIsSubmitting(false);
-  }, [editingTransaction, isOpen, categoryMap, profile, initialIsCuotas, initialTransactionType]);
+  }, [editingTransaction, isOpen, categoryMap, profile, initialIsCuotas, initialTransactionType, activeMode]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -419,6 +422,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
                 onClick={() => {
                   setTipoTransaccion('ingreso'); setCategoria('Ingresos'); setSubcategoria('Sueldo');
                   if (!concepto || concepto === 'Supermercado') setConcepto('Sueldo');
+                  if (activeMode === 'pareja') setTipo('pareja');
                   setFormErrors({});
                 }}
                 className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${isIncome ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'}`}

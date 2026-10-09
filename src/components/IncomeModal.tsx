@@ -14,13 +14,14 @@ import {
   ArrowDownLeft,
   Plus
 } from 'lucide-react';
-import { CoupleProfile, Transaction } from '../types';
+import { CoupleProfile, ExpenseMode, Transaction } from '../types';
 
 interface IncomeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (income: Partial<Transaction>) => void;
   profile: CoupleProfile;
+  activeMode?: ExpenseMode;
 }
 
 const INCOME_PRESETS = [
@@ -38,13 +39,26 @@ export const IncomeModal: React.FC<IncomeModalProps> = ({
   onClose,
   onSave,
   profile,
+  activeMode = 'individual',
 }) => {
   const [concepto, setConcepto] = useState<string>('Sueldo');
   const [monto, setMonto] = useState<string>('');
   const [fecha, setFecha] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [destinatario, setDestinatario] = useState<'user1' | 'user2'>(profile.currentUser || 'user1');
-  const [tipo, setTipo] = useState<'individual' | 'pareja'>('individual');
+  const [tipo, setTipo] = useState<'individual' | 'pareja'>(activeMode === 'pareja' ? 'pareja' : 'individual');
   const [notas, setNotas] = useState<string>('');
+
+  // Sincronizar estado inicial cada vez que el modal se abre
+  React.useEffect(() => {
+    if (isOpen) {
+      setDestinatario(profile.currentUser || 'user1');
+      setTipo(activeMode === 'pareja' ? 'pareja' : 'individual');
+      setFecha(new Date().toISOString().split('T')[0]);
+      setMonto('');
+      setConcepto('Sueldo');
+      setNotas('');
+    }
+  }, [isOpen, activeMode, profile.currentUser]);
 
   if (!isOpen) return null;
 

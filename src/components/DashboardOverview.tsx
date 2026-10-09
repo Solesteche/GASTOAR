@@ -296,9 +296,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       if (t.fecha < s || t.fecha > e) return false;
       if (activeMode === 'individual') {
         const isCurrent = !t.pagadoPor || !profile?.currentUser || t.pagadoPor === profile?.currentUser;
-        if (t.tipo !== 'individual' || !isCurrent) return false;
+        if (!isCurrent) return false;
+        if (t.tipo !== 'individual' && t.tipoTransaccion !== 'ingreso') return false;
       } else if (activeMode === 'pareja') {
-        if (t.tipo !== 'pareja') return false;
+        // En modo pareja se ven todos los gastos compartidos y los ingresos del hogar
+        if (t.tipo !== 'pareja' && t.tipoTransaccion !== 'ingreso') return false;
       }
       return true;
     });
@@ -582,7 +584,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const ringDashOffset = ringCircumference - (budgetUsedPercent / 100) * ringCircumference;
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-4 sm:space-y-6 pb-20 font-sans transition-colors duration-300 bg-[#FFFFFF]">
+    <div className="w-full max-w-5xl mx-auto space-y-3 sm:space-y-4 pb-16 font-sans transition-colors duration-300 bg-[#FFFFFF]">
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* GREETING & RESUMEN ROW                                              */}
@@ -638,39 +640,39 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* 3. HERO "SALDO DISPONIBLE" CARD                                     */}
+      {/* 3. HERO "SALDO DISPONIBLE" CARD (ALTURA COMPACTA Y MODERNA)         */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       <div
         style={{ background: 'linear-gradient(135deg, #5B29D6 0%, #6A35E1 50%, #713BE8 100%)' }}
-        className="text-white rounded-3xl p-4.5 sm:p-6 shadow-xl border border-[#6A35E1]/40 relative overflow-hidden"
+        className="text-white rounded-2xl sm:rounded-3xl px-4 py-3 sm:px-6 sm:py-3.5 shadow-lg border border-[#6A35E1]/40 relative overflow-hidden"
       >
         {/* Ambient glow in background */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="relative z-10 space-y-3 sm:space-y-4">
-          {/* Fila superior: Saldo a la izquierda & Círculo de porcentaje a la derecha (en la misma línea en mobile y desktop) */}
-          <div className="flex items-center justify-between gap-3 sm:gap-6">
+        <div className="relative z-10 space-y-2 sm:space-y-2.5">
+          {/* Fila superior: Saldo a la izquierda & Círculo de porcentaje a la derecha */}
+          <div className="flex items-center justify-between gap-3 sm:gap-5">
             {/* Sección Saldo */}
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-purple-100 tracking-wide">Saldo disponible</p>
+              <p className="text-[11px] sm:text-xs font-semibold text-purple-100 tracking-wide uppercase">Saldo disponible</p>
 
-              <div className="flex items-center gap-2 sm:gap-3 mt-1 sm:mt-1.5 flex-wrap sm:flex-nowrap">
-                <h2 className="text-2xl xs:text-3xl sm:text-4xl lg:text-5xl font-black font-outfit tracking-tight leading-none text-white break-words">
+              <div className="flex items-center gap-2 sm:gap-2.5 mt-0.5 sm:mt-1 flex-wrap sm:flex-nowrap">
+                <h2 className="text-2xl xs:text-3xl sm:text-3xl lg:text-4xl font-black font-outfit tracking-tight leading-none text-white break-words">
                   {isBalanceHidden ? "$ ••••••" : `$ ${availableBalance.toLocaleString('es-AR')}`}
                 </h2>
                 <button
                   type="button"
                   onClick={toggleHideBalance}
-                  className="text-purple-200 hover:text-white transition-colors cursor-pointer p-1 shrink-0"
+                  className="text-purple-200 hover:text-white transition-colors cursor-pointer p-0.5 shrink-0"
                   title={isBalanceHidden ? "Mostrar saldo" : "Ocultar saldo"}
                 >
-                  {isBalanceHidden ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
+                  {isBalanceHidden ? <EyeOff className="w-4 h-4 sm:w-4.5 sm:h-4.5" /> : <Eye className="w-4 h-4 sm:w-4.5 sm:h-4.5" />}
                 </button>
               </div>
             </div>
 
-            {/* Círculo de porcentaje afinado (en la misma línea que el saldo para versión móvil y desktop) */}
-            <div className="relative flex-shrink-0 w-20 h-20 xs:w-24 xs:h-24 sm:w-32 sm:h-32 flex items-center justify-center">
+            {/* Círculo de porcentaje compacto */}
+            <div className="relative flex-shrink-0 w-16 h-16 xs:w-18 xs:h-18 sm:w-20 sm:h-20 md:w-22 md:h-22 flex items-center justify-center">
               <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
                 <circle
                   cx="50"
@@ -694,28 +696,28 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-1 text-center">
-                <span className="text-base xs:text-lg sm:text-2xl lg:text-3xl font-black text-white leading-none tracking-tight">
+                <span className="text-sm xs:text-base sm:text-lg lg:text-xl font-black text-white leading-none tracking-tight">
                   {budgetUsedPercent}%
                 </span>
-                <span className="text-[8px] xs:text-[9px] sm:text-[10px] text-purple-100 font-medium leading-tight mt-0.5 sm:mt-1">
-                  del presupuesto<br className="hidden xs:inline" /> utilizado
+                <span className="text-[7px] xs:text-[8px] sm:text-[9px] text-purple-100 font-medium leading-tight mt-0.5">
+                  usado
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Barra de progreso afinada (delicada, moderna, h-1 para todas las versiones) */}
-          <div>
-            <div className="h-1 rounded-full bg-white/20 overflow-hidden mb-2.5 w-full max-w-sm sm:max-w-md shadow-inner">
+          {/* Barra de progreso y presupuesto mensual compacto */}
+          <div className="pt-0.5">
+            <div className="h-1 rounded-full bg-white/20 overflow-hidden mb-1.5 w-full max-w-sm sm:max-w-md shadow-inner">
               <div
                 className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-orange-400 to-[#F95420]"
                 style={{ width: `${budgetUsedPercent}%` }}
               />
             </div>
 
-            <div className="flex items-center gap-1.5 text-xs sm:text-sm text-purple-100 font-medium flex-wrap">
-              <span>Presupuesto mensual</span>
-              <span className="font-black text-white">
+            <div className="flex items-center gap-1.5 text-xs text-purple-100 font-medium flex-wrap">
+              <span>Presupuesto mensual:</span>
+              <span className="font-bold text-white">
                 {isBalanceHidden ? '$ ••••••' : `$ ${generalBudget.toLocaleString('es-AR')}`}
               </span>
               {onOpenBudgetModal && (
@@ -725,7 +727,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   className="text-purple-200 hover:text-white transition-colors p-0.5 cursor-pointer ml-0.5"
                   title="Configurar presupuesto mensual"
                 >
-                  <Pencil className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <Pencil className="w-3 h-3 stroke-[2.5]" />
                 </button>
               )}
             </div>
@@ -736,41 +738,41 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* 4. 2 CARDS ROW (LÍMITE DIARIO RESTANTE & ALERTA DE PRESUPUESTO)     */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         {/* Card 1: Límite de gasto diario restante */}
         <div
           style={{ background: 'linear-gradient(135deg, #5B29D6 0%, #6A35E1 50%, #713BE8 100%)' }}
-          className="text-white rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-lg border border-[#6A35E1]/40 flex flex-col justify-between"
+          className="text-white rounded-2xl sm:rounded-3xl px-3 py-2 sm:px-3.5 sm:py-2.5 shadow-lg border border-[#6A35E1]/40 flex flex-col justify-between"
         >
           <div>
-            <div className="flex items-center gap-2 sm:gap-2.5 mb-1.5 sm:mb-2">
-              <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-xs sm:text-base flex-shrink-0 shadow-2xs">
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5">
+              <div className="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 rounded-lg bg-white/10 border border-white/10 flex items-center justify-center text-xs flex-shrink-0 shadow-2xs">
                 💳
               </div>
-              <span className="text-[11px] sm:text-xs font-semibold text-purple-100 leading-tight">
-                Límite de gasto diario<br className="hidden xs:inline" /> restante
+              <span className="text-[10px] sm:text-[11px] font-semibold text-purple-100 leading-tight">
+                Límite diario<br className="hidden xs:inline" /> restante
               </span>
             </div>
 
-            <p className="text-base xs:text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight mt-1 sm:mt-1.5 tabular-nums truncate">
+            <p className="text-sm xs:text-base sm:text-lg lg:text-xl font-black text-white tracking-tight mt-0.5 tabular-nums truncate">
               {isBalanceHidden ? "$ •••••" : `$ ${dailyBudgetRemaining.toLocaleString('es-AR')}`}
             </p>
-            <p className="text-[10px] sm:text-xs text-purple-200/90 font-medium mt-0.5 truncate">
+            <p className="text-[9px] sm:text-[10px] text-purple-200/90 font-medium truncate">
               {dailyLimit > 0
                 ? `de ${isBalanceHidden ? '$ •••••' : `$ ${dailyLimit.toLocaleString('es-AR')}`}`
                 : (isDemoMode ? 'de $ 26.000' : 'Sin límite')}
             </p>
           </div>
 
-          <div className="mt-2 sm:mt-0">
+          <div className="mt-0.5 sm:mt-1">
             {/* Barra afinada con Verde de progreso (#20D878) */}
-            <div className="h-1 rounded-full bg-white/20 overflow-hidden my-1.5 sm:my-2.5 w-full shadow-inner">
+            <div className="h-1 rounded-full bg-white/20 overflow-hidden my-0.5 sm:my-1 w-full shadow-inner">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-[#20D878] to-[#16B563] transition-all duration-700"
                 style={{ width: `${dailyAvailablePercent}%` }}
               />
             </div>
-            <p className="text-[11px] sm:text-xs font-bold text-[#20D878]">
+            <p className="text-[9px] sm:text-[10px] font-bold text-[#20D878]">
               {dailyAvailablePercent}% disponible
             </p>
           </div>
@@ -779,27 +781,27 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         {/* Card 2: Alerta de Categorías de Presupuesto (Exclusivo para Alertas) */}
         <div
           style={{ background: 'linear-gradient(135deg, #5B29D6 0%, #6A35E1 50%, #713BE8 100%)' }}
-          className="text-white rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-lg border border-[#6A35E1]/40 flex flex-col justify-between"
+          className="text-white rounded-2xl sm:rounded-3xl px-3 py-2 sm:px-3.5 sm:py-2.5 shadow-lg border border-[#6A35E1]/40 flex flex-col justify-between"
         >
           <div>
-            <div className="flex items-center justify-between gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
-              <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
-                <div className={`w-7 h-7 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl flex items-center justify-center text-xs sm:text-base flex-shrink-0 shadow-2xs border ${
+            <div className="flex items-center justify-between gap-1 sm:gap-2 mb-0.5">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                <div className={`w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 rounded-lg flex items-center justify-center text-xs flex-shrink-0 shadow-2xs border ${
                   budgetAlertCategories.length > 0
                     ? 'bg-amber-500/20 border-amber-400/30 text-amber-300'
                     : 'bg-[#20D878]/20 border-[#20D878]/30 text-[#20D878]'
                 }`}>
                   {budgetAlertCategories.length > 0 ? (
-                    <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300" />
+                    <AlertTriangle className="w-3 h-3 text-amber-300" />
                   ) : (
-                    <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#20D878]" />
+                    <CheckCircle2 className="w-3 h-3 text-[#20D878]" />
                   )}
                 </div>
                 <div className="min-w-0">
-                  <span className="text-[11px] sm:text-xs font-semibold text-purple-100 leading-tight block truncate">
-                    Alerta de presupuesto
+                  <span className="text-[10px] sm:text-[11px] font-semibold text-purple-100 leading-tight block truncate">
+                    Alerta presupuesto
                   </span>
-                  <span className="text-[9px] sm:text-[10px] text-purple-200/80 block leading-tight truncate">
+                  <span className="text-[8px] sm:text-[9px] text-purple-200/80 block leading-tight truncate">
                     Por categoría
                   </span>
                 </div>
@@ -810,61 +812,61 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsAlertsModalOpen(true)}
-                  className={`px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold border flex items-center gap-0.5 sm:gap-1 shrink-0 transition-transform active:scale-95 cursor-pointer shadow-xs ${
+                  className={`px-1.5 py-0.2 rounded-full text-[8px] sm:text-[9px] font-bold border flex items-center gap-0.5 shrink-0 transition-transform active:scale-95 cursor-pointer shadow-xs ${
                     budgetAlertCategories.some(c => c.status === 'exceeded')
                       ? 'bg-rose-500/25 text-rose-200 border-rose-400/40 hover:bg-rose-500/35'
                       : 'bg-amber-500/25 text-amber-200 border-amber-400/40 hover:bg-amber-500/35'
                   }`}
                   title="Ver detalle completo de alertas"
                 >
-                  <AlertTriangle className="w-2.5 h-2.5 hidden xs:inline" />
+                  <AlertTriangle className="w-2 h-2 hidden xs:inline" />
                   <span>{budgetAlertCategories.length}</span>
-                  <ChevronRight className="w-2.5 h-2.5 opacity-70" />
+                  <ChevronRight className="w-2 h-2 opacity-70" />
                 </button>
               ) : (
-                <span className="px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold bg-[#20D878]/20 text-[#20D878] border border-[#20D878]/30 flex items-center gap-0.5 sm:gap-1 shrink-0 shadow-xs">
-                  <CheckCircle2 className="w-2.5 h-2.5 hidden xs:inline" />
+                <span className="px-1.5 py-0.2 rounded-full text-[8px] sm:text-[9px] font-bold bg-[#20D878]/20 text-[#20D878] border border-[#20D878]/30 flex items-center gap-0.5 shrink-0 shadow-xs">
+                  <CheckCircle2 className="w-2 h-2 hidden xs:inline" />
                   <span>Al día</span>
                 </span>
               )}
             </div>
 
-            <div className="mt-1">
-              <p className="text-base xs:text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight tabular-nums flex items-baseline gap-1.5">
+            <div className="mt-0.5">
+              <p className="text-sm xs:text-base sm:text-lg lg:text-xl font-black text-white tracking-tight tabular-nums flex items-baseline gap-1">
                 <span>
                   {budgetAlertCategories.length > 0
                     ? `${budgetAlertCategories.length} en alerta`
                     : '0 en alerta'}
                 </span>
               </p>
-              <p className="text-[10px] sm:text-xs text-purple-200/90 font-medium mt-0.5 truncate">
+              <p className="text-[9px] sm:text-[10px] text-purple-200/90 font-medium truncate">
                 {budgetAlertCategories.length > 0
                   ? (budgetAlertCategories.filter(c => c.status === 'exceeded').length > 0
-                      ? `${budgetAlertCategories.filter(c => c.status === 'exceeded').length} superó el 100%`
-                      : `Cerca del límite (${alertThreshold}%)`)
+                      ? `${budgetAlertCategories.filter(c => c.status === 'exceeded').length} superó 100%`
+                      : `Cerca de límite (${alertThreshold}%)`)
                   : `Bajo control (<${alertThreshold}%)`}
               </p>
             </div>
           </div>
 
           {/* Contenido de alertas con barras de progreso afinadas */}
-          <div className="mt-2 sm:mt-3 pt-2 sm:pt-2.5 border-t border-white/15">
+          <div className="mt-1 pt-1 border-t border-white/15">
             {budgetAlertCategories.length > 0 ? (
-              <div className="space-y-1.5 sm:space-y-2">
-                {budgetAlertCategories.slice(0, 2).map((cat) => {
+              <div className="space-y-1">
+                {budgetAlertCategories.slice(0, 1).map((cat) => {
                   const isExceeded = cat.status === 'exceeded';
                   return (
-                    <div key={cat.name} className="space-y-1">
-                      <div className="flex items-center justify-between text-[11px] sm:text-xs">
+                    <div key={cat.name} className="space-y-0.5">
+                      <div className="flex items-center justify-between text-[9px] sm:text-[10px]">
                         <span className="font-semibold text-white truncate flex items-center gap-1 min-w-0">
                           <span
-                            className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0"
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
                             style={{ backgroundColor: cat.color }}
                           />
                           <span className="truncate">{cat.name}</span>
                         </span>
-                        <div className="flex items-center gap-1 shrink-0 ml-1.5">
-                          <span className={`text-[9px] sm:text-[10px] font-black px-1 sm:px-1.5 py-0.2 rounded-md ${
+                        <div className="flex items-center gap-1 shrink-0 ml-1">
+                          <span className={`text-[8px] font-black px-1 rounded ${
                             isExceeded
                               ? 'bg-rose-500/30 text-rose-200 border border-rose-500/40'
                               : 'bg-amber-500/30 text-amber-200 border border-amber-500/40'
@@ -889,38 +891,38 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   );
                 })}
 
-                <div className="flex items-center justify-between pt-0.5 sm:pt-1">
-                  {budgetAlertCategories.length > 2 ? (
-                    <span className="text-[9px] sm:text-[10px] text-purple-200/80 font-medium">
-                      +{budgetAlertCategories.length - 2} más
+                <div className="flex items-center justify-between">
+                  {budgetAlertCategories.length > 1 ? (
+                    <span className="text-[8px] text-purple-200/80 font-medium">
+                      +{budgetAlertCategories.length - 1} más
                     </span>
                   ) : <span />}
                   <button
                     type="button"
                     onClick={() => setIsAlertsModalOpen(true)}
-                    className="text-[9px] sm:text-[10px] font-bold text-purple-200 hover:text-white transition-colors cursor-pointer flex items-center gap-0.5 ml-auto"
+                    className="text-[8px] sm:text-[9px] font-bold text-purple-200 hover:text-white transition-colors cursor-pointer flex items-center gap-0.5 ml-auto"
                   >
                     Ver detalle
-                    <ChevronRight className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                    <ChevronRight className="w-2 h-2" />
                   </button>
                 </div>
               </div>
             ) : (
               <div>
                 {/* Barra afinada de estado óptimo (#20D878 Verde brillante) */}
-                <div className="h-1 rounded-full bg-white/20 overflow-hidden my-1.5 sm:my-2.5 w-full shadow-inner">
+                <div className="h-1 rounded-full bg-white/20 overflow-hidden my-0.5 sm:my-1 w-full shadow-inner">
                   <div className="h-full rounded-full bg-gradient-to-r from-[#20D878] to-[#16B563] w-full" />
                 </div>
-                <div className="flex items-center justify-between text-[11px] sm:text-xs">
+                <div className="flex items-center justify-between text-[9px] sm:text-[10px]">
                   <p className="font-bold text-[#20D878] flex items-center gap-1 truncate">
-                    <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                    <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
                     <span className="truncate">Al día</span>
                   </p>
                   {onOpenBudgetModal && (
                     <button
                       type="button"
                       onClick={onOpenBudgetModal}
-                      className="text-[9px] sm:text-[10px] text-purple-200 hover:text-white font-medium cursor-pointer shrink-0 ml-1"
+                      className="text-[8px] sm:text-[9px] text-purple-200 hover:text-white font-medium cursor-pointer shrink-0 ml-1"
                     >
                       Ajustar
                     </button>
@@ -933,27 +935,27 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* 5. ACCIONES RÁPIDAS                                                 */}
+      {/* 5. ACCIONES RÁPIDAS (ALTURA REDUCIDA)                               */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="bg-[#FFFFFF] rounded-3xl p-4 sm:p-5 border border-[#E9E4F2] shadow-xs transition-all">
-        <h4 className="text-[11px] font-black text-[#29344D] uppercase tracking-wider mb-3">
+      <div className="bg-[#FFFFFF] rounded-2xl sm:rounded-3xl px-3 py-2 sm:px-4 sm:py-2.5 border border-[#E9E4F2] shadow-xs transition-all">
+        <h4 className="text-[9px] sm:text-[10px] font-black text-[#29344D] uppercase tracking-wider mb-1.5">
           Acciones rápidas
         </h4>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
           {/* Card 1: Cuotas (Lila muy pálido #F7F3FC) */}
           <button
             type="button"
             onClick={() => onNavigateTab?.('installments')}
-            className="bg-[#F7F3FC] hover:bg-[#EFE8FA] border border-[#E9E4F2] rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between h-20 sm:h-22 transition-all cursor-pointer group text-left"
+            className="bg-[#F7F3FC] hover:bg-[#EFE8FA] border border-[#E9E4F2] rounded-xl sm:rounded-2xl p-1.5 sm:p-2 flex flex-col justify-between h-11 sm:h-12 transition-all cursor-pointer group text-left"
           >
             <div className="flex items-center justify-between w-full">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-white/90 text-[#6A35E1] flex items-center justify-center shadow-2xs">
-                <CreditCard className="w-4 h-4" />
+              <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-md sm:rounded-lg bg-white/90 text-[#6A35E1] flex items-center justify-center shadow-2xs">
+                <CreditCard className="w-3 h-3" />
               </div>
-              <ChevronRight className="w-3.5 h-3.5 text-[#6A35E1] group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-2.5 h-2.5 text-[#6A35E1] group-hover:translate-x-0.5 transition-transform" />
             </div>
-            <span className="text-xs sm:text-sm font-bold text-[#29344D]">
+            <span className="text-[10px] sm:text-[11px] font-bold text-[#29344D] leading-tight">
               Cuotas
             </span>
           </button>
@@ -962,15 +964,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <button
             type="button"
             onClick={() => onNavigateTab?.('goals')}
-            className="bg-[#FFF8E8] hover:bg-[#FFF2D4] border border-[#FBEEC9] rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between h-20 sm:h-22 transition-all cursor-pointer group text-left"
+            className="bg-[#FFF8E8] hover:bg-[#FFF2D4] border border-[#FBEEC9] rounded-xl sm:rounded-2xl p-1.5 sm:p-2 flex flex-col justify-between h-11 sm:h-12 transition-all cursor-pointer group text-left"
           >
             <div className="flex items-center justify-between w-full">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shadow-2xs">
-                <Target className="w-4 h-4" />
+              <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-md sm:rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shadow-2xs">
+                <Target className="w-3 h-3" />
               </div>
-              <ChevronRight className="w-3.5 h-3.5 text-amber-500 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-2.5 h-2.5 text-amber-500 group-hover:translate-x-0.5 transition-transform" />
             </div>
-            <span className="text-xs sm:text-sm font-bold text-[#29344D]">
+            <span className="text-[10px] sm:text-[11px] font-bold text-[#29344D] leading-tight">
               Metas
             </span>
           </button>
@@ -979,15 +981,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <button
             type="button"
             onClick={() => onNavigateTab?.('balance')}
-            className="bg-[#FFF1F5] hover:bg-[#FFE4ED] border border-[#FCDCE7] rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between h-20 sm:h-22 transition-all cursor-pointer group text-left"
+            className="bg-[#FFF1F5] hover:bg-[#FFE4ED] border border-[#FCDCE7] rounded-xl sm:rounded-2xl p-1.5 sm:p-2 flex flex-col justify-between h-11 sm:h-12 transition-all cursor-pointer group text-left"
           >
             <div className="flex items-center justify-between w-full">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shadow-2xs">
-                <Users className="w-4 h-4" />
+              <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-md sm:rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shadow-2xs">
+                <Users className="w-3 h-3" />
               </div>
-              <ChevronRight className="w-3.5 h-3.5 text-rose-500 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-2.5 h-2.5 text-rose-500 group-hover:translate-x-0.5 transition-transform" />
             </div>
-            <span className="text-xs sm:text-sm font-bold text-[#29344D]">
+            <span className="text-[10px] sm:text-[11px] font-bold text-[#29344D] leading-tight">
               Balance Dúo
             </span>
           </button>
@@ -996,15 +998,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <button
             type="button"
             onClick={() => onNavigateTab?.('balance')}
-            className="bg-[#F0F7FC] hover:bg-[#E2F0F9] border border-[#D9EAF7] rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between h-20 sm:h-22 transition-all cursor-pointer group text-left"
+            className="bg-[#F0F7FC] hover:bg-[#E2F0F9] border border-[#D9EAF7] rounded-xl sm:rounded-2xl p-1.5 sm:p-2 flex flex-col justify-between h-11 sm:h-12 transition-all cursor-pointer group text-left"
           >
             <div className="flex items-center justify-between w-full">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shadow-2xs">
-                <ArrowRightLeft className="w-4 h-4" />
+              <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-md sm:rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shadow-2xs">
+                <ArrowRightLeft className="w-3 h-3" />
               </div>
-              <ChevronRight className="w-3.5 h-3.5 text-blue-500 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-2.5 h-2.5 text-blue-500 group-hover:translate-x-0.5 transition-transform" />
             </div>
-            <span className="text-xs sm:text-sm font-bold text-[#29344D]">
+            <span className="text-[10px] sm:text-[11px] font-bold text-[#29344D] leading-tight">
               Liquidar
             </span>
           </button>
@@ -1012,15 +1014,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* 6. PRÓXIMOS VENCIMIENTOS                                            */}
+      {/* 6. PRÓXIMOS VENCIMIENTOS (ALTURA REDUCIDA)                          */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="bg-[#FFFFFF] rounded-3xl p-4 sm:p-6 border border-[#E9E4F2] shadow-xs transition-all">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-[#F7F3FC] text-[#6A35E1] flex items-center justify-center text-xs">
+      <div className="bg-[#FFFFFF] rounded-2xl sm:rounded-3xl px-3 py-2 sm:px-4 sm:py-2.5 border border-[#E9E4F2] shadow-xs transition-all">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-1.5">
+            <div className="w-5.5 h-5.5 rounded-md bg-[#F7F3FC] text-[#6A35E1] flex items-center justify-center text-xs">
               📅
             </div>
-            <h3 className="text-sm sm:text-base font-black text-[#29344D] tracking-tight">
+            <h3 className="text-xs sm:text-[13px] font-black text-[#29344D] tracking-tight">
               Próximos vencimientos
             </h3>
           </div>
@@ -1028,7 +1030,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <button
               type="button"
               onClick={() => onNavigateTab('card_alerts')}
-              className="text-xs font-semibold text-[#F95420] hover:text-[#D84315] hover:underline cursor-pointer flex items-center gap-0.5"
+              className="text-[11px] font-semibold text-[#F95420] hover:text-[#D84315] hover:underline cursor-pointer flex items-center gap-0.5"
             >
               <span>Ver todos</span>
               <span>→</span>
@@ -1041,29 +1043,29 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <div
               key={bill.id}
               onClick={() => onNavigateTab ? onNavigateTab('card_alerts') : {}}
-              className="py-3 flex items-center justify-between gap-3 hover:bg-[#F7F3FC]/50 rounded-xl px-1.5 transition-colors cursor-pointer"
+              className="py-1 sm:py-1.5 flex items-center justify-between gap-2.5 hover:bg-[#F7F3FC]/50 rounded-xl px-1 transition-colors cursor-pointer"
             >
               {/* Left: Icon, Title & Category */}
-              <div className="flex items-center gap-3 min-w-0">
-                <div className={`w-9 h-9 rounded-xl ${bill.bg} flex items-center justify-center text-sm flex-shrink-0 shadow-2xs`}>
+              <div className="flex items-center gap-2 min-w-0">
+                <div className={`w-6.5 h-6.5 sm:w-7 sm:h-7 rounded-lg ${bill.bg} flex items-center justify-center text-xs flex-shrink-0 shadow-2xs`}>
                   {bill.icon}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-bold text-[#29344D] truncate">
+                  <p className="text-xs sm:text-[13px] font-bold text-[#29344D] truncate">
                     {bill.title}
                   </p>
-                  <p className="text-[11px] text-[#7C8498] font-medium truncate">
+                  <p className="text-[9px] sm:text-[10px] text-[#7C8498] font-medium truncate">
                     {bill.cat}
                   </p>
                 </div>
               </div>
 
               {/* Right: Amount & Date Pill */}
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <span className="text-xs sm:text-sm font-black text-[#29344D] tabular-nums">
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-xs sm:text-[13px] font-black text-[#29344D] tabular-nums">
                   {isBalanceHidden ? "$ •••••" : `$ ${bill.amount.toLocaleString('es-AR')}`}
                 </span>
-                <span className="px-2.5 py-1 rounded-xl bg-[#F7F3FC] text-[#6A35E1] border border-[#E9E4F2] text-[11px] font-bold tracking-tight">
+                <span className="px-1.5 py-0.2 rounded-md bg-[#F7F3FC] text-[#6A35E1] border border-[#E9E4F2] text-[9px] sm:text-[10px] font-bold tracking-tight">
                   {bill.duePill}
                 </span>
               </div>
@@ -1073,33 +1075,33 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* 7. HERRAMIENTAS PRO                                                 */}
+      {/* 7. HERRAMIENTAS PRO (ALTURA REDUCIDA)                               */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="bg-[#FFFFFF] rounded-3xl p-4 sm:p-6 border border-[#E9E4F2] shadow-xs transition-all">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm sm:text-base font-black text-[#29344D] tracking-tight flex items-center gap-1.5">
+      <div className="bg-[#FFFFFF] rounded-2xl sm:rounded-3xl px-3 py-2 sm:px-4 sm:py-2.5 border border-[#E9E4F2] shadow-xs transition-all">
+        <div className="flex items-center justify-between mb-1.5">
+          <h3 className="text-xs sm:text-[13px] font-black text-[#29344D] tracking-tight flex items-center gap-1.5">
             <span>Herramientas</span>
             <span className="text-[#6A35E1]">PRO</span>
           </h3>
           <button
             type="button"
             onClick={() => onNavigateTab ? onNavigateTab('subscriptions') : setIsScoreModalOpen(true)}
-            className="text-xs font-semibold text-[#6A35E1] hover:underline cursor-pointer flex items-center gap-0.5"
+            className="text-[11px] font-semibold text-[#6A35E1] hover:underline cursor-pointer flex items-center gap-0.5"
           >
             <span>Ver más</span>
             <span>→</span>
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-2.5">
           {/* Card 1: Score Financiero (Lila muy pálido #F7F3FC) */}
           <div
             onClick={() => setIsScoreModalOpen(true)}
-            className="bg-[#F7F3FC] hover:bg-[#EFE8FA] border border-[#E9E4F2] rounded-2xl p-4 transition-all cursor-pointer group flex items-center justify-between gap-3.5"
+            className="bg-[#F7F3FC] hover:bg-[#EFE8FA] border border-[#E9E4F2] rounded-xl sm:rounded-2xl p-2 sm:p-2.5 transition-all cursor-pointer group flex items-center justify-between gap-2.5"
           >
-            <div className="flex items-center gap-3.5 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
               {/* Ring icon */}
-              <div className="relative w-11 h-11 flex-shrink-0 flex items-center justify-center">
+              <div className="relative w-8 h-8 sm:w-8.5 sm:h-8.5 flex-shrink-0 flex items-center justify-center">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 40 40">
                   <circle cx="20" cy="20" r="15" fill="none" stroke="rgba(106, 53, 225, 0.15)" strokeWidth="3" />
                   <circle
@@ -1114,54 +1116,54 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     strokeDashoffset={2 * Math.PI * 15 * (1 - (dailyScore?.total ?? 82) / 100)}
                   />
                 </svg>
-                <div className="absolute inset-0 flex items-center justify-center text-[11px] font-black text-[#6A35E1]">
+                <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-[#6A35E1]">
                   {dailyScore?.total ?? 82}
                 </div>
               </div>
 
               <div className="min-w-0">
-                <h4 className="text-xs sm:text-sm font-black text-[#29344D] truncate">
+                <h4 className="text-xs sm:text-[13px] font-black text-[#29344D] truncate">
                   Score financiero
                 </h4>
-                <p className="text-[11px] text-[#7C8498] leading-snug line-clamp-2 mt-0.5">
-                  Conocé tu salud financiera, hábitos de gasto y recomendaciones.
+                <p className="text-[9px] sm:text-[10px] text-[#7C8498] leading-tight line-clamp-1 mt-0.5">
+                  Conocé tu salud financiera y recomendaciones.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <span className="px-2 py-0.5 rounded-full bg-[#6A35E1] text-white text-[9px] font-black tracking-wider uppercase shadow-2xs">
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <span className="px-1.5 py-0.2 rounded-full bg-[#6A35E1] text-white text-[8px] font-black tracking-wider uppercase shadow-2xs">
                 PRO
               </span>
-              <ChevronRight className="w-3.5 h-3.5 text-[#6A35E1] group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-2.5 h-2.5 text-[#6A35E1] group-hover:translate-x-0.5 transition-transform" />
             </div>
           </div>
 
           {/* Card 2: Flujo de caja (Crema muy suave #FFF8E8) */}
           <div
             onClick={() => setIsCashFlowModalOpen(true)}
-            className="bg-[#FFF8E8] hover:bg-[#FFF2D4] border border-[#FBEEC9] rounded-2xl p-4 transition-all cursor-pointer group flex items-center justify-between gap-3.5"
+            className="bg-[#FFF8E8] hover:bg-[#FFF2D4] border border-[#FBEEC9] rounded-xl sm:rounded-2xl p-2 sm:p-2.5 transition-all cursor-pointer group flex items-center justify-between gap-2.5"
           >
-            <div className="flex items-center gap-3.5 min-w-0">
-              <div className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0 text-lg shadow-2xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 sm:w-8.5 sm:h-8.5 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0 text-sm shadow-2xs">
                 📊
               </div>
 
               <div className="min-w-0">
-                <h4 className="text-xs sm:text-sm font-black text-[#29344D] truncate">
+                <h4 className="text-xs sm:text-[13px] font-black text-[#29344D] truncate">
                   Flujo de caja
                 </h4>
-                <p className="text-[11px] text-[#7C8498] leading-snug line-clamp-2 mt-0.5">
-                  Proyectá tus ingresos y gastos, anticipá tu saldo futuro y evitá sorpresas.
+                <p className="text-[9px] sm:text-[10px] text-[#7C8498] leading-tight line-clamp-1 mt-0.5">
+                  Proyectá tus ingresos y gastos a futuro.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <span className="px-2 py-0.5 rounded-full bg-[#6A35E1] text-white text-[9px] font-black tracking-wider uppercase shadow-2xs">
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <span className="px-1.5 py-0.2 rounded-full bg-[#6A35E1] text-white text-[8px] font-black tracking-wider uppercase shadow-2xs">
                 PRO
               </span>
-              <ChevronRight className="w-3.5 h-3.5 text-[#6A35E1] group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-2.5 h-2.5 text-[#6A35E1] group-hover:translate-x-0.5 transition-transform" />
             </div>
           </div>
         </div>
@@ -1170,11 +1172,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* 8. DISTRIBUCIÓN DE GASTOS & ÚLTIMOS MOVIMIENTOS                     */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-3.5">
         {/* Left Card: Distribución de gastos (Blanco #FFFFFF con Borde #E9E4F2) */}
-        <div className="bg-[#FFFFFF] rounded-3xl p-4 sm:p-6 border border-[#E9E4F2] shadow-xs transition-all flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xs sm:text-sm font-bold text-[#29344D] flex items-center gap-2">
+        <div className="bg-[#FFFFFF] rounded-2xl sm:rounded-3xl p-3 sm:p-4 border border-[#E9E4F2] shadow-xs transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs sm:text-[13px] font-bold text-[#29344D] flex items-center gap-1.5">
               <span>📊</span>
               <span>Distribución de gastos</span>
             </h3>
@@ -1182,7 +1184,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <button
                 type="button"
                 onClick={onOpenBudgetModal}
-                className="text-xs font-semibold text-[#F95420] hover:text-[#D84315] hover:underline cursor-pointer flex items-center gap-0.5"
+                className="text-[11px] font-semibold text-[#F95420] hover:text-[#D84315] hover:underline cursor-pointer flex items-center gap-0.5"
               >
                 <span>Ver detalle</span>
                 <span>→</span>
@@ -1190,17 +1192,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             )}
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-5 my-auto">
+          <div className="flex flex-col sm:flex-row items-center gap-3.5 my-auto">
             {/* Donut chart */}
-            <div className="relative w-36 h-36 flex-shrink-0 flex items-center justify-center">
+            <div className="relative w-28 h-28 sm:w-32 sm:h-32 flex-shrink-0 flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={categoryPieData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={40}
-                    outerRadius={60}
+                    innerRadius={32}
+                    outerRadius={50}
                     dataKey="value"
                     strokeWidth={2}
                     stroke="#FFFFFF"
@@ -1213,22 +1215,22 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               </ResponsiveContainer>
 
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-                <span className="text-xs font-black text-[#29344D] leading-tight">
+                <span className="text-[11px] font-black text-[#29344D] leading-tight">
                   {isBalanceHidden ? '$ •••' : `$ ${totalExpenses.toLocaleString('es-AR')}`}
                 </span>
-                <span className="text-[9px] text-[#7C8498] uppercase tracking-wider font-semibold">Total gastos</span>
+                <span className="text-[8px] text-[#7C8498] uppercase tracking-wider font-semibold">Total</span>
               </div>
             </div>
 
             {/* Legend with percentages */}
-            <div className="flex-1 space-y-2 text-xs w-full">
+            <div className="flex-1 space-y-1.5 text-[11px] w-full">
               {categoryPieData.map((item) => (
-                <div key={item.name} className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 truncate min-w-0">
-                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                <div key={item.name} className="flex items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5 truncate min-w-0">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
                     <span className="text-[#7C8498] truncate font-medium">{item.name}</span>
                   </div>
-                  <span className="font-bold text-[#29344D] tabular-nums flex-shrink-0">
+                  <span className="font-bold text-[#29344D] tabular-nums flex-shrink-0 text-[10px]">
                     {item.pct}%
                   </span>
                 </div>
@@ -1238,9 +1240,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
 
         {/* Right Card: Últimos movimientos (Blanco #FFFFFF con Borde #E9E4F2) */}
-        <div className="bg-[#FFFFFF] rounded-3xl p-4 sm:p-6 border border-[#E9E4F2] shadow-xs transition-all flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xs sm:text-sm font-bold text-[#29344D] flex items-center gap-2">
+        <div className="bg-[#FFFFFF] rounded-2xl sm:rounded-3xl p-3 sm:p-4 border border-[#E9E4F2] shadow-xs transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs sm:text-[13px] font-bold text-[#29344D] flex items-center gap-1.5">
               <span>🕒</span>
               <span>Últimos movimientos</span>
             </h3>
@@ -1248,7 +1250,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <button
                 type="button"
                 onClick={() => onNavigateTab('transactions')}
-                className="text-xs font-semibold text-[#F95420] hover:text-[#D84315] hover:underline cursor-pointer flex items-center gap-0.5"
+                className="text-[11px] font-semibold text-[#F95420] hover:text-[#D84315] hover:underline cursor-pointer flex items-center gap-0.5"
               >
                 <span>Ver todos</span>
                 <span>→</span>
@@ -1261,23 +1263,23 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <div
                 key={tx.id}
                 onClick={() => onNavigateTab ? onNavigateTab('transactions') : {}}
-                className="py-3 flex items-center justify-between gap-3 hover:bg-[#F7F3FC]/50 rounded-xl px-1.5 transition-colors cursor-pointer"
+                className="py-1.5 sm:py-2 flex items-center justify-between gap-2.5 hover:bg-[#F7F3FC]/50 rounded-xl px-1 transition-colors cursor-pointer"
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center text-sm flex-shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7.5 h-7.5 rounded-lg bg-orange-500/10 text-orange-600 flex items-center justify-center text-xs flex-shrink-0">
                     {tx.emoji}
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs font-bold text-[#29344D] truncate">{tx.title}</p>
-                    <p className="text-[10px] text-[#7C8498] font-medium truncate">{tx.subtitle}</p>
+                    <p className="text-[9px] text-[#7C8498] font-medium truncate">{tx.subtitle}</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 flex-shrink-0">
+                <div className="flex items-center gap-1 flex-shrink-0">
                   <span className="text-xs font-black text-[#F95420] tabular-nums">
                     - ${tx.amount.toLocaleString('es-AR')}
                   </span>
-                  <ChevronRight className="w-3.5 h-3.5 text-[#7C8498]" />
+                  <ChevronRight className="w-3 h-3 text-[#7C8498]" />
                 </div>
               </div>
             ))}

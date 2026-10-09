@@ -10,7 +10,7 @@
       "currency": "ARS",
       "selectedPlanId": "individual",
       "createdAt": 1788609803762,
-      "updatedAt": 1791402400718
+      "updatedAt": 1791485454645
     },
     "sol.martinez@gastoar.com": {
       "id": "usr-sol-001",
@@ -88,49 +88,21 @@
   },
   "accountsData": {
     "testvercel@example.com": {
-      "transactions": [],
-      "categoryMap": null,
-      "categoryColors": null,
-      "budgets": {
-        "categories": {},
-        "subcategories": {}
-      },
-      "profile": {
-        "accountCode": "VERCEL-1234",
-        "user1Name": "Test User",
-        "user2Name": "Fondo Ahorro",
-        "currentUser": "user1",
-        "currency": "ARS",
-        "defaultSplit": "50_50"
-      },
-      "settlementHistory": [],
-      "goals": [],
-      "subscriptions": [
+      "transactions": [
         {
-          "id": "sub-testvercel",
-          "userId": "acc-1788609803762-659",
-          "userEmail": "testvercel@example.com",
-          "userName": "Test User",
-          "accountCode": "VERCEL-1234",
-          "planId": "individual",
-          "planName": "Plan Individual",
-          "status": "trial",
-          "billingCycle": "monthly",
-          "pricePaid": 0,
-          "currency": "ARS",
-          "paymentMethod": "Mercado Pago (Prueba 15 Días)",
-          "startDate": "2026-10-07",
-          "lastPaymentDate": "2026-10-07",
-          "nextRenewalDate": "2026-11-06",
-          "trialEndsDate": "2026-11-06",
-          "trialDaysGranted": 15,
-          "autoRenew": true,
-          "createdAt": 1791401929310,
-          "notes": "Cuenta de prueba restablecida con 15 días. | Prórroga de +15 días otorgada el 7/10/2026"
+          "id": "tx_test_1",
+          "concepto": "Sueldo Prueba",
+          "monto": 150000,
+          "tipoTransaccion": "ingreso",
+          "categoria": "Ingresos",
+          "fecha": "2026-10-08"
         }
       ],
+      "settlementHistory": [],
+      "goals": [],
+      "subscriptions": [],
       "alertItems": [],
-      "updatedAt": 1791402400735
+      "updatedAt": 1791485454645
     },
     "VERCEL-1234": {
       "transactions": [],

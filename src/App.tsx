@@ -1027,15 +1027,17 @@ export default function App() {
     const unsubscribeAppState = listenToAppState(
       activeUserId,
       (data) => {
-        // The first Firestore snapshot is authoritative for this account.
-        // Never merge it with whatever was left by another account/demo.
+        // If data is empty or document does not exist, do not wipe in-memory state
+        if (!data || Object.keys(data).length === 0) {
+          isInitialCloudLoadDone.current = true;
+          setCloudSyncStatus('synced');
+          return;
+        }
         isRemoteUpdate.current = true;
 
-        setTransactions(
-          Array.isArray(data.transactions)
-            ? (data.transactions as Transaction[])
-            : [],
-        );
+        if (Array.isArray(data.transactions)) {
+          setTransactions(data.transactions as Transaction[]);
+        }
 
         if (data.categoryMap && Object.keys(data.categoryMap as object).length > 0) {
           setCategoryMap(data.categoryMap as Record<string, string[]>);
@@ -1254,8 +1256,8 @@ export default function App() {
       }
 
       // 2. Mode (all / individual / pareja)
-      if (filters.mode === 'individual' && tx.tipo !== 'individual') return false;
-      if (filters.mode === 'pareja' && tx.tipo !== 'pareja') return false;
+      if (filters.mode === 'individual' && tx.tipo !== 'individual' && tx.tipoTransaccion !== 'ingreso') return false;
+      if (filters.mode === 'pareja' && tx.tipo !== 'pareja' && tx.tipoTransaccion !== 'ingreso') return false;
 
       // 3. Category
       if (filters.categoria !== 'ALL' && tx.categoria !== filters.categoria) return false;
@@ -1342,13 +1344,44 @@ export default function App() {
       }
     }
 
+    const updatedTxs = [savedTx, ...transactions.filter(t => t.id !== savedTx.id)];
+
+    // Inmediata persistencia en almacenamiento local seguro por usuario
+    if (localStorageOwnerId) {
+      writeScopedStorage('control_gastos_tx_v5', localStorageOwnerId, updatedTxs);
+    }
+
+    // Persistencia y respaldo en el servidor backend (/api/sync/save)
+    const targetEmail = currentUserAccount?.email || null;
+    const targetCode = currentUserAccount?.accountCode || profile?.accountCode || null;
+    if (targetEmail || targetCode) {
+      fetch('/api/sync/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: targetEmail,
+          accountCode: targetCode,
+          data: {
+            transactions: updatedTxs,
+            categoryMap,
+            categoryColors,
+            budgets,
+            profile,
+            settlementHistory,
+            goals,
+            subscriptions,
+          }
+        })
+      }).catch(err => {
+        console.warn('Could not sync app state to backend:', err);
+      });
+    }
+
     // Persist to Firebase Firestore under users/{userId}/movimientos/{mesKey}/items/{txId}
     if (activeUserId && !isDemoMode) {
       saveMovementToFirestore(activeUserId, savedTx).catch(err => {
         console.warn('Could not sync movement to Firebase Firestore:', err);
       });
-      // Sincronización inmediata de estado para reflejo instantáneo en otros dispositivos (PC <-> Celular)
-      const updatedTxs = [savedTx, ...transactions.filter(t => t.id !== savedTx.id)];
       syncAppStateToFirestore(activeUserId, {
         transactions: updatedTxs,
         categoryMap,
@@ -1361,6 +1394,11 @@ export default function App() {
       }).catch(err => {
         console.warn('Could not sync app state on save:', err);
       });
+    }
+
+    // Si había un filtro de categoría específico que ocultaría el movimiento recién guardado, resetear a 'ALL'
+    if (filters.categoria !== 'ALL' && filters.categoria !== savedTx.categoria) {
+      setFilters(prev => ({ ...prev, categoria: 'ALL', subcategoria: 'ALL' }));
     }
 
     setIsTxModalOpen(false);
@@ -1377,11 +1415,42 @@ export default function App() {
 
   const handleDeleteTransaction = (id: string) => {
     const toDelete = transactions.find(t => t.id === id);
+    const remainingTxs = transactions.filter(t => t.id !== id);
+    setTransactions(remainingTxs);
+
+    if (localStorageOwnerId) {
+      writeScopedStorage('control_gastos_tx_v5', localStorageOwnerId, remainingTxs);
+    }
+
+    const targetEmail = currentUserAccount?.email || null;
+    const targetCode = currentUserAccount?.accountCode || profile?.accountCode || null;
+    if (targetEmail || targetCode) {
+      fetch('/api/sync/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: targetEmail,
+          accountCode: targetCode,
+          data: {
+            transactions: remainingTxs,
+            categoryMap,
+            categoryColors,
+            budgets,
+            profile,
+            settlementHistory,
+            goals,
+            subscriptions,
+          }
+        })
+      }).catch(err => {
+        console.warn('Could not sync remaining transactions to backend:', err);
+      });
+    }
+
     if (toDelete && activeUserId && !isDemoMode) {
       deleteMovementFromFirestore(activeUserId, id, toDelete.fecha).catch(err => {
         console.warn('Could not delete movement from Firebase Firestore:', err);
       });
-      const remainingTxs = transactions.filter(t => t.id !== id);
       syncAppStateToFirestore(activeUserId, {
         transactions: remainingTxs,
         categoryMap,
@@ -1395,7 +1464,6 @@ export default function App() {
         console.warn('Could not sync app state on delete:', err);
       });
     }
-    setTransactions(prev => prev.filter(t => t.id !== id));
     showToast('Movimiento eliminado', 'info');
   };
 
@@ -1800,9 +1868,23 @@ export default function App() {
           if (Array.isArray(data.goals)) setGoals(data.goals);
           if (Array.isArray(data.subscriptions) && data.subscriptions.length > 0) setSubscriptions(data.subscriptions);
         } else {
-          // A successful login without payload must never display whatever was
-          // left by Demo mode or the previous account. Start empty instead.
-          clearPreviousSessionData();
+          // If server didn't have data, check if we already have local scoped transactions
+          const ownerId = acc.id || acc.email;
+          const localScopedTxs = readScopedStorage<Transaction[]>('control_gastos_tx_v5', ownerId, []);
+          if (localScopedTxs.length > 0) {
+            setTransactions(localScopedTxs);
+            fetch('/api/sync/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: acc.email,
+                accountCode: acc.accountCode,
+                data: { transactions: localScopedTxs, profile }
+              })
+            }).catch(() => {});
+          } else {
+            clearPreviousSessionData();
+          }
           setProfile({
             ...DEFAULT_COUPLE_PROFILE,
             user1Name: acc.name,
@@ -2853,6 +2935,7 @@ export default function App() {
         profile={profile}
         initialIsCuotas={initialIsCuotas}
         initialTransactionType={txModalInitialType}
+        activeMode={activeMode}
       />
 
       <IncomeModal
@@ -2860,6 +2943,7 @@ export default function App() {
         onClose={() => setIsIncomeModalOpen(false)}
         onSave={handleSaveTransaction}
         profile={profile}
+        activeMode={activeMode}
       />
 
       <PriorInstallmentsModal
