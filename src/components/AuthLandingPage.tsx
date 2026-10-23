@@ -1240,19 +1240,6 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => { setRegAccountType('pareja'); setRegSelectedPlan('pareja'); }}
-                        className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                          regAccountType === 'pareja'
-                            ? 'border-pink-500 bg-pink-500/20 text-pink-300'
-                            : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        <Users className="w-3.5 h-3.5" />
-                        <span>Cuenta Compartida (Dúo)</span>
-                      </button>
-
-                      <button
-                        type="button"
                         onClick={() => { setRegAccountType('individual'); setRegSelectedPlan('individual'); }}
                         className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                           regAccountType === 'individual'
@@ -1261,7 +1248,20 @@ export const AuthLandingPage: React.FC<AuthLandingPageProps> = ({
                         }`}
                       >
                         <User className="w-3.5 h-3.5" />
-                        <span>Individual</span>
+                        <span>Personal</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => { setRegAccountType('pareja'); setRegSelectedPlan('pareja'); }}
+                        className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          regAccountType === 'pareja'
+                            ? 'border-pink-500 bg-pink-500/20 text-pink-300'
+                            : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        <span>Compartido</span>
                       </button>
                     </div>
                   </div>

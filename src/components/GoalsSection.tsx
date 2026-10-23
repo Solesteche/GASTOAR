@@ -24,9 +24,10 @@ import {
   Award,
   DollarSign,
   X,
-  Check
+  Check,
+  Search
 } from 'lucide-react';
-import { Goal, GoalCategory, GoalContribution } from '../types';
+import { Goal, GoalCategory, GoalContribution, Transaction } from '../types';
 
 interface GoalsSectionProps {
   goals: Goal[];
@@ -35,6 +36,7 @@ interface GoalsSectionProps {
   onUpdateGoal: (id: string, updated: Partial<Goal>) => void;
   onDeleteGoal: (id: string) => void;
   onAddContribution: (goalId: string, contribution: Omit<GoalContribution, 'id'>) => void;
+  onSaveTransaction?: (tx: Partial<Transaction>) => void;
   profile?: any;
 }
 
@@ -70,9 +72,12 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
   onAddGoal,
   onUpdateGoal,
   onDeleteGoal,
-  onAddContribution
+  onAddContribution,
+  onSaveTransaction,
+  profile,
 }) => {
   const [selectedFilter, setSelectedFilter] = useState<'all' | GoalCategory | 'completed'>('all');
+  const [goalSearch, setGoalSearch] = useState('');
   
   // Modals
   const [isNewGoalModalOpen, setIsNewGoalModalOpen] = useState(false);
@@ -84,6 +89,7 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
   const [contribAmount, setContribAmount] = useState<string>('');
   const [contribType, setContribType] = useState<'aporte' | 'retiro'>('aporte');
   const [contribNote, setContribNote] = useState<string>('');
+  const [impactInMovimientos, setImpactInMovimientos] = useState<boolean>(true);
   const [contribDate, setContribDate] = useState<string>(() => {
     const d = new Date();
     const pad = (n: number) => n.toString().padStart(2, '0');
@@ -129,11 +135,20 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
   const filteredGoals = useMemo(() => {
     return goals.filter(g => {
       const isDone = (g.montoActual >= g.montoObjetivo && g.montoObjetivo > 0) || g.completada;
-      if (selectedFilter === 'all') return true;
-      if (selectedFilter === 'completed') return isDone;
-      return g.categoria === selectedFilter;
+      if (selectedFilter === 'completed' && !isDone) return false;
+      if (selectedFilter !== 'all' && selectedFilter !== 'completed' && g.categoria !== selectedFilter) {
+        return false;
+      }
+      if (goalSearch.trim()) {
+        const q = goalSearch.toLowerCase();
+        const match =
+          g.nombre.toLowerCase().includes(q) ||
+          (g.descripcion || '').toLowerCase().includes(q);
+        if (!match) return false;
+      }
+      return true;
     });
-  }, [goals, selectedFilter]);
+  }, [goals, selectedFilter, goalSearch]);
 
   // Open Create Modal
   const handleOpenCreate = () => {
@@ -231,185 +246,117 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
       tipo: contribType
     });
 
+    if (impactInMovimientos && onSaveTransaction) {
+      onSaveTransaction({
+        concepto:
+          contribType === 'aporte'
+            ? `Ahorro p/ ${contributingGoal.nombre}`
+            : `Retiro de caja: ${contributingGoal.nombre}`,
+        descripcion: contribNote.trim() || undefined,
+        monto: amt,
+        moneda: currency || 'ARS',
+        categoria: contribType === 'aporte' ? 'Ahorro' : 'Ingresos',
+        subcategoria: contributingGoal.nombre,
+        fecha: contribDate,
+        tipo: 'individual',
+        tipoTransaccion: contribType === 'aporte' ? 'gasto' : 'ingreso',
+        pagadoPor: profile?.currentUser || 'user1',
+        metodoPago: 'Transferencia',
+      });
+    }
+
     setContributingGoal(null);
   };
 
   return (
-    <div className="space-y-7 max-w-6xl mx-auto animate-in fade-in duration-200">
-      
-      {/* 1. Header & Summary Section */}
+    <div className="space-y-4 max-w-4xl mx-auto pb-16 font-sans">
+      {/* 1. Unified Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+        <div>
+          <p className="text-sm text-gray-400">Ahorro & Objetivos</p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Metas y Cajas</h1>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={handleOpenCreate}
+            className="px-4 py-2 rounded-xl bg-[#6936F5] hover:bg-[#5b2bd9] text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-xs active:scale-95 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nueva Caja de Meta</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 2. Unified Full-Width Purple Hero Balance Card (Zero Circular Gauges) */}
       <div
         style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
-        className="text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-400/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        className="text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-purple-300/30 relative overflow-hidden"
       >
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/15 text-white border border-white/20 backdrop-blur-xs flex items-center justify-center shadow-xs shrink-0">
-              <Target className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                Metas & Cajas
-              </h1>
-              <p className="text-xs sm:text-sm text-purple-200 font-medium">
-                Crea cajas personalizadas para ahorrar para viajes, saldar deudas o crear fondos de respaldo
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* New Goal CTA */}
-        <button
-          onClick={handleOpenCreate}
-          className="px-4 py-2.5 bg-[#F95420] hover:bg-[#E04412] text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 self-start sm:self-auto active:scale-95 cursor-pointer"
-        >
-          <Plus className="w-4 h-4 stroke-[3]" />
-          <span>+ Nueva Caja de Meta</span>
-        </button>
-      </div>
-
-      {/* 2. Top Stats Overview (4 Cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Total Ahorrado / Saldado */}
-        <div className="bg-white rounded-3xl p-5 border border-purple-100/80 shadow-[0_4px_20px_-4px_rgba(121,40,202,0.06)] space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">Total Acumulado</span>
-            <div className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Coins className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-2xl font-black text-[#2E0854] tracking-tight">
-            ${formatNumber(totalSaved)}
+        <div className="w-full">
+          <p className="text-xs sm:text-sm font-medium text-white/80 mb-1.5 tracking-wide">
+            Total acumulado en cajas
           </p>
-          <div className="text-xs text-slate-400 font-medium flex items-center gap-1">
-            <span>En {goals.length} cajas creadas</span>
-          </div>
-        </div>
-
-        {/* Card 2: Monto Objetivo Total */}
-        <div className="bg-white rounded-3xl p-5 border border-purple-100/80 shadow-[0_4px_20px_-4px_rgba(121,40,202,0.06)] space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">Meta Global Total</span>
-            <div className="w-7 h-7 rounded-xl bg-purple-50 text-[#7928CA] flex items-center justify-center">
-              <Target className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-2xl font-black text-[#2E0854] tracking-tight">
-            ${formatNumber(totalTarget)}
-          </p>
-          <div className="text-xs text-slate-400 font-medium">
-            Faltan ${formatNumber(Math.max(0, totalTarget - totalSaved))}
-          </div>
-        </div>
-
-        {/* Card 3: Progreso General */}
-        <div className="bg-white rounded-3xl p-5 border border-purple-100/80 shadow-[0_4px_20px_-4px_rgba(121,40,202,0.06)] space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">Progreso Global</span>
-            <span className="text-xs font-black text-[#7928CA] bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">
-              {globalProgress}%
+          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <h2 className="text-[32px] sm:text-4xl font-black font-outfit text-white tracking-tight leading-none truncate">
+              $ {formatNumber(totalSaved)}
+            </h2>
+            <span className="text-xs text-white/80 font-medium">
+              {globalProgress}% del objetivo global
             </span>
           </div>
-          <div className="w-full bg-purple-100/60 h-1 rounded-full overflow-hidden mt-1">
+          <div className="h-1.5 rounded-full overflow-hidden mb-3 bg-white/20">
             <div
-              className="h-full bg-gradient-to-r from-[#7928CA] to-[#F95420] rounded-full transition-all duration-500"
-              style={{ width: `${globalProgress}%` }}
+              className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#FFA234] via-[#F97316] to-[#F95420]"
+              style={{ width: `${Math.min(100, Math.max(totalSaved > 0 ? 5 : 0, globalProgress))}%` }}
             />
           </div>
-          <div className="text-xs text-slate-400 font-medium flex items-center justify-between pt-1">
-            <span>Objetivo general</span>
-            <span className="font-bold text-[#2E0854]">{globalProgress}% completado</span>
-          </div>
-        </div>
-
-        {/* Card 4: Metas Activas & Cumplidas */}
-        <div className="bg-white rounded-3xl p-5 border border-purple-100/80 shadow-[0_4px_20px_-4px_rgba(121,40,202,0.06)] space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400">Estado de Cajas</span>
-            <div className="w-7 h-7 rounded-xl bg-orange-50 text-[#F95420] flex items-center justify-center">
-              <Award className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <p className="text-2xl font-black text-[#2E0854] tracking-tight">{activeCount}</p>
-            <span className="text-xs text-slate-400 font-semibold">activas</span>
-            <span className="text-slate-300">·</span>
-            <p className="text-2xl font-black text-emerald-600 tracking-tight">{completedCount}</p>
-            <span className="text-xs text-emerald-600 font-semibold">logradas 🎉</span>
-          </div>
-          <div className="text-xs text-slate-400 font-medium">
-            {completedCount > 0 ? '¡Excelente avance!' : '¡A por tu primera meta!'}
+          <div className="flex items-center gap-2 text-xs text-white/85 flex-wrap">
+            <span>Meta global:{" "}
+              <span className="font-semibold text-white">${formatNumber(totalTarget)}</span>
+            </span>
+            <span>•</span>
+            <span>Faltan:{" "}
+              <span className="font-semibold text-amber-300">${formatNumber(Math.max(0, totalTarget - totalSaved))}</span>
+            </span>
+            <span>•</span>
+            <span>{activeCount} activas</span>
+            <span>•</span>
+            <span className="text-emerald-300 font-semibold">{completedCount} logradas</span>
           </div>
         </div>
       </div>
 
-      {/* 3. Category Filter Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-        <button
-          onClick={() => setSelectedFilter('all')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-            selectedFilter === 'all'
-              ? 'bg-[#2E0854] text-white shadow-xs'
-              : 'bg-white text-slate-600 hover:bg-purple-50 border border-purple-100/70'
-          }`}
-        >
-          Todas ({goals.length})
-        </button>
-        <button
-          onClick={() => setSelectedFilter('viaje')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-            selectedFilter === 'viaje'
-              ? 'bg-[#7928CA] text-white shadow-xs'
-              : 'bg-white text-slate-600 hover:bg-purple-50 border border-purple-100/70'
-          }`}
-        >
-          <span>✈️</span>
-          <span>Viajes</span>
-        </button>
-        <button
-          onClick={() => setSelectedFilter('deuda')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-            selectedFilter === 'deuda'
-              ? 'bg-rose-600 text-white shadow-xs'
-              : 'bg-white text-slate-600 hover:bg-rose-50 border border-purple-100/70'
-          }`}
-        >
-          <span>💳</span>
-          <span>Saldar Deudas</span>
-        </button>
-        <button
-          onClick={() => setSelectedFilter('emergencia')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-            selectedFilter === 'emergencia'
-              ? 'bg-emerald-600 text-white shadow-xs'
-              : 'bg-white text-slate-600 hover:bg-emerald-50 border border-purple-100/70'
-          }`}
-        >
-          <span>🛡️</span>
-          <span>Fondos Emergencia</span>
-        </button>
-        <button
-          onClick={() => setSelectedFilter('hogar')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-            selectedFilter === 'hogar'
-              ? 'bg-[#F95420] text-white shadow-xs'
-              : 'bg-white text-slate-600 hover:bg-orange-50 border border-purple-100/70'
-          }`}
-        >
-          <span>🏠</span>
-          <span>Hogar</span>
-        </button>
-        <button
-          onClick={() => setSelectedFilter('completed')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ml-auto ${
-            selectedFilter === 'completed'
-              ? 'bg-emerald-600 text-white shadow-xs'
-              : 'bg-white text-slate-600 hover:bg-purple-50 border border-purple-100/70'
-          }`}
-        >
-          <span>🎉</span>
-          <span>Completadas ({completedCount})</span>
-        </button>
+      {/* 3. Reduced Compact Filter Bar */}
+      <div className="bg-white rounded-3xl p-3.5 sm:p-4 shadow-xs border border-slate-200/80">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={goalSearch}
+              onChange={(e) => setGoalSearch(e.target.value)}
+              placeholder="Buscar caja o meta de ahorro..."
+              className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200/80 rounded-xl text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6936F5]/25 focus:border-[#6936F5]"
+            />
+          </div>
+          <select
+            value={selectedFilter}
+            onChange={(e) => setSelectedFilter(e.target.value as any)}
+            aria-label="Filtrar metas por categoría"
+            className="px-3 py-2 text-sm bg-slate-50 border border-slate-200/80 rounded-xl text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#6936F5]/25"
+          >
+            <option value="all">Todas las cajas ({goals.length})</option>
+            <option value="viaje">✈️ Viajes</option>
+            <option value="deuda">💳 Saldar Deudas</option>
+            <option value="emergencia">🛡️ Fondos Emergencia</option>
+            <option value="hogar">🏠 Hogar</option>
+            <option value="vehiculo">🚗 Auto / Moto</option>
+            <option value="ahorro">💰 Ahorro General</option>
+            <option value="completed">🎉 Completadas ({completedCount})</option>
+          </select>
+        </div>
       </div>
 
       {/* 4. Grid of Customized Goal Boxes */}
@@ -998,6 +945,25 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#7928CA]/20 focus:border-[#7928CA]"
                 />
               </div>
+
+              {onSaveTransaction && (
+                <label className="flex items-start gap-2.5 p-3 rounded-xl bg-purple-50/70 border border-purple-100 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={impactInMovimientos}
+                    onChange={(e) => setImpactInMovimientos(e.target.checked)}
+                    className="mt-0.5 accent-[#6936F5]"
+                  />
+                  <span className="text-xs text-slate-700 leading-snug">
+                    <strong className="font-bold text-slate-900 block">
+                      Impactar también en Movimientos del mes
+                    </strong>
+                    {contribType === 'aporte'
+                      ? 'Se descontará automáticamente de tu disponible como ahorro.'
+                      : 'Se acreditará como ingreso desde esta caja.'}
+                  </span>
+                </label>
+              )}
 
               {/* Submit Buttons */}
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-purple-50">

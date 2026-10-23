@@ -4,12 +4,12 @@ import {
   Receipt, 
   RotateCcw, 
   Download, 
+  History,
   Search, 
   ChevronDown, 
   ChevronRight, 
   ChevronLeft, 
   SlidersHorizontal, 
-  Layers, 
   ShoppingCart, 
   Bus, 
   Zap, 
@@ -36,7 +36,10 @@ import {
   CalendarRange,
   Users,
   LayoutGrid,
-  Mic
+  Mic,
+  Upload,
+  FileText,
+  Paperclip
 } from 'lucide-react';
 import { 
   CategoryColors, 
@@ -64,9 +67,12 @@ interface TransactionsTableProps {
   onDelete?: (id: string) => void;
   onDuplicateTransaction?: (tx: Transaction) => void;
   onExportCSV?: () => void;
+  onOpenImportModal?: () => void;
+  onOpenMonthlyReport?: () => void;
   onResetData?: () => void;
   onNavigateTab?: (tab: any) => void;
   onOpenCloudSync?: () => void;
+  onOpenNewTransaction?: () => void;
 }
 
 const DEFAULT_FILTERS: FilterState = {
@@ -267,9 +273,12 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   onDelete,
   onDuplicateTransaction = () => {},
   onExportCSV = () => {},
+  onOpenImportModal,
+  onOpenMonthlyReport,
   onResetData = () => {},
   onNavigateTab,
   onOpenCloudSync,
+  onOpenNewTransaction,
 }) => {
   const effectiveFiltered = filteredTransactions || transactions || [];
   const effectiveTransactions = transactions || filteredTransactions || [];
@@ -324,27 +333,6 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isDateMenuOpen]);
 
-  // Carousel scroll state for mobile 4-card pagination
-  const carouselRef = useRef<HTMLDivElement>(null);
-  const [activeCarouselPage, setActiveCarouselPage] = useState<number>(0);
-
-  const handleCarouselScroll = () => {
-    if (!carouselRef.current) return;
-    const { scrollLeft, clientWidth } = carouselRef.current;
-    if (clientWidth > 0) {
-      const page = Math.round(scrollLeft / clientWidth);
-      setActiveCarouselPage(page);
-    }
-  };
-
-  const scrollToCarouselPage = (pageIndex: number) => {
-    if (!carouselRef.current) return;
-    carouselRef.current.scrollTo({
-      left: pageIndex * carouselRef.current.clientWidth,
-      behavior: 'smooth',
-    });
-    setActiveCarouselPage(pageIndex);
-  };
 
   // Reset page when filters change
   useEffect(() => {
@@ -360,6 +348,41 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   const totalFilteredAmount = useMemo(() => {
     return effectiveFiltered.reduce((acc, t) => acc + (t?.monto || 0), 0);
   }, [effectiveFiltered]);
+
+  // Split expenses vs income for hero card metrics
+  const totalExpenses = useMemo(() => {
+    return effectiveFiltered
+      .filter(t => t?.tipoTransaccion !== 'ingreso')
+      .reduce((acc, t) => acc + Math.abs(t?.monto || 0), 0);
+  }, [effectiveFiltered]);
+
+  const totalIncome = useMemo(() => {
+    return effectiveFiltered
+      .filter(t => t?.tipoTransaccion === 'ingreso')
+      .reduce((acc, t) => acc + Math.abs(t?.monto || 0), 0);
+  }, [effectiveFiltered]);
+
+  // Overall percent metric (ratio of expenses to income, or proportion of total)
+  const percentSpent = useMemo(() => {
+    if (totalIncome > 0) {
+      return Math.min(100, Math.max(0, Math.round((totalExpenses / totalIncome) * 100)));
+    }
+    const allIncome = (effectiveTransactions || [])
+      .filter(t => t?.tipoTransaccion === 'ingreso')
+      .reduce((acc, t) => acc + Math.abs(t?.monto || 0), 0);
+    if (allIncome > 0) {
+      return Math.min(100, Math.max(0, Math.round((totalExpenses / allIncome) * 100)));
+    }
+    if (effectiveTransactions.length > 0 && totalExpenses > 0) {
+      return Math.min(100, Math.max(0, Math.round((effectiveFiltered.length / effectiveTransactions.length) * 100)));
+    }
+    return 0;
+  }, [totalExpenses, totalIncome, effectiveFiltered.length, effectiveTransactions]);
+
+  // Circular gauge math matching user attachment
+  const r = 38, cx = 50, cy = 50;
+  const circ = 2 * Math.PI * r;
+  const dash = (percentSpent / 100) * circ;
 
   // Get active date range human title
   const getDateRangeTitle = () => {
@@ -427,7 +450,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   }, [effectiveTransactions]);
 
   // Only show categories that have actual expenses (> 0), or the currently selected category
-  const carouselCategories = useMemo(() => {
+  const categoriesWithSpending = useMemo(() => {
     const activeWithSpending = Object.entries(categoryTotals)
       .filter(([catName, amount]) => Number(amount) > 0 || activeFilters.categoria === catName)
       .sort((a, b) => Number(b[1]) - Number(a[1])) // highest expense first
@@ -519,35 +542,106 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   return (
     <div className="space-y-4 max-w-7xl mx-auto font-sans pb-16">
 
-      {/* ROW 1: HERO MOVIMIENTOS CARD */}
-      <div
-        style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
-        className="w-full rounded-3xl p-5 sm:p-6 text-white shadow-xl border border-purple-400/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-      >
-        
-        {/* Left: Icon + Title + Subtitle */}
-        <div className="flex items-center gap-3.5 sm:gap-4">
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/15 backdrop-blur-xs text-white border border-white/20 flex items-center justify-center shrink-0 shadow-xs">
-            <Calendar className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
-          </div>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-tight">
-              Movimientos
-            </h2>
-            <p className="text-xs sm:text-sm text-purple-200 font-medium mt-0.5">
-              Mostrando {effectiveFiltered.length} de {effectiveTransactions.length} transacciones
-            </p>
-          </div>
+      {/* 1. Header: Section title + Actions (Estilo idéntico a Gastos en Cuotas / Resumen) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+        <div>
+          <p className="text-sm text-gray-400">Historial & Finanzas</p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Movimientos</h1>
         </div>
 
-        {/* Right: Total Section (No white background, all white text) */}
-        <div className="self-start sm:self-center shrink-0 text-left sm:text-right">
-          <span className="block text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
-            Total
-          </span>
-          <span className="block text-xl sm:text-2xl font-black text-white tracking-tight mt-0.5">
-            {formatCurrency(totalFilteredAmount, profile.currency)}
-          </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          {onOpenImportModal && (
+            <button
+              type="button"
+              onClick={onOpenImportModal}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-purple-50/50 text-slate-700 hover:text-[#6F2EC5] transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+              title="Importar resumen CSV, PDF o foto de comprobante"
+            >
+              <Upload className="w-3.5 h-3.5 text-[#6936F5]" />
+              <span>Importar</span>
+            </button>
+          )}
+
+          {onOpenMonthlyReport && (
+            <button
+              type="button"
+              onClick={onOpenMonthlyReport}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-purple-50/50 text-slate-700 hover:text-[#6F2EC5] transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+              title="Ver cierre mensual, liquidación WhatsApp y reporte PDF/HTML"
+            >
+              <FileText className="w-3.5 h-3.5 text-slate-500" />
+              <span>Cierre Mensual</span>
+            </button>
+          )}
+
+          {onExportCSV && !onOpenMonthlyReport && (
+            <button
+              type="button"
+              onClick={onExportCSV}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-purple-50/50 text-slate-700 hover:text-[#6F2EC5] transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+              title="Descargar movimientos filtrados en formato CSV"
+            >
+              <History className="w-3.5 h-3.5 text-slate-500" />
+              <span>Exportar CSV</span>
+            </button>
+          )}
+
+          {onOpenNewTransaction && (
+            <button
+              type="button"
+              onClick={onOpenNewTransaction}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 bg-[#6936F5] hover:bg-[#5b2bd9]"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Nuevo Movimiento</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 2. Hero Balance Card (Unified GastoAR style — Zero Circular Gauge) */}
+      <div
+        style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
+        className="text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-purple-300/30 relative overflow-hidden"
+      >
+        <div className="w-full">
+          <p className="text-xs sm:text-sm font-medium text-white/80 mb-1.5 tracking-wide">
+            Saldo total gastado
+          </p>
+          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <h2 className="text-[32px] sm:text-4xl font-black font-outfit text-white tracking-tight leading-none truncate">
+              {formatCurrency(
+                totalExpenses > 0 ? totalExpenses : totalFilteredAmount,
+                profile.currency
+              )}
+            </h2>
+            {totalIncome > 0 && (
+              <span className="text-xs text-white/80 font-medium">
+                {percentSpent}% de ingresos
+              </span>
+            )}
+          </div>
+          <div className="h-1.5 rounded-full overflow-hidden mb-3 bg-white/20">
+            <div
+              className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#FFA234] via-[#F97316] to-[#F95420]"
+              style={{ 
+                width: `${Math.min(100, Math.max(totalExpenses > 0 || totalIncome > 0 ? 5 : 0, percentSpent))}%`, 
+              }}
+            />
+          </div>
+          <div className="flex items-center gap-2 text-xs text-white/85 flex-wrap">
+            <span>Total gastos:{" "}
+              <span className="font-semibold text-white">{formatCurrency(totalExpenses, profile.currency)}</span>
+            </span>
+            <span>•</span>
+            <span>Ingresos:{" "}
+              <span className="font-semibold text-emerald-300">{formatCurrency(totalIncome, profile.currency)}</span>
+            </span>
+            <span>•</span>
+            <span>Movimientos:{" "}
+              <span className="font-semibold text-white">{filteredTransactions?.length ?? transactions?.length ?? 0}</span>
+            </span>
+          </div>
         </div>
       </div>
 
@@ -838,13 +932,13 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                 title="Filtrar por categoría"
               >
                 <option value="ALL">Todas las Categorías</option>
-                {carouselCategories.map((cat) => (
+                {categoriesWithSpending.map((cat) => (
                   <option key={cat} value={cat}>
                     {cat} {categoryTotals[cat] ? `(${formatCurrency(categoryTotals[cat], profile.currency)})` : ''}
                   </option>
                 ))}
                 {Object.keys(categoryMap)
-                  .filter(c => !carouselCategories.includes(c))
+                  .filter(c => !categoriesWithSpending.includes(c))
                   .map((cat) => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
@@ -876,109 +970,6 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
 
       </div>
 
-      {/* ROW 3: CATEGORÍAS CAROUSEL */}
-      <div className="space-y-3 pt-1">
-        
-        {/* Header: Categorías + Ver todas > */}
-        <div className="flex items-center justify-between px-1">
-          <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-            Categorías
-          </h3>
-          <button
-            type="button"
-            onClick={() => onFilterChange({ categoria: 'ALL', subcategoria: 'ALL' })}
-            className="text-xs sm:text-sm font-bold text-[#6F2EC5] hover:text-[#5B21B6] hover:underline flex items-center gap-1 cursor-pointer transition-colors"
-          >
-            <span>Ver todas</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        {/* Category Cards Carousel (Sized to fit exactly 4 cards on mobile view) */}
-        <div 
-          ref={carouselRef}
-          onScroll={handleCarouselScroll}
-          className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-none px-0.5 sm:px-1 snap-x snap-mandatory scroll-smooth"
-        >
-          
-          {/* 1. TODAS Card */}
-          <button
-            type="button"
-            onClick={() => onFilterChange({ categoria: 'ALL', subcategoria: 'ALL' })}
-            className={`flex flex-col items-center justify-center p-1.5 sm:p-3 rounded-2xl transition-all cursor-pointer shrink-0 snap-start w-[calc((100%-24px)/4)] min-w-[68px] sm:w-auto sm:min-w-[96px] border ${
-              activeFilters.categoria === 'ALL'
-                ? 'bg-purple-50/80 border-[#6F2EC5] shadow-xs'
-                : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/50 shadow-2xs'
-            }`}
-          >
-            <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center mb-1 sm:mb-1.5 transition-all shrink-0 ${
-              activeFilters.categoria === 'ALL'
-                ? 'bg-[#6F2EC5] text-white shadow-xs'
-                : 'bg-purple-100/70 text-[#6F2EC5]'
-            }`}>
-              <Layers className="w-4 h-4 sm:w-6 sm:h-6" />
-            </div>
-            <span className={`text-[10px] sm:text-xs font-bold truncate w-full text-center tracking-tight ${activeFilters.categoria === 'ALL' ? 'text-[#6F2EC5]' : 'text-slate-800'}`}>
-              Todas
-            </span>
-            <span className={`text-[9px] sm:text-[11px] font-bold mt-0.5 truncate w-full text-center ${activeFilters.categoria === 'ALL' ? 'text-[#6F2EC5]' : 'text-slate-500'}`}>
-              {formatCurrency(totalFilteredAmount, profile.currency)}
-            </span>
-          </button>
-
-          {/* Dynamic Category Cards (Matching pastel styling from image) */}
-          {carouselCategories.map((catName) => {
-            const visuals = getCategoryVisuals(catName);
-            const Icon = visuals.icon;
-            const isSelected = activeFilters.categoria === catName;
-            const catAmount = categoryTotals[catName] || 0;
-
-            return (
-              <button
-                key={catName}
-                type="button"
-                onClick={() => onFilterChange({ 
-                  categoria: isSelected ? 'ALL' : catName, 
-                  subcategoria: 'ALL' 
-                })}
-                className={`flex flex-col items-center justify-center p-1.5 sm:p-3 rounded-2xl transition-all cursor-pointer shrink-0 snap-start w-[calc((100%-24px)/4)] min-w-[68px] sm:w-auto sm:min-w-[96px] border ${
-                  isSelected 
-                    ? 'bg-purple-50/80 border-[#6F2EC5] shadow-xs' 
-                    : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/50 shadow-2xs'
-                }`}
-              >
-                <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center mb-1 sm:mb-1.5 transition-all border shrink-0 ${visuals.bg} ${visuals.text} ${visuals.border} shadow-2xs`}>
-                  <Icon className="w-4 h-4 sm:w-6 sm:h-6" />
-                </div>
-                <span className={`text-[10px] sm:text-xs font-bold truncate w-full text-center tracking-tight ${isSelected ? 'text-[#6F2EC5]' : 'text-slate-800'}`}>
-                  {catName}
-                </span>
-                <span className="text-[9px] sm:text-[11px] font-bold text-slate-500 mt-0.5 truncate w-full text-center">
-                  {formatCurrency(catAmount, profile.currency)}
-                </span>
-              </button>
-            );
-          })}
-
-        </div>
-
-        {/* Carousel Slider Indicator (Matching image, interactive) */}
-        <div className="flex items-center justify-center gap-1.5 pt-1">
-          {Array.from({ length: Math.max(4, Math.ceil((1 + carouselCategories.length) / 4)) }).map((_, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => scrollToCarouselPage(idx)}
-              className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                activeCarouselPage === idx 
-                  ? 'w-7 sm:w-8 bg-[#6F2EC5]' 
-                  : 'w-3.5 sm:w-5 bg-slate-200 hover:bg-slate-300'
-              }`}
-              aria-label={`Página ${idx + 1}`}
-            />
-          ))}
-        </div>
-      </div>
 
       {/* ROW 4: MOVIMIENTOS HEADER (Count badge + Ordenar por) */}
       <div className="flex items-center justify-between gap-3 pt-3 px-1">
@@ -1101,6 +1092,16 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                                 <span>Voz</span>
                               </span>
                             )}
+
+                            {tx.comprobanteUrl && (
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                title="Contiene ticket adjunto"
+                              >
+                                <Paperclip className="w-2.5 h-2.5" />
+                                <span>Ticket</span>
+                              </span>
+                            )}
                           </div>
 
                           {/* Time and Payer */}
@@ -1155,9 +1156,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (confirm(`¿Estás seguro de que querés borrar el movimiento "${tx.concepto}" por $${Math.abs(tx.monto).toLocaleString('es-AR')}?`)) {
-                                handleDelete(tx.id);
-                              }
+                              handleDelete(tx.id);
                             }}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                             title="Borrar movimiento"

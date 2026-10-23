@@ -20,7 +20,8 @@ import {
   BadgePercent,
   TrendingUp,
   Coins,
-  Compass
+  Compass,
+  Wallet
 } from 'lucide-react';
 
 interface MobileBottomNavProps {
@@ -62,7 +63,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     onSelectTab(tab);
   };
 
-  const isMoreTabActive = ['installments', 'charts', 'couple_balance', 'goals', 'budgets', 'categories', 'ai', 'cashflow', 'currency'].includes(activeTab);
+  const isMoreTabActive = ['wallets', 'installments', 'charts', 'couple_balance', 'goals', 'budgets', 'categories', 'ai', 'cashflow', 'currency'].includes(activeTab);
 
   return (
     <>
@@ -84,6 +85,18 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             </div>
 
             <div className="grid grid-cols-3 gap-2.5 text-xs">
+              <button
+                onClick={() => handleMoreItemClick('wallets')}
+                className={`p-3 rounded-2xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                  activeTab === 'wallets' ? 'bg-purple-50 border-purple-300 text-[#6936F5] font-bold' : 'bg-slate-50/70 border-slate-100 text-slate-700'
+                }`}
+              >
+                <div className="w-9 h-9 rounded-xl bg-purple-100 text-[#6936F5] flex items-center justify-center">
+                  <Wallet className="w-4.5 h-4.5" />
+                </div>
+                <span>Cuentas</span>
+              </button>
+
               <button
                 onClick={() => handleMoreItemClick('installments')}
                 className={`p-3 rounded-2xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
@@ -117,7 +130,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 <div className="w-9 h-9 rounded-xl bg-purple-100 text-[#6F2EC5] flex items-center justify-center">
                   <Scale className="w-4.5 h-4.5" />
                 </div>
-                <span>Cuenta Compartida</span>
+                <span>Compartido</span>
                 {hasDebt && (
                   <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#6F2EC5]" />
                 )}

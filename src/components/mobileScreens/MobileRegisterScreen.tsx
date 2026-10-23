@@ -73,7 +73,7 @@ export const MobileRegisterScreen: React.FC<MobileRegisterScreenProps> = ({
       return;
     }
     if (accountType === 'pareja' && !partnerName.trim()) {
-      setError('Ingresá el nombre del otro miembro o elegí cuenta individual');
+      setError('Ingresá el nombre del otro miembro o elegí cuenta personal');
       return;
     }
     if (!acceptTerms) {
@@ -174,26 +174,6 @@ export const MobileRegisterScreen: React.FC<MobileRegisterScreenProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setAccountType('pareja')}
-                className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${
-                  accountType === 'pareja'
-                    ? 'border-[#7928CA] bg-purple-50/60 ring-2 ring-purple-100'
-                    : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
-                }`}
-              >
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                  accountType === 'pareja' ? 'bg-[#7928CA] text-white' : 'bg-slate-200 text-slate-600'
-                }`}>
-                  <Users className="w-3.5 h-3.5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-slate-900 leading-tight">Cuenta Compartida</p>
-                  <p className="text-[10px] text-slate-500 truncate">Finanzas 2 personas</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setAccountType('individual')}
                 className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${
                   accountType === 'individual'
@@ -207,8 +187,28 @@ export const MobileRegisterScreen: React.FC<MobileRegisterScreenProps> = ({
                   <User className="w-3.5 h-3.5" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-slate-900 leading-tight">Individual</p>
-                  <p className="text-[10px] text-slate-500 truncate">Uso Personal</p>
+                  <p className="text-xs font-bold text-slate-900 leading-tight">Personal</p>
+                  <p className="text-[10px] text-slate-500 truncate">Uso personal</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAccountType('pareja')}
+                className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${
+                  accountType === 'pareja'
+                    ? 'border-[#7928CA] bg-purple-50/60 ring-2 ring-purple-100'
+                    : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                }`}
+              >
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                  accountType === 'pareja' ? 'bg-[#7928CA] text-white' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  <Users className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-900 leading-tight">Compartido</p>
+                  <p className="text-[10px] text-slate-500 truncate">Finanzas 2 personas</p>
                 </div>
               </button>
             </div>

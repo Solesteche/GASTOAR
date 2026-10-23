@@ -258,7 +258,7 @@ export function exportTransactionsToCSV(transactions: Transaction[], currency: s
     t.fecha,
     `"${(t.concepto || '').replace(/"/g, '""')}"`,
     `"${(t.descripcion || '').replace(/"/g, '""')}"`,
-    t.tipo === 'pareja' ? 'En Pareja' : 'Individual',
+    t.tipo === 'pareja' ? 'Compartido' : 'Personal',
     `"${(t.categoria || '').replace(/"/g, '""')}"`,
     `"${(t.subcategoria || '').replace(/"/g, '""')}"`,
     t.monto,

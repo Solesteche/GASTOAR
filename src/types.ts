@@ -48,6 +48,44 @@ export interface Transaction {
   createdAt?: number;
   learnedPreferenceApplied?: boolean;
   learnedMerchantId?: string;
+  walletId?: string;
+  deletedAt?: number;
+}
+
+export type WalletAccountType = 'billetera_virtual' | 'banco' | 'efectivo' | 'ahorro_usd';
+
+export interface WalletAccount {
+  id: string;
+  nombre: string;
+  tipo: WalletAccountType;
+  moneda: 'ARS' | 'USD';
+  saldoInicial: number;
+  color: string;
+  icono: string;
+  metodoPagoAsociado?: PaymentMethod;
+  aliasCbu?: string;
+}
+
+export interface WalletTransfer {
+  id: string;
+  origenWalletId: string;
+  destinoWalletId: string;
+  montoOrigen: number;
+  monedaOrigen: 'ARS' | 'USD';
+  montoDestino: number;
+  monedaDestino: 'ARS' | 'USD';
+  fecha: string; // YYYY-MM-DD
+  nota?: string;
+  createdAt: number;
+}
+
+export interface CreditCardConfig {
+  id: string;
+  tarjetaNombre: string;
+  diaCierre: number; // 1-31
+  diaVencimiento: number; // 1-31
+  limite?: number;
+  color?: string;
 }
 
 export interface LearnedMerchant {

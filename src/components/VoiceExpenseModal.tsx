@@ -1192,7 +1192,7 @@ export const VoiceExpenseModal: React.FC<VoiceExpenseModalProps> = ({
                               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                           }`}
                         >
-                          Individual
+                          Personal
                         </button>
                         <button
                           type="button"
@@ -1203,7 +1203,7 @@ export const VoiceExpenseModal: React.FC<VoiceExpenseModalProps> = ({
                               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                           }`}
                         >
-                          Pareja (50/50)
+                          Compartido (50/50)
                         </button>
                       </div>
 

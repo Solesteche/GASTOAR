@@ -521,13 +521,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       return realBills.slice(0, 5);
     }
 
-    return [
-      { id: '1', icon: '💳', title: 'Tarjeta Visa', cat: 'Tarjeta de crédito', dueText: 'Vence en 3 días', duePill: '28 sept', amount: 85000, daysLeft: 3, color: 'text-rose-500', bg: 'bg-amber-100 text-amber-700' },
-      { id: '2', icon: '🏢', title: 'Expensas', cat: 'Hogar', dueText: 'Vence en 5 días', duePill: '30 sept', amount: 135000, daysLeft: 5, color: 'text-amber-500', bg: 'bg-blue-100 text-blue-700' },
-      { id: '3', icon: '💧', title: 'AySA', cat: 'Servicios', dueText: 'Vence en 8 días', duePill: '2 oct', amount: 28500, daysLeft: 8, color: 'text-cyan-500', bg: 'bg-cyan-100 text-cyan-700' },
-      { id: '4', icon: '🌐', title: 'Internet', cat: 'Servicios', dueText: 'Vence en 11 días', duePill: '4 oct', amount: 12000, daysLeft: 11, color: 'text-purple-500', bg: 'bg-purple-100 text-purple-700' },
-      { id: '5', icon: '🏠', title: 'Alquiler', cat: 'Vivienda', dueText: 'Vence en 14 días', duePill: '9 oct', amount: 650000, daysLeft: 14, color: 'text-emerald-500', bg: 'bg-emerald-100 text-emerald-700' }
-    ];
+    if (isDemoMode) {
+      return [
+        { id: '1', icon: '💳', title: 'Tarjeta Visa', cat: 'Tarjeta de crédito', dueText: 'Vence en 3 días', duePill: '28 sept', amount: 85000, daysLeft: 3, color: 'text-rose-500', bg: 'bg-amber-100 text-amber-700' },
+        { id: '2', icon: '🏢', title: 'Expensas', cat: 'Hogar', dueText: 'Vence en 5 días', duePill: '30 sept', amount: 135000, daysLeft: 5, color: 'text-amber-500', bg: 'bg-blue-100 text-blue-700' },
+        { id: '3', icon: '💧', title: 'AySA', cat: 'Servicios', dueText: 'Vence en 8 días', duePill: '2 oct', amount: 28500, daysLeft: 8, color: 'text-cyan-500', bg: 'bg-cyan-100 text-cyan-700' },
+        { id: '4', icon: '🌐', title: 'Internet', cat: 'Servicios', dueText: 'Vence en 11 días', duePill: '4 oct', amount: 12000, daysLeft: 11, color: 'text-purple-500', bg: 'bg-purple-100 text-purple-700' },
+        { id: '5', icon: '🏠', title: 'Alquiler', cat: 'Vivienda', dueText: 'Vence en 14 días', duePill: '9 oct', amount: 650000, daysLeft: 14, color: 'text-emerald-500', bg: 'bg-emerald-100 text-emerald-700' }
+      ];
+    }
+
+    return [];
   }, [vencimientos, isDemoMode]);
 
   // Distribución de gastos (Pie Data)
@@ -549,12 +553,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       });
     }
 
-    return [
-      { name: 'Alimentación & Bebidas', value: 117000, pct: 100, color: '#3B82F6' },
-    ];
+    if (isDemoMode) {
+      return [
+        { name: 'Alimentación & Bebidas', value: 117000, pct: 100, color: '#3B82F6' },
+      ];
+    }
+
+    return [];
   }, [monthExpensesList, categoryColors, isDemoMode]);
 
-  // Últimos movimientos (con fallback idéntico al diseño de referencia)
+  // Últimos movimientos (con fallback solo para modo demo)
   const recentMovements = useMemo(() => {
     const list = (transactions || [])
       .filter(t => t.tipoTransaccion !== 'ingreso')
@@ -571,11 +579,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       return list;
     }
 
-    return [
-      { id: 'm1', title: 'División por mov. "gasté 117,000 en coto"', subtitle: '2026_09_18 · Alimentación & Bebidas', amount: 117000, emoji: '🛒' },
-      { id: 'm2', title: 'Alimentación & Bebidas', subtitle: '2026_09_06 · Alimentación & Bebidas', amount: 20000, emoji: '🍔' },
-      { id: 'm3', title: 'Farmacia & Salud', subtitle: '2026_09_02 · Salud', amount: 12300, emoji: '💊' },
-    ];
+    if (isDemoMode) {
+      return [
+        { id: 'm1', title: 'División por mov. "gasté 117,000 en coto"', subtitle: '2026_09_18 · Alimentación & Bebidas', amount: 117000, emoji: '🛒' },
+        { id: 'm2', title: 'Alimentación & Bebidas', subtitle: '2026_09_06 · Alimentación & Bebidas', amount: 20000, emoji: '🍔' },
+        { id: 'm3', title: 'Farmacia & Salud', subtitle: '2026_09_02 · Salud', amount: 12300, emoji: '💊' },
+      ];
+    }
+
+    return [];
   }, [transactions, isDemoMode]);
 
   // Math para el Ring del Hero Card (Diámetro ~110px)
@@ -977,7 +989,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </span>
           </button>
 
-          {/* Card 3: Balance Dúo (Rosa muy pálido #FFF1F5) */}
+          {/* Card 3: Cuenta compartida (Rosa muy pálido #FFF1F5) */}
           <button
             type="button"
             onClick={() => onNavigateTab?.('balance')}
@@ -990,11 +1002,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <ChevronRight className="w-2.5 h-2.5 text-rose-500 group-hover:translate-x-0.5 transition-transform" />
             </div>
             <span className="text-[10px] sm:text-[11px] font-bold text-[#29344D] leading-tight">
-              Balance Dúo
+              Cuenta compartida
             </span>
           </button>
 
-          {/* Card 4: Liquidar (Celeste muy pálido #F0F7FC) */}
+          {/* Card 4: Saldar deuda (Celeste muy pálido #F0F7FC) */}
           <button
             type="button"
             onClick={() => onNavigateTab?.('balance')}
@@ -1007,7 +1019,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <ChevronRight className="w-2.5 h-2.5 text-blue-500 group-hover:translate-x-0.5 transition-transform" />
             </div>
             <span className="text-[10px] sm:text-[11px] font-bold text-[#29344D] leading-tight">
-              Liquidar
+              Saldar deuda
             </span>
           </button>
         </div>
@@ -1038,40 +1050,55 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           )}
         </div>
 
-        <div className="divide-y divide-[#E9E4F2]">
-          {upcomingBills.map(bill => (
-            <div
-              key={bill.id}
-              onClick={() => onNavigateTab ? onNavigateTab('card_alerts') : {}}
-              className="py-1 sm:py-1.5 flex items-center justify-between gap-2.5 hover:bg-[#F7F3FC]/50 rounded-xl px-1 transition-colors cursor-pointer"
-            >
-              {/* Left: Icon, Title & Category */}
-              <div className="flex items-center gap-2 min-w-0">
-                <div className={`w-6.5 h-6.5 sm:w-7 sm:h-7 rounded-lg ${bill.bg} flex items-center justify-center text-xs flex-shrink-0 shadow-2xs`}>
-                  {bill.icon}
+        {upcomingBills.length === 0 ? (
+          <div className="py-3 text-center">
+            <p className="text-xs text-[#7C8498] font-medium">No tenés vencimientos pendientes</p>
+            {onNavigateTab && (
+              <button
+                type="button"
+                onClick={() => onNavigateTab('card_alerts')}
+                className="mt-1 text-[11px] font-semibold text-[#6A35E1] hover:underline cursor-pointer"
+              >
+                + Agregar vencimiento
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="divide-y divide-[#E9E4F2]">
+            {upcomingBills.map(bill => (
+              <div
+                key={bill.id}
+                onClick={() => onNavigateTab ? onNavigateTab('card_alerts') : {}}
+                className="py-1 sm:py-1.5 flex items-center justify-between gap-2.5 hover:bg-[#F7F3FC]/50 rounded-xl px-1 transition-colors cursor-pointer"
+              >
+                {/* Left: Icon, Title & Category */}
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className={`w-6.5 h-6.5 sm:w-7 sm:h-7 rounded-lg ${bill.bg} flex items-center justify-center text-xs flex-shrink-0 shadow-2xs`}>
+                    {bill.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-[13px] font-bold text-[#29344D] truncate">
+                      {bill.title}
+                    </p>
+                    <p className="text-[9px] sm:text-[10px] text-[#7C8498] font-medium truncate">
+                      {bill.cat}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-[13px] font-bold text-[#29344D] truncate">
-                    {bill.title}
-                  </p>
-                  <p className="text-[9px] sm:text-[10px] text-[#7C8498] font-medium truncate">
-                    {bill.cat}
-                  </p>
-                </div>
-              </div>
 
-              {/* Right: Amount & Date Pill */}
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="text-xs sm:text-[13px] font-black text-[#29344D] tabular-nums">
-                  {isBalanceHidden ? "$ •••••" : `$ ${bill.amount.toLocaleString('es-AR')}`}
-                </span>
-                <span className="px-1.5 py-0.2 rounded-md bg-[#F7F3FC] text-[#6A35E1] border border-[#E9E4F2] text-[9px] sm:text-[10px] font-bold tracking-tight">
-                  {bill.duePill}
-                </span>
+                {/* Right: Amount & Date Pill */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs sm:text-[13px] font-black text-[#29344D] tabular-nums">
+                    {isBalanceHidden ? "$ •••••" : `$ ${bill.amount.toLocaleString('es-AR')}`}
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded-md bg-[#F7F3FC] text-[#6A35E1] border border-[#E9E4F2] text-[9px] sm:text-[10px] font-bold tracking-tight">
+                    {bill.duePill}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
@@ -1258,32 +1285,47 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             )}
           </div>
 
-          <div className="divide-y divide-[#E9E4F2]">
-            {recentMovements.slice(0, 3).map((tx) => (
-              <div
-                key={tx.id}
-                onClick={() => onNavigateTab ? onNavigateTab('transactions') : {}}
-                className="py-1.5 sm:py-2 flex items-center justify-between gap-2.5 hover:bg-[#F7F3FC]/50 rounded-xl px-1 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-7.5 h-7.5 rounded-lg bg-orange-500/10 text-orange-600 flex items-center justify-center text-xs flex-shrink-0">
-                    {tx.emoji}
+          {recentMovements.length === 0 ? (
+            <div className="py-4 text-center">
+              <p className="text-xs text-[#7C8498] font-medium">No hay movimientos registrados</p>
+              {onNavigateTab && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateTab('transactions')}
+                  className="mt-1 text-[11px] font-semibold text-[#F95420] hover:underline cursor-pointer"
+                >
+                  + Cargar primer gasto
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="divide-y divide-[#E9E4F2]">
+              {recentMovements.slice(0, 3).map((tx) => (
+                <div
+                  key={tx.id}
+                  onClick={() => onNavigateTab ? onNavigateTab('transactions') : {}}
+                  className="py-1.5 sm:py-2 flex items-center justify-between gap-2.5 hover:bg-[#F7F3FC]/50 rounded-xl px-1 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7.5 h-7.5 rounded-lg bg-orange-500/10 text-orange-600 flex items-center justify-center text-xs flex-shrink-0">
+                      {tx.emoji}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-[#29344D] truncate">{tx.title}</p>
+                      <p className="text-[9px] text-[#7C8498] font-medium truncate">{tx.subtitle}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-[#29344D] truncate">{tx.title}</p>
-                    <p className="text-[9px] text-[#7C8498] font-medium truncate">{tx.subtitle}</p>
-                  </div>
-                </div>
 
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <span className="text-xs font-black text-[#F95420] tabular-nums">
-                    - ${tx.amount.toLocaleString('es-AR')}
-                  </span>
-                  <ChevronRight className="w-3 h-3 text-[#7C8498]" />
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <span className="text-xs font-black text-[#F95420] tabular-nums">
+                      - ${tx.amount.toLocaleString('es-AR')}
+                    </span>
+                    <ChevronRight className="w-3 h-3 text-[#7C8498]" />
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

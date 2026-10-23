@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   Bell, BellRing, Building2, Calendar, CalendarClock, CalendarPlus, Check,
   CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock, Copy,
-  CreditCard, Download, Droplets, Edit3, ExternalLink, FileText, Flame, HeartPulse, Home, Landmark,
+  CreditCard, Download, Droplets, Edit3, ExternalLink, FileText, Flame, HeartPulse, History, Home, Landmark,
   Layers, LayoutGrid, MoreHorizontal, Plus, Search, SlidersHorizontal, Trash2, Tv, Wifi, X, Zap, Volume2, AlertTriangle, Sparkles, Star
 } from 'lucide-react';
 import { CoupleProfile, Transaction } from '../types';
@@ -38,6 +38,7 @@ export interface DueAlertItem {
   reminderDaysBeforeClose?: number;
   notes?: string;
   paidThisMonth?: boolean;
+  paidMonth?: string; // YYYY-MM for automatic monthly reset
   paidAt?: number;
   lastSyncedAt?: number;
 }
@@ -139,10 +140,35 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   const currentDay = now.getDate();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
+  const currentMonthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+
+  // Reinicio automático mensual de vencimientos recurrentes al comenzar un nuevo mes
+  useEffect(() => {
+    setItems((prev) => {
+      let changed = false;
+      const next = prev.map((it) => {
+        if (it.paidThisMonth && it.paidMonth && it.paidMonth !== currentMonthKey) {
+          changed = true;
+          return { ...it, paidThisMonth: false, paidAt: undefined, paidMonth: undefined };
+        }
+        return it;
+      });
+      if (changed) {
+        try {
+          localStorage.setItem('gastoar_vencimientos_alerts_v5', JSON.stringify(next));
+        } catch {}
+        return next;
+      }
+      return prev;
+    });
+  }, [currentMonthKey]);
 
   const [activeView, setActiveView] = useState<'proximos' | 'mes' | 'pagados' | 'todos' | 'calendario'>('proximos');
   const [urgencyFilter, setUrgencyFilter] = useState<'all' | 'week' | 'month' | 'next'>('all');
   const [promptPayItem, setPromptPayItem] = useState<DueAlertItem | null>(null);
+  const [payAmountInput, setPayAmountInput] = useState<string>('');
+  const [payScopeInput, setPayScopeInput] = useState<'individual' | 'pareja'>('individual');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [templateFrequency, setTemplateFrequency] = useState<Record<string, number>>(() => {
     try {
       const saved = localStorage.getItem('gastoar_vencimientos_tpl_freq');
@@ -329,24 +355,106 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   };
 
   const togglePaid = (id: string) => {
+    const target = items.find((i) => i.id === id);
+    if (!target) return;
+    if (target.paidThisMonth) {
+      saveItems(
+        items.map((i) =>
+          i.id === id
+            ? { ...i, paidThisMonth: false, paidAt: undefined, paidMonth: undefined }
+            : i
+        )
+      );
+      onShowToast('Vencimiento marcado nuevamente como pendiente', 'info');
+      return;
+    }
+
+    if (onSaveTransaction) {
+      setPromptPayItem(target);
+      setPayAmountInput(target.estimatedAmount ? String(target.estimatedAmount) : '');
+      setPayScopeInput(target.category === 'alquiler' || target.category === 'expensas' ? 'pareja' : 'individual');
+      return;
+    }
+
     saveItems(
-      items.map(i => i.id === id ? { ...i, paidThisMonth: !i.paidThisMonth, paidAt: !i.paidThisMonth ? Date.now() : undefined } : i)
+      items.map((i) =>
+        i.id === id
+          ? { ...i, paidThisMonth: true, paidAt: Date.now(), paidMonth: currentMonthKey }
+          : i
+      )
     );
-    onShowToast('Estado actualizado', 'info');
+    onShowToast('Vencimiento marcado como pagado', 'success');
   };
 
-  const deleteItem = (id: string, name: string) => {
-    if (confirm(`¿Eliminar el vencimiento "${name}"?`)) {
-      saveItems(items.filter(i => i.id !== id));
-      onShowToast('Vencimiento eliminado', 'info');
+  const confirmMarkPaid = (recordInMovimientos: boolean) => {
+    if (!promptPayItem) return;
+    const finalAmt = parseFloat(payAmountInput.replace(',', '.')) || promptPayItem.estimatedAmount || 0;
+    saveItems(
+      items.map((i) =>
+        i.id === promptPayItem.id
+          ? {
+              ...i,
+              estimatedAmount: finalAmt > 0 ? finalAmt : i.estimatedAmount,
+              paidThisMonth: true,
+              paidAt: Date.now(),
+              paidMonth: currentMonthKey,
+            }
+          : i
+      )
+    );
+
+    if (recordInMovimientos && onSaveTransaction && finalAmt > 0) {
+      const catMapByAlert: Record<AlertItemCategory, string> = {
+        tarjeta: 'Tarjetas',
+        alquiler: 'Hogar',
+        expensas: 'Hogar',
+        servicio: 'Servicios',
+        impuesto: 'Impuestos',
+        suscripcion: 'Suscripciones',
+        salud: 'Salud',
+        otro: 'Otros',
+      };
+      onSaveTransaction({
+        concepto: `Pago ${promptPayItem.name}${promptPayItem.provider ? ` (${promptPayItem.provider})` : ''}`,
+        monto: finalAmt,
+        moneda: profile.currency || 'ARS',
+        categoria: catMapByAlert[promptPayItem.category] || 'Servicios',
+        subcategoria: CATEGORY_META[promptPayItem.category]?.label || 'General',
+        fecha: new Date().toISOString().split('T')[0],
+        tipo: payScopeInput,
+        tipoTransaccion: 'gasto',
+        pagadoPor: profile.currentUser || 'user1',
+        splitType: payScopeInput === 'pareja' ? profile.defaultSplit : undefined,
+        metodoPago: promptPayItem.autoDebit ? 'Débito' : 'Transferencia',
+      });
+      onShowToast(`Pagado y registrado en Movimientos ($${finalAmt.toLocaleString('es-AR')})`, 'success');
+    } else {
+      onShowToast('Vencimiento marcado como pagado', 'success');
     }
+
+    setPromptPayItem(null);
+  };
+
+  const deleteItem = (id: string) => {
+    saveItems(items.filter(i => i.id !== id));
+    setConfirmDeleteId(null);
+    onShowToast('Vencimiento eliminado', 'info');
   };
 
   const toggleNotifications = async () => {
     const res = await requestNotificationPermission();
     if (res === 'granted') {
       setNotificationsEnabled(true);
+      localStorage.setItem('gastoar_vencimientos_notif_v1', 'true');
       playNotificationSound();
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SHOW_NOTIFICATION',
+          title: 'Alertas de GastoAR activadas',
+          body: 'Te avisaremos antes de que venzan tus servicios y tarjetas.',
+          url: '/vencimientos',
+        });
+      }
       onShowToast('¡Servicio de notificaciones a menos de 48 hs activado!', 'success');
       // Trigger evaluation immediately
       checkAndNotifyVencimientos([], items, {
@@ -398,6 +506,12 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
       paidAmount: paid.reduce((s, i) => s + (i.estimatedAmount || 0), 0)
     };
   }, [items, currentDay]);
+
+  // Calculations for Hero Balance Card (Matching Gastos en Cuotas / Movimientos style)
+  const totalCommitted = stats.pendingAmount + stats.paidAmount;
+  const percentPaid = totalCommitted > 0 
+    ? Math.min(100, Math.max(0, Math.round((stats.paidAmount / totalCommitted) * 100))) 
+    : (items.length > 0 && stats.pendingCount === 0 ? 100 : 0);
 
   // Totales de gastos/compromisos por categoría para el carrusel
   const categoryTotals = useMemo(() => {
@@ -847,14 +961,33 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>Editar</span>
               </button>
-              <button
-                type="button"
-                onClick={() => deleteItem(item.id, item.name)}
-                className="px-3 py-2.5 rounded-xl border border-rose-100 text-rose-600 hover:bg-rose-50 text-xs font-bold cursor-pointer flex items-center justify-center gap-1 active:scale-95"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Eliminar</span>
-              </button>
+              {confirmDeleteId === item.id ? (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => deleteItem(item.id)}
+                    className="px-3 py-2.5 rounded-xl bg-rose-600 text-white text-xs font-bold cursor-pointer"
+                  >
+                    Confirmar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteId(null)}
+                    className="px-2.5 py-2.5 rounded-xl border border-slate-200 text-slate-500 text-xs font-bold cursor-pointer"
+                  >
+                    No
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteId(item.id)}
+                  className="px-3 py-2.5 rounded-xl border border-rose-100 text-rose-600 hover:bg-rose-50 text-xs font-bold cursor-pointer flex items-center justify-center gap-1 active:scale-95"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Eliminar</span>
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -1000,143 +1133,89 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
   };
 
   return (
-    <div className="space-y-4 max-w-xl mx-auto pb-28 sm:pb-8">
-      {/* 1. Header Card (Hero) */}
-      <section
-        style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
-        className="text-white rounded-3xl p-3 sm:p-5 shadow-xl border border-purple-300/30 space-y-2.5 sm:space-y-3.5 relative overflow-hidden"
-      >
-        {/* Ambient decorative glow */}
-        <div className="absolute -right-8 -top-8 w-36 h-36 bg-[#F95420]/20 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute -left-8 -bottom-8 w-36 h-36 bg-pink-400/20 rounded-full blur-2xl pointer-events-none" />
-
-        {/* Top row: Icon + Title + Subtitle */}
-        <div className="relative z-10 flex items-center gap-2.5 sm:gap-3">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/15 border border-white/25 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-xs">
-            <div className="relative">
-              <CalendarClock className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-[#F95420] rounded-full ring-2 ring-[#7C3AED]" />
-            </div>
-          </div>
-          <div>
-            <h1 className="text-lg sm:text-2xl font-black text-white tracking-tight leading-tight">Vencimientos</h1>
-            <p className="text-xs text-purple-100 font-normal mt-0.5">Organizá tus pagos y evitá recargos.</p>
-          </div>
+    <div className="space-y-4 max-w-4xl mx-auto pb-28 sm:pb-8 font-sans">
+      {/* 1. Header: Section title + Actions (Estilo idéntico a Gastos en Cuotas / Resumen) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+        <div>
+          <p className="text-sm text-gray-400">Servicios & Tarjetas</p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Vencimientos</h1>
         </div>
 
-        {/* Second row: Avisos, Calendario, Google Cal, Apple Cal, Exportar .ics & Flujo Pro pills */}
-        <div className={`relative z-10 grid ${onOpenCashFlow ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'} gap-1.5 sm:gap-2`}>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={toggleNotifications}
-              className={`flex-1 py-2 px-2 sm:py-2.5 sm:px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 ${
-                notificationsEnabled 
-                  ? 'border-white/40 bg-white/25 text-white shadow-xs' 
-                  : 'border-white/20 bg-white/10 text-white hover:bg-white/15'
-              }`}
-            >
-              {notificationsEnabled ? <BellRing className="w-3.5 h-3.5 text-[#FFA785]" /> : <Bell className="w-3.5 h-3.5 text-purple-100" />}
-              <span className="truncate">{notificationsEnabled ? 'Avisos (<48h)' : 'Avisos'}</span>
-            </button>
-            {notificationsEnabled && (
-              <button
-                type="button"
-                onClick={handleTestNotification}
-                className="py-2 px-2 sm:py-2.5 sm:px-2 rounded-xl border border-white/20 bg-white/10 text-white hover:bg-white/20 text-xs font-bold flex items-center justify-center shrink-0 cursor-pointer active:scale-95"
-                title="Probar sonido y notificación local de 48 hs"
-              >
-                <Volume2 className="w-3.5 h-3.5 text-amber-200" />
-              </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={toggleNotifications}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95 ${
+              notificationsEnabled
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-slate-200 bg-white hover:bg-purple-50/50 text-slate-700'
+            }`}
+            title="Activar recordatorios automáticos en tu dispositivo"
+          >
+            {notificationsEnabled ? (
+              <BellRing className="w-3.5 h-3.5 text-emerald-600" />
+            ) : (
+              <Bell className="w-3.5 h-3.5 text-slate-500" />
             )}
-          </div>
+            <span>{notificationsEnabled ? 'Alertas activas' : 'Activar alertas'}</span>
+          </button>
 
           <button
             type="button"
             onClick={() => setActiveView(activeView === 'calendario' ? 'proximos' : 'calendario')}
-            className={`py-2 px-2 sm:py-2.5 sm:px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
-              activeView === 'calendario'
-                ? 'border-white/50 bg-white/30 text-white shadow-xs'
-                : 'border-white/20 bg-white/10 text-white hover:bg-white/15'
-            }`}
+            className="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-purple-50/50 text-slate-700 hover:text-[#6F2EC5] transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+            title="Ver vista calendario mensual o lista de vencimientos"
           >
-            <Calendar className="w-3.5 h-3.5 text-white" />
-            <span className="truncate">Calendario</span>
+            <History className="w-3.5 h-3.5 text-slate-500" />
+            <span>{activeView === 'calendario' ? 'Ver Lista' : 'Calendario'}</span>
           </button>
 
-          {/* Sincronizar Google Calendar */}
           <button
             type="button"
-            onClick={() => setIsGoogleCalendarModalOpen(true)}
-            className="py-2 px-2 sm:py-2.5 sm:px-2.5 rounded-xl border border-blue-300/40 bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs"
-            title="Sincronizar pagos con Google Calendar automáticamente"
+            onClick={() => openCreate()}
+            className="px-4 py-2 rounded-xl text-xs font-bold text-white transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 bg-[#6936F5] hover:bg-[#5b2bd9]"
           >
-            <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 40 40">
-              <rect width="40" height="40" rx="8" fill="#FFFFFF"/>
-              <path d="M28 8H12C9.79 8 8 9.79 8 12V28C8 30.21 9.79 32 12 32H28C30.21 32 32 30.21 32 28V12C32 9.79 30.21 8 28 8Z" fill="#FFFFFF"/>
-              <path d="M28 8H12C9.79 8 8 9.79 8 12V15H32V12C32 9.79 30.21 8 28 8Z" fill="#1A73E8"/>
-              <circle cx="13" cy="11.5" r="1.5" fill="#FFFFFF"/>
-              <circle cx="27" cy="11.5" r="1.5" fill="#FFFFFF"/>
-              <text x="20" y="26" fontSize="11" fontWeight="900" fill="#1A73E8" textAnchor="middle" fontFamily="sans-serif">
-                31
-              </text>
-            </svg>
-            <span className="truncate">Google Cal</span>
-            {stats.pendingCount > 0 && (
-              <span className="px-1.5 py-0.2 bg-blue-400/40 text-blue-100 rounded-md text-[10px] font-black">
-                {stats.pendingCount}
-              </span>
-            )}
+            <Plus className="w-4 h-4" />
+            <span>Nuevo Vencimiento</span>
           </button>
-
-          {/* Apple Calendar (iOS) */}
-          <button
-            type="button"
-            onClick={() => setIsAppleCalendarModalOpen(true)}
-            className="py-2 px-2 sm:py-2.5 sm:px-2.5 rounded-xl border border-rose-300/40 bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs"
-            title="Sincronizar con Apple Calendar (iPhone / iPad / Mac)"
-          >
-            <div className="w-3.5 h-3.5 rounded bg-white flex flex-col items-center justify-center overflow-hidden shrink-0">
-              <div className="w-full bg-[#FF3B30] text-[4px] leading-none py-0.2" />
-              <span className="text-[7px] font-black text-slate-900 leading-none">{new Date().getDate()}</span>
-            </div>
-            <span className="truncate">Apple Cal</span>
-          </button>
-
-          {/* Exportar a Calendar (.ics) */}
-          <button
-            type="button"
-            onClick={() => setIsCalendarExportModalOpen(true)}
-            className="py-2 px-2 sm:py-2.5 sm:px-2.5 rounded-xl border border-amber-300/40 bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs"
-            title="Exportar pagos pendientes a un archivo .ics para Google Calendar o Apple Calendar"
-          >
-            <CalendarPlus className="w-3.5 h-3.5 text-amber-200" />
-            <span className="truncate">Exportar .ics</span>
-          </button>
-
-          {onOpenCashFlow && (
-            <button
-              type="button"
-              onClick={onOpenCashFlow}
-              className="py-2 px-2 sm:py-2.5 sm:px-2 rounded-xl border border-purple-200/40 bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
-              title="Proyección de Flujo de Caja Pro"
-            >
-              <span className="text-amber-200">🔮</span>
-              <span className="truncate">Flujo Pro</span>
-            </button>
-          )}
         </div>
+      </div>
 
-        {/* Third row: Full-width vibrant orange button */}
-        <button
-          type="button"
-          onClick={() => openCreate()}
-          className="relative z-10 w-full py-2.5 sm:py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#F95420] via-[#FF6B3D] to-[#FA541C] hover:from-[#E04412] hover:to-[#F95420] text-white text-xs sm:text-sm font-black flex items-center justify-center gap-2 shadow-md shadow-orange-500/20 active:scale-[0.98] transition-all cursor-pointer"
-        >
-          <Plus className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
-          <span>Nuevo vencimiento</span>
-        </button>
-      </section>
+      {/* 2. Hero Balance Card (Estilo Resumen: Saldo por pagar & % Pagado con linear-gradient) */}
+      <div
+        style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
+        className="text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-purple-300/30 relative overflow-hidden"
+      >
+        <div className="w-full">
+          <p className="text-xs sm:text-sm font-medium text-white/80 mb-1.5 tracking-wide">
+            Saldo total por pagar
+          </p>
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-[32px] sm:text-4xl font-black font-outfit text-white tracking-tight leading-none truncate">
+              {formatCurrency(stats.pendingAmount, profile.currency)}
+            </h2>
+          </div>
+          <div className="h-1 rounded-full overflow-hidden mb-2.5 bg-white/20">
+            <div
+              className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#FFA234] via-[#F97316] to-[#F95420]"
+              style={{ 
+                width: `${Math.min(100, Math.max(stats.paidAmount > 0 ? 5 : 0, percentPaid))}%`, 
+              }}
+            />
+          </div>
+          <div className="flex items-center gap-2 text-xs text-white/80 flex-wrap">
+            <span>Total a pagar:{" "}
+              <span className="font-semibold text-white">{formatCurrency(totalCommitted, profile.currency)}</span>
+            </span>
+            <span>•</span>
+            <span>Pagado:{" "}
+              <span className="font-semibold text-emerald-300">{formatCurrency(stats.paidAmount, profile.currency)}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+
 
       {/* 2. Status Filter Pills */}
       <section className="flex items-center gap-2 overflow-x-auto scrollbar-none py-0.5">
@@ -1290,347 +1369,86 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
             </div>
           </section>
 
-          {/* 5. SEARCH BAR & ACTIVE FILTERS (Req 1 & Req 2: feedback de resultados y filtros) */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          {/* 5. REDUCED COMPACT FILTER BAR (Estilo idéntico a la solapa compartida / image_4fc71c01.png) */}
+          <section className="bg-white rounded-3xl p-3.5 sm:p-4 shadow-xs border border-slate-200/80">
+            <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 items-stretch sm:items-center justify-between">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
+                  placeholder="Buscar vencimientos o servicios..."
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  placeholder="Buscar vencimiento por nombre, proveedor o código..."
-                  className="w-full pl-10 pr-24 py-3 rounded-2xl bg-white border border-slate-200/90 text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-purple-200 focus:border-[#7928CA] transition-all shadow-2xs"
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
                 />
-                <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-                  {isSearchFiltered && (
-                    <>
-                      <span className={`text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-full ${
-                        filteredItems.length > 0 
-                          ? 'bg-purple-100 text-[#7928CA]' 
-                          : 'bg-rose-100 text-rose-700'
-                      }`}>
-                        {filteredItems.length}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setSearchTerm('')}
-                        className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                        title="Borrar búsqueda"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className={`p-3 border rounded-2xl transition-all cursor-pointer shadow-2xs shrink-0 flex items-center gap-1.5 ${
-                  activeFiltersCount > 0 
-                    ? 'bg-purple-50 border-purple-300 text-[#7928CA]' 
-                    : 'bg-white hover:bg-purple-50 border-slate-200/90 hover:border-purple-200 text-slate-600 hover:text-[#7928CA]'
-                }`}
-                title="Restablecer filtros"
-              >
-                <SlidersHorizontal className="w-4 h-4" />
-                {activeFiltersCount > 0 && (
-                  <span className="w-4 h-4 rounded-full bg-[#7928CA] text-white text-[9px] font-black flex items-center justify-center">
-                    {activeFiltersCount}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {/* Active search / filters feedback strip */}
-            {activeFiltersCount > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                {isSearchFiltered && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-[#7928CA] border border-purple-200 text-[11px] font-bold shadow-2xs">
-                    <span>Buscar: «{searchTerm}» ({filteredItems.length})</span>
-                    <button type="button" onClick={() => setSearchTerm('')} className="hover:text-purple-900 cursor-pointer ml-0.5">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-                {isDateFiltered && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-[#7928CA] border border-purple-200 text-[11px] font-bold shadow-2xs">
-                    <span>Plazo: {getDateFilterLabel()}</span>
-                    <button type="button" onClick={() => setDateFilter('all')} className="hover:text-purple-900 cursor-pointer ml-0.5">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-                {isModeFiltered && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-[#7928CA] border border-purple-200 text-[11px] font-bold shadow-2xs">
-                    <span>Modo: {getModeFilterLabel()}</span>
-                    <button type="button" onClick={() => setModeFilter('all')} className="hover:text-purple-900 cursor-pointer ml-0.5">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-                {isCategoryFiltered && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-[#7928CA] border border-purple-200 text-[11px] font-bold shadow-2xs">
-                    <span>Categoría: {getCategoryFilterLabel()}</span>
-                    <button type="button" onClick={() => setCategoryFilter('all')} className="hover:text-purple-900 cursor-pointer ml-0.5">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* 3 Dropdown Filter Pills (Responsive on mobile: grid-cols-1 sm:grid-cols-3) */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              
-              {/* Pill 1: Plazo / Fecha */}
-              <div className="relative">
-                <div className={`w-full border rounded-2xl p-2.5 flex items-center justify-between gap-2.5 transition-all text-left cursor-pointer group shadow-2xs relative ${
-                  isDateFiltered 
-                    ? 'bg-purple-50/70 border-[#7928CA] ring-1 ring-purple-400/30' 
-                    : 'bg-white hover:bg-purple-50/50 border-slate-200/90 hover:border-purple-300'
-                }`}>
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                      isDateFiltered ? 'bg-[#7928CA] text-white shadow-2xs' : 'bg-purple-100/70 text-[#7928CA]'
-                    }`}>
-                      <CalendarClock className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="block text-[10px] font-medium text-slate-400 leading-tight">
-                          Plazo
-                        </span>
-                        {isDateFiltered && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#7928CA]" />
-                        )}
-                      </div>
-                      <span className={`block text-xs font-bold leading-tight truncate transition-colors ${
-                        isDateFiltered ? 'text-[#7928CA]' : 'text-slate-800 group-hover:text-[#7928CA]'
-                      }`}>
-                        {getDateFilterLabel()}
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-
-                  {/* Invisible native select over pill */}
-                  <select
-                    value={dateFilter}
-                    onChange={(e) => setDateFilter(e.target.value as any)}
-                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                    title="Filtrar por plazo o vencimiento"
-                  >
-                    <option value="all">Plazo: Todos los plazos</option>
-                    <option value="week">Plazo: Próximos 7 días (Urgente)</option>
-                    <option value="this_month">Plazo: Este mes</option>
-                    <option value="next_month">Plazo: Próximo mes</option>
-                    <option value="overdue">Plazo: Vencidos</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Pill 2: Modo de Pago */}
-              <div className="relative">
-                <div className={`w-full border rounded-2xl p-2.5 flex items-center justify-between gap-2.5 transition-all text-left cursor-pointer group shadow-2xs relative ${
-                  isModeFiltered 
-                    ? 'bg-purple-50/70 border-[#7928CA] ring-1 ring-purple-400/30' 
-                    : 'bg-white hover:bg-purple-50/50 border-slate-200/90 hover:border-purple-300'
-                }`}>
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                      isModeFiltered ? 'bg-[#7928CA] text-white shadow-2xs' : 'bg-purple-100/70 text-[#7928CA]'
-                    }`}>
-                      <CreditCard className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="block text-[10px] font-medium text-slate-400 leading-tight">
-                          Modo
-                        </span>
-                        {isModeFiltered && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#7928CA]" />
-                        )}
-                      </div>
-                      <span className={`block text-xs font-bold leading-tight truncate transition-colors ${
-                        isModeFiltered ? 'text-[#7928CA]' : 'text-slate-800 group-hover:text-[#7928CA]'
-                      }`}>
-                        {getModeFilterLabel()}
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-
-                  {/* Invisible native select over pill */}
-                  <select
-                    value={modeFilter}
-                    onChange={(e) => setModeFilter(e.target.value as any)}
-                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                    title="Filtrar por modo de pago"
-                  >
-                    <option value="all">Modo: Todos los modos</option>
-                    <option value="auto">Modo: Débito automático</option>
-                    <option value="manual">Modo: Pago manual / Transferencia</option>
-                    <option value="tarjeta">Modo: Tarjeta de crédito</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Pill 3: Categoría */}
-              <div className="relative">
-                <div className={`w-full border rounded-2xl p-2.5 flex items-center justify-between gap-2.5 transition-all text-left cursor-pointer group shadow-2xs relative ${
-                  isCategoryFiltered 
-                    ? 'bg-purple-50/70 border-[#7928CA] ring-1 ring-purple-400/30' 
-                    : 'bg-white hover:bg-purple-50/50 border-slate-200/90 hover:border-purple-300'
-                }`}>
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                      isCategoryFiltered ? 'bg-[#7928CA] text-white shadow-2xs' : 'bg-purple-100/70 text-[#7928CA]'
-                    }`}>
-                      <LayoutGrid className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="block text-[10px] font-medium text-slate-400 leading-tight">
-                          Categoría
-                        </span>
-                        {isCategoryFiltered && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#7928CA]" />
-                        )}
-                      </div>
-                      <span className={`block text-xs font-bold leading-tight truncate transition-colors ${
-                        isCategoryFiltered ? 'text-[#7928CA]' : 'text-slate-800 group-hover:text-[#7928CA]'
-                      }`}>
-                        {getCategoryFilterLabel()}
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-
-                  {/* Invisible native select over pill */}
-                  <select
-                    value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value as any)}
-                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                    title="Filtrar por categoría"
-                  >
-                    <option value="all">Todas las Categorías</option>
-                    {carouselCategories.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {CATEGORY_META[cat]?.label} {categoryTotals[cat] ? `(${formatCurrency(categoryTotals[cat] || 0, profile.currency)})` : ''}
-                      </option>
-                    ))}
-                    {(Object.keys(CATEGORY_META) as AlertItemCategory[])
-                      .filter(c => !carouselCategories.includes(c))
-                      .map((cat) => (
-                        <option key={cat} value={cat}>{CATEGORY_META[cat]?.label}</option>
-                      ))}
-                  </select>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          {/* 6. CATEGORÍAS CAROUSEL (Req 3: sin ruido de $0, solo con montos activos) */}
-          <div className="space-y-3 pt-1">
-            <div className="flex items-center justify-between px-1">
-              <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                Categorías de vencimientos
-              </h3>
-              <button
-                type="button"
-                onClick={() => setCategoryFilter('all')}
-                className="text-xs sm:text-sm font-bold text-[#7928CA] hover:text-[#5B21B6] hover:underline flex items-center gap-1 cursor-pointer transition-colors"
-              >
-                <span>Ver todas</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Category Cards Carousel (Sized to fit exactly 4 cards on mobile view) */}
-            <div 
-              ref={carouselRef}
-              onScroll={handleCarouselScroll}
-              className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-none px-0.5 sm:px-1 snap-x snap-mandatory scroll-smooth"
-            >
-              {/* 1. TODAS Card */}
-              <button
-                type="button"
-                onClick={() => setCategoryFilter('all')}
-                className={`flex flex-col items-center justify-center p-1.5 sm:p-3 rounded-2xl transition-all cursor-pointer shrink-0 snap-start w-[calc((100%-24px)/4)] min-w-[68px] sm:w-auto sm:min-w-[96px] border ${
-                  categoryFilter === 'all'
-                    ? 'bg-purple-50/80 border-[#7928CA] shadow-xs'
-                    : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/50 shadow-2xs'
-                }`}
-              >
-                <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center mb-1 sm:mb-1.5 transition-all shrink-0 ${
-                  categoryFilter === 'all'
-                    ? 'bg-[#7928CA] text-white shadow-xs'
-                    : 'bg-purple-100/70 text-[#7928CA]'
-                }`}>
-                  <Layers className="w-4 h-4 sm:w-6 sm:h-6" />
-                </div>
-                <span className={`text-[10px] sm:text-xs font-bold truncate w-full text-center tracking-tight ${categoryFilter === 'all' ? 'text-[#7928CA]' : 'text-slate-800'}`}>
-                  Todas
-                </span>
-                <span className={`text-[9px] sm:text-[11px] font-bold mt-0.5 truncate w-full text-center ${categoryFilter === 'all' ? 'text-[#7928CA]' : 'text-slate-500'}`}>
-                  {formatCurrency(totalFilteredAmount, profile.currency)}
-                </span>
-              </button>
-
-              {/* Dynamic Category Cards (Eliminando las que tengan $0) */}
-              {carouselCategories.map((catKey) => {
-                const meta = CATEGORY_META[catKey];
-                if (!meta) return null;
-                const Icon = meta.Icon;
-                const isSelected = categoryFilter === catKey;
-                const catAmount = categoryTotals[catKey] || 0;
-
-                return (
+                {searchTerm && (
                   <button
-                    key={catKey}
                     type="button"
-                    onClick={() => setCategoryFilter(isSelected ? 'all' : catKey)}
-                    className={`flex flex-col items-center justify-center p-1.5 sm:p-3 rounded-2xl transition-all cursor-pointer shrink-0 snap-start w-[calc((100%-24px)/4)] min-w-[68px] sm:w-auto sm:min-w-[96px] border ${
-                      isSelected 
-                        ? 'bg-purple-50/80 border-[#7928CA] shadow-xs' 
-                        : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/50 shadow-2xs'
-                    }`}
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                    title="Limpiar búsqueda"
                   >
-                    <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center mb-1 sm:mb-1.5 transition-all border shrink-0 ${meta.soft} ${meta.text} ${meta.border} shadow-2xs`}>
-                      <Icon className="w-4 h-4 sm:w-6 sm:h-6" />
-                    </div>
-                    <span className={`text-[10px] sm:text-xs font-bold truncate w-full text-center tracking-tight ${isSelected ? 'text-[#7928CA]' : 'text-slate-800'}`}>
-                      {meta.label}
-                    </span>
-                    <span className={`text-[9px] sm:text-[11px] font-bold mt-0.5 truncate w-full text-center ${isSelected ? 'text-[#7928CA]' : 'text-slate-500'}`}>
-                      {formatCurrency(catAmount, profile.currency)}
-                    </span>
+                    <X className="w-3.5 h-3.5" />
                   </button>
-                );
-              })}
-            </div>
+                )}
+              </div>
 
-            {/* Carousel Slider Indicator (Matching TransactionsTable) */}
-            <div className="flex items-center justify-center gap-1.5 pt-1">
-              {Array.from({ length: Math.max(3, Math.ceil((1 + carouselCategories.length) / 4)) }).map((_, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => scrollToCarouselPage(idx)}
-                  className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                    activeCarouselPage === idx 
-                      ? 'w-7 sm:w-8 bg-[#7928CA]' 
-                      : 'w-3.5 sm:w-5 bg-slate-200 hover:bg-slate-300'
-                  }`}
-                  aria-label={`Página ${idx + 1}`}
-                />
-              ))}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Plazo Dropdown */}
+                <select
+                  value={dateFilter}
+                  onChange={e => setDateFilter(e.target.value as any)}
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-400 cursor-pointer"
+                >
+                  <option value="all">Plazo: Todos</option>
+                  <option value="week">Próximos 7 días</option>
+                  <option value="this_month">Este mes</option>
+                  <option value="next_month">Próximo mes</option>
+                  <option value="overdue">Vencidos</option>
+                </select>
+
+                {/* Categorías Dropdown */}
+                <select
+                  value={categoryFilter}
+                  onChange={e => setCategoryFilter(e.target.value as any)}
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-400 cursor-pointer"
+                >
+                  <option value="all">Todas las categorías</option>
+                  {(Object.keys(CATEGORY_META) as AlertItemCategory[]).map(cat => (
+                    <option key={cat} value={cat}>
+                      {CATEGORY_META[cat]?.label || cat}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Modo Dropdown */}
+                <select
+                  value={modeFilter}
+                  onChange={e => setModeFilter(e.target.value as any)}
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-400 cursor-pointer"
+                >
+                  <option value="all">Modo: Todos</option>
+                  <option value="auto">Débito automático</option>
+                  <option value="manual">Pago manual</option>
+                  <option value="tarjeta">Tarjeta de crédito</option>
+                </select>
+
+                {/* Reset button if active */}
+                {activeFiltersCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="px-2.5 py-2 rounded-xl text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200/60 transition-all cursor-pointer"
+                    title="Restablecer filtros"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          </section>
+
+
 
           {/* Calendar Sync Banner */}
           {stats.pendingCount > 0 && activeView !== 'pagados' && (
@@ -2169,6 +1987,94 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({
         currency={profile.currency}
         onShowToast={onShowToast}
       />
+
+      {/* 1-Click Vencimiento -> Movimiento Payment Confirmation Modal */}
+      {promptPayItem && (
+        <div className="fixed inset-0 z-50 bg-slate-900/55 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  Confirmar pago de {promptPayItem.name}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Podés descontarlo también en Movimientos con 1 toque
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPromptPayItem(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Importe final abonado ({profile.currency || 'ARS'})
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  value={payAmountInput}
+                  onChange={(e) => setPayAmountInput(e.target.value)}
+                  placeholder="0"
+                  className="w-full px-3.5 py-2.5 text-sm font-bold rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Ámbito si se registra en Movimientos
+                </label>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setPayScopeInput('individual')}
+                    className={`py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                      payScopeInput === 'individual'
+                        ? 'bg-white text-[#6936F5] shadow-2xs'
+                        : 'text-slate-600'
+                    }`}
+                  >
+                    Personal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPayScopeInput('pareja')}
+                    className={`py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                      payScopeInput === 'pareja'
+                        ? 'bg-white text-[#F95420] shadow-2xs'
+                        : 'text-slate-600'
+                    }`}
+                  >
+                    Compartido
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => confirmMarkPaid(true)}
+                className="w-full py-2.5 px-4 rounded-xl bg-[#6936F5] hover:bg-[#5b2bd9] text-white text-xs sm:text-sm font-bold shadow-sm cursor-pointer"
+              >
+                Marcar pagado + Registrar en Movimientos
+              </button>
+              <button
+                type="button"
+                onClick={() => confirmMarkPaid(false)}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold cursor-pointer"
+              >
+                Solo marcar como pagado aquí
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

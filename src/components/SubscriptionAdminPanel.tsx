@@ -821,7 +821,7 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
         a.email,
         a.phone || '',
         a.accountCode,
-        a.accountType === 'pareja' ? 'Parejas Duo' : 'Individual',
+        a.accountType === 'pareja' ? 'Compartido' : 'Personal',
         `"${a.partnerName || ''}"`,
         `"${a.selectedPlanId}"`,
         a.status,
@@ -940,14 +940,14 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-pink-100 text-pink-800 border border-pink-200">
             <Users className="w-3.5 h-3.5 text-pink-600" />
-            <span>Parejas Dúo</span>
+            <span>Compartido</span>
           </span>
         );
       case 'individual':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">
             <UserCheck className="w-3.5 h-3.5 text-sky-600" />
-            <span>Individual</span>
+            <span>Personal</span>
           </span>
         );
       default:
@@ -1126,7 +1126,7 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
               </div>
               <div className="text-2xl font-black text-slate-900 flex items-center gap-2">
                 <span>{accountStats.couple}</span>
-                <span className="text-xs font-semibold text-slate-400">Parejas Dúo • {accountStats.individual} Indiv.</span>
+                <span className="text-xs font-semibold text-slate-400">Compartido • {accountStats.individual} Personal</span>
               </div>
               <div className="text-[11px] text-slate-500">
                 {accountStats.couple > 0 ? `${Math.round((accountStats.couple / (accountStats.total || 1)) * 100)}% usan finanzas compartidas` : 'Modalidad de uso'}
@@ -1192,8 +1192,8 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
                   className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="all">Todas las modalidades</option>
-                  <option value="individual">Solo Individual</option>
-                  <option value="pareja">Solo Parejas Dúo</option>
+                  <option value="individual">Solo Personal</option>
+                  <option value="pareja">Solo Compartido</option>
                 </select>
 
                 {/* Plan Selector */}
@@ -1203,8 +1203,8 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
                   className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="all">Todos los planes</option>
-                  <option value="individual">Plan Individual</option>
-                  <option value="pareja">Plan Parejas Dúo</option>
+                  <option value="individual">Plan Personal</option>
+                  <option value="pareja">Plan Dúo</option>
                   <option value="pro_ai">Plan Pro & IA</option>
                 </select>
 
@@ -1307,12 +1307,12 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
                                 {acc.accountType === 'pareja' ? (
                                   <span className="text-pink-700 font-medium flex items-center gap-0.5">
                                     <Heart className="w-3 h-3 text-pink-500" />
-                                    <span>Pareja Dúo {acc.partnerName ? `(${acc.partnerName})` : ''}</span>
+                                    <span>Compartido {acc.partnerName ? `(${acc.partnerName})` : ''}</span>
                                   </span>
                                 ) : (
                                   <span className="text-sky-700 font-medium flex items-center gap-0.5">
                                     <UserCheck className="w-3 h-3 text-sky-500" />
-                                    <span>Individual</span>
+                                    <span>Personal</span>
                                   </span>
                                 )}
                               </div>
@@ -1559,8 +1559,8 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
                   className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="all">Todos los planes</option>
-                  <option value="individual">Plan Individual</option>
-                  <option value="pareja">Plan Parejas Dúo</option>
+                  <option value="individual">Plan Personal</option>
+                  <option value="pareja">Plan Dúo</option>
                   <option value="pro_ai">Plan Pro & IA</option>
                 </select>
 
@@ -1854,8 +1854,8 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
                     onChange={(e) => setNewAccType(e.target.value as 'individual' | 'pareja')}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-purple-500"
                   >
-                    <option value="individual">Individual</option>
-                    <option value="pareja">Parejas Dúo</option>
+                    <option value="individual">Personal</option>
+                    <option value="pareja">Compartido</option>
                   </select>
                 </div>
 
@@ -1866,8 +1866,8 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
                     onChange={(e) => setNewAccPlanId(e.target.value as SubscriptionPlanId)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-purple-500"
                   >
-                    <option value="individual">Plan Individual</option>
-                    <option value="pareja">Plan Parejas Dúo</option>
+                    <option value="individual">Plan Personal</option>
+                    <option value="pareja">Plan Dúo</option>
                     <option value="pro_ai">Plan Pro & IA</option>
                   </select>
                 </div>
@@ -1875,7 +1875,7 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
 
               {newAccType === 'pareja' && (
                 <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-700">Nombre de la Pareja</label>
+                  <label className="block text-xs font-bold text-slate-700">Nombre del otro miembro</label>
                   <input
                     type="text"
                     value={newAccPartnerName}
@@ -2024,8 +2024,8 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
                     onChange={(e) => setEditAccType(e.target.value as 'individual' | 'pareja')}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-purple-500"
                   >
-                    <option value="individual">Individual</option>
-                    <option value="pareja">Parejas Dúo</option>
+                    <option value="individual">Personal</option>
+                    <option value="pareja">Compartido</option>
                   </select>
                 </div>
 
@@ -2036,8 +2036,8 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
                     onChange={(e) => setEditAccPlanId(e.target.value as SubscriptionPlanId)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-purple-500"
                   >
-                    <option value="individual">Plan Individual</option>
-                    <option value="pareja">Plan Parejas Dúo</option>
+                    <option value="individual">Plan Personal</option>
+                    <option value="pareja">Plan Dúo</option>
                     <option value="pro_ai">Plan Pro & IA</option>
                   </select>
                 </div>
@@ -2045,7 +2045,7 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
 
               {editAccType === 'pareja' && (
                 <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-700">Nombre de la Pareja</label>
+                  <label className="block text-xs font-bold text-slate-700">Nombre del otro miembro</label>
                   <input
                     type="text"
                     value={editAccPartnerName}
@@ -2386,7 +2386,7 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
               </p>
               <div className="bg-white/80 p-2.5 rounded-xl border border-rose-200/80 font-mono text-[11px] space-y-1 text-slate-700">
                 <div>• Correo: <strong>{deletingAccount.email}</strong></div>
-                <div>• Código de Cuenta: <strong>{deletingAccount.accountCode}</strong> ({deletingAccount.accountType === 'pareja' ? 'Parejas Dúo' : 'Individual'})</div>
+                <div>• Código de Cuenta: <strong>{deletingAccount.accountCode}</strong> ({deletingAccount.accountType === 'pareja' ? 'Compartido' : 'Personal'})</div>
                 <div>• Movimientos asociados: <strong>{deletingAccount.transactionCount} gastos</strong></div>
                 <div>• Plan: <strong>{deletingAccount.selectedPlanId}</strong></div>
               </div>
@@ -2475,8 +2475,8 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
                     onChange={(e) => setFormPlanId(e.target.value as SubscriptionPlanId)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-indigo-500"
                   >
-                    <option value="individual">Plan Individual ($4.900/m)</option>
-                    <option value="pareja">Plan Parejas Dúo ($7.900/m)</option>
+                    <option value="individual">Plan Personal ($4.900/m)</option>
+                    <option value="pareja">Plan Dúo ($7.900/m)</option>
                     <option value="pro_ai">Plan Pro & IA ($12.500/m)</option>
                   </select>
                 </div>
@@ -2602,8 +2602,8 @@ export const SubscriptionAdminPanel: React.FC<SubscriptionAdminPanelProps> = ({
                   }}
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-indigo-500"
                 >
-                  <option value="individual">Plan Individual</option>
-                  <option value="pareja">Plan Parejas Dúo</option>
+                  <option value="individual">Plan Personal</option>
+                  <option value="pareja">Plan Dúo</option>
                   <option value="pro_ai">Plan Pro & IA</option>
                 </select>
               </div>

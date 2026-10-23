@@ -16,7 +16,9 @@ import {
   Calendar,
   Sparkles,
   CreditCard,
-  Tag
+  Tag,
+  Link2,
+  Share2
 } from 'lucide-react';
 import { CoupleProfile, Transaction, CategoryMap, CategoryColors } from '../types';
 import { formatCurrency, formatDateEs } from '../utils/formatters';
@@ -35,6 +37,9 @@ interface CoupleBalanceSectionProps {
   };
   categoryMap?: CategoryMap;
   categoryColors?: CategoryColors;
+  partnerConnected?: boolean;
+  onOpenCoupleSettings?: () => void;
+  onOpenMonthlyReport?: () => void;
   onOpenSettlementModal: () => void;
   onOpenTransactionModal: () => void;
   onEditTransaction?: (tx: Transaction) => void;
@@ -49,6 +54,9 @@ export const CoupleBalanceSection: React.FC<CoupleBalanceSectionProps> = ({
   debtInfo,
   categoryMap = {},
   categoryColors = {},
+  partnerConnected = false,
+  onOpenCoupleSettings,
+  onOpenMonthlyReport,
   onOpenSettlementModal,
   onOpenTransactionModal,
   onEditTransaction,
@@ -100,169 +108,226 @@ export const CoupleBalanceSection: React.FC<CoupleBalanceSectionProps> = ({
     return Array.from(set);
   }, [coupleTransactions]);
 
-  return (
-    <div className="space-y-6">
-      {/* 1. TOP HEADER & BALANCE CARD */}
-      <section
-        style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
-        className="text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-400/20 space-y-5"
-      >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div 
-              className="w-11 h-11 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0 bg-white/15 border border-white/20 backdrop-blur-xs"
-            >
-              <Scale className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                  Cuenta Compartida
-                </h1>
-              </div>
-              <p className="text-xs sm:text-sm text-purple-200 font-medium">
-                Cuentas claras entre {profile.user1Name} y {profile.user2Name} sin discusiones.
-              </p>
-            </div>
-          </div>
+  const currentUserPaid = isUser1 ? debtInfo.user1Paid : debtInfo.user2Paid;
+  const partnerPaid = isUser1 ? debtInfo.user2Paid : debtInfo.user1Paid;
 
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <button
-              type="button"
-              onClick={onOpenSettlementModal}
-              className="px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white border border-white/20 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer backdrop-blur-xs active:scale-95"
-            >
-              <Receipt className="w-4 h-4 text-purple-200" />
-              <span>Liquidar Cuentas</span>
-            </button>
-            <button
-              type="button"
-              onClick={onOpenTransactionModal}
-              className="px-4 py-2.5 rounded-2xl bg-[#F95420] hover:bg-[#E04412] text-white font-bold text-xs shadow-lg active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
-            >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span>Registrar Gasto Compartido</span>
-            </button>
-          </div>
+  const currentUserPercent = useMemo(() => {
+    if (debtInfo.totalCoupleSpent <= 0) return 0;
+    return Math.min(100, Math.max(0, Math.round((currentUserPaid / debtInfo.totalCoupleSpent) * 100)));
+  }, [currentUserPaid, debtInfo.totalCoupleSpent]);
+
+  return (
+    <div className="space-y-4 max-w-4xl mx-auto font-sans pb-16">
+      {/* 1. Header: Section title + Actions (Estilo idéntico a Movimientos / Vencimientos) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+        <div>
+          <p className="text-sm text-gray-400">Balance & Cuentas</p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Cuenta Compartida</h1>
         </div>
 
-        {/* 2. NET SETTLEMENT STATUS BANNER */}
-        <div className={`p-4 sm:p-5 rounded-2xl border transition-all ${
-          isEven
-            ? 'bg-emerald-50/50 border-emerald-200 text-emerald-950'
-            : currentUserOwes
-              ? 'bg-rose-50/60 border-rose-200 text-rose-950'
-              : 'bg-purple-50/60 border-purple-200 text-purple-950'
-        }`}>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
-                isEven
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : currentUserOwes
-                    ? 'bg-rose-100 text-rose-700'
-                    : 'bg-purple-100 text-[#6F2EC5]'
-              }`}>
-                {isEven ? (
-                  <CheckCircle2 className="w-6 h-6" />
-                ) : currentUserOwes ? (
-                  <ArrowUpRight className="w-6 h-6" />
-                ) : (
-                  <ArrowDownLeft className="w-6 h-6" />
-                )}
-              </div>
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider block opacity-70">
-                  Estado de Cuentas
-                </span>
-                <h3 className="font-extrabold text-base leading-tight">
-                  {isEven
-                    ? '¡Todo equilibrado! Ninguno le debe nada al otro.'
-                    : currentUserOwes
-                      ? `Le debes transferir a ${partnerName}:`
-                      : `Saldo a favor con ${partnerName}:`}
-                </h3>
-              </div>
-            </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {onOpenCoupleSettings && (
+            <button
+              type="button"
+              onClick={onOpenCoupleSettings}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-purple-50/50 text-slate-700 hover:text-[#6F2EC5] transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+              title="Vincular dispositivo de tu pareja o configurar división"
+            >
+              <Link2 className="w-3.5 h-3.5 text-[#6936F5]" />
+              <span>{partnerConnected ? 'Pareja sincronizada' : 'Vincular Pareja'}</span>
+            </button>
+          )}
 
-            {!isEven && (
-              <div className="flex items-center gap-3 self-start sm:self-auto">
-                <span className={`text-2xl font-black font-outfit ${
-                  currentUserOwes ? 'text-rose-600' : 'text-[#6F2EC5]'
-                }`}>
-                  {formatCurrency(debtInfo.debtAmount, profile.currency)}
-                </span>
-                <button
-                  type="button"
-                  onClick={onOpenSettlementModal}
-                  className="px-3.5 py-1.5 rounded-xl bg-white text-slate-800 border border-slate-200 text-xs font-bold hover:bg-slate-50 transition-all shadow-2xs cursor-pointer"
-                >
-                  Saldar ahora
-                </button>
-              </div>
+          {onOpenMonthlyReport && (
+            <button
+              type="button"
+              onClick={onOpenMonthlyReport}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-purple-50/50 text-slate-700 hover:text-[#6F2EC5] transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+              title="Copiar liquidación para WhatsApp o descargar reporte"
+            >
+              <Share2 className="w-3.5 h-3.5 text-slate-500" />
+              <span>WhatsApp / Cierre</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={onOpenSettlementModal}
+            className="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-purple-50/50 text-slate-700 hover:text-[#6F2EC5] transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+            title="Liquidar o registrar pagos entre ambos"
+          >
+            <Receipt className="w-3.5 h-3.5 text-slate-500" />
+            <span>Liquidar Cuentas</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenTransactionModal}
+            className="px-4 py-2 rounded-xl text-xs font-bold text-white transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 bg-[#6936F5] hover:bg-[#5b2bd9]"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Registrar Gasto</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 2. Hero Balance Card (Unified GastoAR style — Zero Circular Gauge) */}
+      <div
+        style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
+        className="text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-purple-300/30 relative overflow-hidden"
+      >
+        <div className="w-full">
+          <p className="text-xs sm:text-sm font-medium text-white/80 mb-1.5 tracking-wide">
+            Saldo total compartido
+          </p>
+          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <h2 className="text-[32px] sm:text-4xl font-black font-outfit text-white tracking-tight leading-none truncate">
+              {formatCurrency(debtInfo.totalCoupleSpent, profile.currency)}
+            </h2>
+            {profile.accountCode && (
+              <span className="text-xs text-white/80 font-mono">
+                Sala: {profile.accountCode}
+              </span>
             )}
           </div>
-        </div>
-
-        {/* 3. 4 KPI STATS CARDS */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
-          {/* Total Compartido */}
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-              Total Compartido
-            </span>
-            <span className="text-xl sm:text-2xl font-black text-slate-900 font-outfit">
-              {formatCurrency(debtInfo.totalCoupleSpent, profile.currency)}
-            </span>
-            <p className="text-[10px] text-slate-400 mt-0.5">En común este período</p>
+          <div className="h-1.5 rounded-full overflow-hidden mb-3 bg-white/20">
+            <div
+              className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#FFA234] via-[#F97316] to-[#F95420]"
+              style={{ 
+                width: `${Math.min(100, Math.max(debtInfo.totalCoupleSpent > 0 ? 5 : 0, currentUserPercent))}%`, 
+              }}
+            />
           </div>
-
-          {/* User 1 Paid */}
-          <div className={`p-4 rounded-2xl border ${isUser1 ? 'bg-purple-50/40 border-purple-200' : 'bg-slate-50 border-slate-100'}`}>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                {profile.user1Name} {isUser1 && '(Tú)'}
-              </span>
-              <User className="w-3.5 h-3.5 text-slate-400" />
-            </div>
-            <span className="text-xl sm:text-2xl font-black text-slate-900 font-outfit">
-              {formatCurrency(debtInfo.user1Paid, profile.currency)}
+          <div className="flex items-center gap-2 text-xs text-white/85 flex-wrap">
+            <span>{currentUserName}:{" "}
+              <span className="font-semibold text-white">{formatCurrency(currentUserPaid, profile.currency)}</span>
             </span>
-            <p className="text-[10px] text-slate-500 mt-0.5">
-              Le correspondía: {formatCurrency(debtInfo.user1ShouldPay, profile.currency)}
-            </p>
-          </div>
-
-          {/* User 2 Paid */}
-          <div className={`p-4 rounded-2xl border ${!isUser1 ? 'bg-purple-50/40 border-purple-200' : 'bg-slate-50 border-slate-100'}`}>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                {profile.user2Name} {!isUser1 && '(Tú)'}
-              </span>
-              <User className="w-3.5 h-3.5 text-slate-400" />
-            </div>
-            <span className="text-xl sm:text-2xl font-black text-slate-900 font-outfit">
-              {formatCurrency(debtInfo.user2Paid, profile.currency)}
+            <span>•</span>
+            <span>{partnerName}:{" "}
+              <span className="font-semibold text-emerald-300">{formatCurrency(partnerPaid, profile.currency)}</span>
             </span>
-            <p className="text-[10px] text-slate-500 mt-0.5">
-              Le correspondía: {formatCurrency(debtInfo.user2ShouldPay, profile.currency)}
-            </p>
-          </div>
-
-          {/* Balance Neto */}
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-              Diferencia a Ajustar
-            </span>
-            <span className={`text-xl sm:text-2xl font-black font-outfit ${isEven ? 'text-emerald-600' : 'text-[#6F2EC5]'}`}>
-              {isEven ? '$ 0' : formatCurrency(debtInfo.debtAmount, profile.currency)}
-            </span>
-            <p className="text-[10px] text-slate-400 mt-0.5">
-              {isEven ? 'Equilibrio total' : currentUserOwes ? 'Saldo a pagar' : 'Saldo a favor'}
-            </p>
+            <span>•</span>
+            <span>{coupleTransactions.length} movimientos en común</span>
           </div>
         </div>
-      </section>
+      </div>
+
+      {/* 3. NET SETTLEMENT STATUS BANNER */}
+      <div className={`p-4 sm:p-5 rounded-3xl border transition-all shadow-xs ${
+        isEven
+          ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
+          : currentUserOwes
+            ? 'bg-rose-50/70 border-rose-200 text-rose-950'
+            : 'bg-purple-50/70 border-purple-200 text-purple-950'
+      }`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+              isEven
+                ? 'bg-emerald-100 text-emerald-700'
+                : currentUserOwes
+                  ? 'bg-rose-100 text-rose-700'
+                  : 'bg-purple-100 text-[#6F2EC5]'
+            }`}>
+              {isEven ? (
+                <CheckCircle2 className="w-6 h-6" />
+              ) : currentUserOwes ? (
+                <ArrowUpRight className="w-6 h-6" />
+              ) : (
+                <ArrowDownLeft className="w-6 h-6" />
+              )}
+            </div>
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider block opacity-70">
+                Estado de Cuentas
+              </span>
+              <h3 className="font-extrabold text-base leading-tight">
+                {isEven
+                  ? '¡Todo equilibrado! Ninguno le debe nada al otro.'
+                  : currentUserOwes
+                    ? `Le debes transferir a ${partnerName}:`
+                    : `Saldo a favor con ${partnerName}:`}
+              </h3>
+            </div>
+          </div>
+
+          {!isEven && (
+            <div className="flex items-center gap-3 self-start sm:self-auto">
+              <span className={`text-2xl font-black font-outfit ${
+                currentUserOwes ? 'text-rose-600' : 'text-[#6F2EC5]'
+              }`}>
+                {formatCurrency(debtInfo.debtAmount, profile.currency)}
+              </span>
+              <button
+                type="button"
+                onClick={onOpenSettlementModal}
+                className="px-3.5 py-1.5 rounded-xl bg-white text-slate-800 border border-slate-200 text-xs font-bold hover:bg-slate-50 transition-all shadow-2xs cursor-pointer active:scale-95"
+              >
+                Saldar ahora
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 4. 4 KPI STATS CARDS */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Total Compartido */}
+        <div className="p-4 rounded-3xl bg-white border border-slate-200/80 shadow-2xs">
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+            Total Compartido
+          </span>
+          <span className="text-xl sm:text-2xl font-black text-slate-900 font-outfit">
+            {formatCurrency(debtInfo.totalCoupleSpent, profile.currency)}
+          </span>
+          <p className="text-[10px] text-slate-400 mt-0.5">En común este período</p>
+        </div>
+
+        {/* User 1 Paid */}
+        <div className={`p-4 rounded-3xl border shadow-2xs ${isUser1 ? 'bg-purple-50/40 border-purple-200' : 'bg-white border-slate-200/80'}`}>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+              {profile.user1Name} {isUser1 && '(Tú)'}
+            </span>
+            <User className="w-3.5 h-3.5 text-slate-400" />
+          </div>
+          <span className="text-xl sm:text-2xl font-black text-slate-900 font-outfit">
+            {formatCurrency(debtInfo.user1Paid, profile.currency)}
+          </span>
+          <p className="text-[10px] text-slate-500 mt-0.5">
+            Le correspondía: {formatCurrency(debtInfo.user1ShouldPay, profile.currency)}
+          </p>
+        </div>
+
+        {/* User 2 Paid */}
+        <div className={`p-4 rounded-3xl border shadow-2xs ${!isUser1 ? 'bg-purple-50/40 border-purple-200' : 'bg-white border-slate-200/80'}`}>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+              {profile.user2Name} {!isUser1 && '(Tú)'}
+            </span>
+            <User className="w-3.5 h-3.5 text-slate-400" />
+          </div>
+          <span className="text-xl sm:text-2xl font-black text-slate-900 font-outfit">
+            {formatCurrency(debtInfo.user2Paid, profile.currency)}
+          </span>
+          <p className="text-[10px] text-slate-500 mt-0.5">
+            Le correspondía: {formatCurrency(debtInfo.user2ShouldPay, profile.currency)}
+          </p>
+        </div>
+
+        {/* Balance Neto */}
+        <div className="p-4 rounded-3xl bg-white border border-slate-200/80 shadow-2xs">
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+            Diferencia a Ajustar
+          </span>
+          <span className={`text-xl sm:text-2xl font-black font-outfit ${isEven ? 'text-emerald-600' : 'text-[#6F2EC5]'}`}>
+            {isEven ? '$ 0' : formatCurrency(debtInfo.debtAmount, profile.currency)}
+          </span>
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            {isEven ? 'Equilibrio total' : currentUserOwes ? 'Saldo a pagar' : 'Saldo a favor'}
+          </p>
+        </div>
+      </div>
 
       {/* 4. FILTERS & SEARCH BAR (Exact styling of TransactionsTable) */}
       <section className="bg-white rounded-3xl p-4 sm:p-5 shadow-xs border border-slate-200/80 space-y-3">

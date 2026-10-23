@@ -25,7 +25,8 @@ import {
   Bell,
   ArrowUpRight,
   CalendarClock,
-  Mic
+  Mic,
+  Wallet
 } from 'lucide-react';
 import { CoupleProfile, ExpenseMode } from '../types';
 import { GastoArBrand, GastoArIcon } from './GastoArLogo';
@@ -93,6 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const baseNavItems = [
     { id: 'dashboard', label: 'Resumen', icon: LayoutDashboard, badge: null },
     { id: 'transactions', label: 'Movimientos', icon: Receipt, badge: null },
+    { id: 'wallets', label: 'Cuentas y Saldos', icon: Wallet, badge: null },
     { id: 'installments', label: 'Gastos en Cuotas', icon: CreditCard, badge: null },
     { 
       id: 'card_alerts', 
@@ -103,7 +105,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     { 
       id: 'couple_balance', 
-      label: 'Cuenta Compartida', 
+      label: 'Compartido', 
       icon: Scale, 
       badge: null 
     },

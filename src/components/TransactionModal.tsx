@@ -20,8 +20,10 @@ import {
   Coins,
   AlertCircle,
   Trash2,
+  Paperclip,
+  Wallet,
 } from 'lucide-react';
-import { CategoryMap, CoupleProfile, ExpenseMode, PaymentMethod, SplitType, Transaction } from '../types';
+import { CategoryMap, CoupleProfile, ExpenseMode, PaymentMethod, SplitType, Transaction, WalletAccount } from '../types';
 import { BankCardSelect } from './BankCardSelect';
 
 interface TransactionModalProps {
@@ -32,6 +34,7 @@ interface TransactionModalProps {
   editingTransaction?: Transaction | null;
   categoryMap: CategoryMap;
   profile: CoupleProfile;
+  wallets?: WalletAccount[];
   initialIsCuotas?: boolean;
   initialTransactionType?: 'gasto' | 'ingreso';
   activeMode?: ExpenseMode;
@@ -72,6 +75,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   editingTransaction,
   categoryMap,
   profile,
+  wallets = [],
   initialIsCuotas = false,
   initialTransactionType = 'gasto',
   activeMode = 'individual',
@@ -106,6 +110,9 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   const [showSchedulePreview, setShowSchedulePreview] = useState<boolean>(false);
   const [calcMode, setCalcMode]                 = useState<'total' | 'por_cuota'>('total');
   const [montoPorCuotaInput, setMontoPorCuotaInput] = useState<string>('');
+  const [walletId, setWalletId]                 = useState<string>('');
+  const [comprobanteUrl, setComprobanteUrl]     = useState<string>('');
+  const [confirmingDelete, setConfirmingDelete] = useState<boolean>(false);
 
   // ─── FIX 3: estado de errores y submitting ────────────────────────────────
   const [formErrors, setFormErrors]   = useState<Record<string, string>>({});
@@ -146,6 +153,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       } else if (editingTransaction.monto && editingTransaction.cuotasTotal) {
         setMontoPorCuotaInput((editingTransaction.monto / editingTransaction.cuotasTotal).toFixed(2));
       }
+      setWalletId(editingTransaction.walletId || '');
+      setComprobanteUrl(editingTransaction.comprobanteUrl || '');
     } else {
       const mode = initialTransactionType || 'gasto';
       setTipoTransaccion(mode);
@@ -173,11 +182,51 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setFechaPrimerPago(defaultFirstPay);
       setPrimerMesCuota(defaultFirstPay.substring(0, 7));
       setMontoPorCuotaInput('');
+      setWalletId('');
+      setComprobanteUrl('');
     }
+    setConfirmingDelete(false);
     // ─── FIX 3: limpiar errores al abrir ─────────────────────────────────
     setFormErrors({});
     setIsSubmitting(false);
   }, [editingTransaction, isOpen, categoryMap, profile, initialIsCuotas, initialTransactionType, activeMode]);
+
+  const handleReceiptFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') return;
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 900;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          setComprobanteUrl(canvas.toDataURL('image/jpeg', 0.72));
+        } else {
+          setComprobanteUrl(reader.result as string);
+        }
+      };
+      img.onerror = () => setComprobanteUrl(reader.result as string);
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -311,6 +360,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
           tipoTransaccion: 'ingreso',
           pagadoPor,
           metodoPago: metodoPago || 'Transferencia',
+          walletId: walletId || undefined,
+          comprobanteUrl: comprobanteUrl || undefined,
         });
         return;
       }
@@ -337,6 +388,8 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         user1Percent: tipo === 'pareja' && splitType === 'custom_percent' ? user1Percent : undefined,
         user2Percent: tipo === 'pareja' && splitType === 'custom_percent' ? user2Percent : undefined,
         metodoPago: isInstallmentActive ? 'Crédito' : metodoPago,
+        walletId: isInstallmentActive ? undefined : (walletId || undefined),
+        comprobanteUrl: comprobanteUrl || undefined,
         esCuotas: isInstallmentActive,
         cuotasTotal: isInstallmentActive ? cuotasTotal : undefined,
         cuotaActual: isInstallmentActive ? cuotaActual : undefined,
@@ -374,26 +427,43 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               <p className="text-[11px] text-white/80">
                 {isIncome
                   ? 'Registra sueldos, cobros, ventas o transferencias'
-                  : (tipo === 'pareja' ? 'Gasto compartido en pareja' : 'Gasto individual personal') + (esCuotas ? ' • En Cuotas' : '')}
+                  : (tipo === 'pareja' ? 'Gasto compartido' : 'Gasto personal') + (esCuotas ? ' • En Cuotas' : '')}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-1">
             {editingTransaction && onDelete && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm('¿Seguro que deseas eliminar este movimiento?')) {
-                    onDelete(editingTransaction.id);
-                    onClose();
-                  }
-                }}
-                className="text-red-400 hover:text-red-300 p-1.5 rounded-lg transition-colors hover:bg-white/10"
-                title="Eliminar movimiento"
-                aria-label="Eliminar movimiento"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              confirmingDelete ? (
+                <div className="flex items-center gap-1 bg-rose-600/20 px-2 py-1 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDelete(editingTransaction.id);
+                      onClose();
+                    }}
+                    className="px-2 py-0.5 rounded bg-rose-600 text-white text-[11px] font-bold"
+                  >
+                    Confirmar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingDelete(false)}
+                    className="text-white/70 hover:text-white text-[11px] px-1"
+                  >
+                    No
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(true)}
+                  className="text-red-400 hover:text-red-300 p-1.5 rounded-lg transition-colors hover:bg-white/10"
+                  title="Eliminar movimiento"
+                  aria-label="Eliminar movimiento"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )
             )}
             <button onClick={onClose} className="text-white/70 hover:text-white p-1.5 rounded-lg transition-colors hover:bg-white/10" aria-label="Cerrar modal">
               <X className="w-5 h-5" />
@@ -744,7 +814,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               {tipo === 'individual' && (
                 <div className="p-3 bg-blue-50/70 border border-blue-200/80 rounded-2xl space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-blue-600" /><span>¿De quién es este gasto individual?</span>
+                    <User className="w-3.5 h-3.5 text-blue-600" /><span>¿De quién es este gasto personal?</span>
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     {(['user1', 'user2'] as const).map(u => (
@@ -771,6 +841,69 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* Cuenta / Billetera & Comprobante adjunto */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            {wallets.length > 0 && !(tipoTransaccion === 'gasto' && (esCuotas || metodoPago === 'Crédito')) && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                  <Wallet className="w-3.5 h-3.5 text-[#6936F5]" />
+                  <span>Cuenta / Billetera impactada</span>
+                </label>
+                <select
+                  value={walletId}
+                  onChange={(e) => setWalletId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">Automática según medio de pago</option>
+                  {wallets.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.nombre} ({w.moneda})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className={wallets.length > 0 && !(tipoTransaccion === 'gasto' && (esCuotas || metodoPago === 'Crédito')) ? '' : 'sm:col-span-2'}>
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                <Paperclip className="w-3.5 h-3.5 text-slate-500" />
+                <span>Comprobante / Ticket (opcional)</span>
+              </label>
+              {comprobanteUrl ? (
+                <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-xl">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <img
+                      src={comprobanteUrl}
+                      alt="Comprobante"
+                      className="w-7 h-7 rounded-md object-cover border border-purple-200 shrink-0"
+                    />
+                    <span className="text-xs font-semibold text-[#6936F5] truncate">
+                      Ticket adjuntado
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setComprobanteUrl('')}
+                    className="text-xs font-bold text-rose-600 hover:underline shrink-0"
+                  >
+                    Quitar
+                  </button>
+                </div>
+              ) : (
+                <label className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100 border border-dashed border-slate-300 rounded-xl text-xs font-medium text-slate-600 flex items-center justify-center gap-1.5 cursor-pointer transition-colors">
+                  <Paperclip className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Adjuntar foto del ticket</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleReceiptFileChange}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
+          </div>
 
           {/* ─── FIX 3: Botón submit con estado y spinner ─────────────────── */}
           <button

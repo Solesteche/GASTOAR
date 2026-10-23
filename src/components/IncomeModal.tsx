@@ -235,7 +235,7 @@ export const IncomeModal: React.FC<IncomeModalProps> = ({
                       : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  Fondo Pareja
+                  Compartido
                 </button>
               </div>
             </div>

@@ -7,7 +7,8 @@ import {
   ArrowUpRight, 
   LogOut,
   HelpCircle,
-  Mic
+  Mic,
+  Download
 } from 'lucide-react';
 import { CoupleProfile, ExpenseMode, UserAccount } from '../types';
 import { GastoArBrand } from './GastoArLogo';
@@ -50,7 +51,37 @@ export const Header: React.FC<HeaderProps> = ({
   isDarkMode = false,
 }) => {
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
   const addMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const isStandalone =
+      window.matchMedia?.('(display-mode: standalone)').matches ||
+      (window.navigator as any)?.standalone === true;
+    if (isStandalone) return;
+
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+    };
+    const installedHandler = () => setDeferredInstallPrompt(null);
+
+    window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', installedHandler);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', installedHandler);
+    };
+  }, []);
+
+  const handleInstallPwa = async () => {
+    if (!deferredInstallPrompt) return;
+    try {
+      await deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+    } catch {}
+    setDeferredInstallPrompt(null);
+  };
 
   const isUser1 = profile?.currentUser === 'user1';
   const profileName = profile ? (isUser1 ? profile.user1Name : profile.user2Name) : '';
@@ -201,6 +232,19 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Right Side: Quick Action Buttons & Profile Initial */}
         <div className="flex items-center gap-2 sm:gap-3">
           
+          {/* PWA Install Button when browser fires beforeinstallprompt */}
+          {deferredInstallPrompt && (
+            <button
+              type="button"
+              onClick={handleInstallPwa}
+              title="Instalar GastoAR en tu dispositivo"
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-[#6936F5]" />
+              <span>Instalar</span>
+            </button>
+          )}
+
           {/* Voice Expense Button with Smart AI Categorization (Icon only on mobile & PC) */}
           {onOpenAiModal && (
             <button

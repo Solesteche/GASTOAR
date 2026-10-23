@@ -102,7 +102,8 @@
       "goals": [],
       "subscriptions": [],
       "alertItems": [],
-      "updatedAt": 1791485454645
+      "updatedAt": 1791485454645,
+      "vencimientos": []
     },
     "VERCEL-1234": {
       "transactions": [],
@@ -124,35 +125,11 @@
       "goals": [],
       "subscriptions": [],
       "alertItems": [],
-      "updatedAt": 1788609803762
+      "updatedAt": 1788609803762,
+      "vencimientos": []
     },
     "sol.martinez@gastoar.com": {
-      "transactions": [
-        {
-          "id": "tx-s1",
-          "concepto": "Supermercado Coto",
-          "monto": 45200,
-          "categoria": "Supermercado",
-          "fecha": "2026-10-07",
-          "paidBy": "user1"
-        },
-        {
-          "id": "tx-s2",
-          "concepto": "Internet Fibertel",
-          "monto": 22000,
-          "categoria": "Servicios",
-          "fecha": "2026-10-07",
-          "paidBy": "user2"
-        },
-        {
-          "id": "tx-s3",
-          "concepto": "Combustible YPF",
-          "monto": 35000,
-          "categoria": "Transporte",
-          "fecha": "2026-10-07",
-          "paidBy": "user1"
-        }
-      ],
+      "transactions": [],
       "categoryMap": null,
       "categoryColors": null,
       "budgets": {
@@ -194,35 +171,11 @@
         }
       ],
       "alertItems": [],
-      "updatedAt": 1791401929310
+      "updatedAt": 1791401929310,
+      "vencimientos": []
     },
     "COMPARTIDA-2026": {
-      "transactions": [
-        {
-          "id": "tx-s1",
-          "concepto": "Supermercado Coto",
-          "monto": 45200,
-          "categoria": "Supermercado",
-          "fecha": "2026-10-07",
-          "paidBy": "user1"
-        },
-        {
-          "id": "tx-s2",
-          "concepto": "Internet Fibertel",
-          "monto": 22000,
-          "categoria": "Servicios",
-          "fecha": "2026-10-07",
-          "paidBy": "user2"
-        },
-        {
-          "id": "tx-s3",
-          "concepto": "Combustible YPF",
-          "monto": 35000,
-          "categoria": "Transporte",
-          "fecha": "2026-10-07",
-          "paidBy": "user1"
-        }
-      ],
+      "transactions": [],
       "categoryMap": null,
       "categoryColors": null,
       "budgets": {
@@ -264,27 +217,11 @@
         }
       ],
       "alertItems": [],
-      "updatedAt": 1791401929310
+      "updatedAt": 1791401929310,
+      "vencimientos": []
     },
     "lucas.gonzalez@gmail.com": {
-      "transactions": [
-        {
-          "id": "tx-l1",
-          "concepto": "Alquiler Depto",
-          "monto": 280000,
-          "categoria": "Vivienda",
-          "fecha": "2026-10-07",
-          "paidBy": "user1"
-        },
-        {
-          "id": "tx-l2",
-          "concepto": "Expensas",
-          "monto": 65000,
-          "categoria": "Vivienda",
-          "fecha": "2026-10-07",
-          "paidBy": "user2"
-        }
-      ],
+      "transactions": [],
       "categoryMap": null,
       "categoryColors": null,
       "budgets": {
@@ -326,27 +263,11 @@
         }
       ],
       "alertItems": [],
-      "updatedAt": 1791401929310
+      "updatedAt": 1791401929310,
+      "vencimientos": []
     },
     "COMPARTIDA-8492": {
-      "transactions": [
-        {
-          "id": "tx-l1",
-          "concepto": "Alquiler Depto",
-          "monto": 280000,
-          "categoria": "Vivienda",
-          "fecha": "2026-10-07",
-          "paidBy": "user1"
-        },
-        {
-          "id": "tx-l2",
-          "concepto": "Expensas",
-          "monto": 65000,
-          "categoria": "Vivienda",
-          "fecha": "2026-10-07",
-          "paidBy": "user2"
-        }
-      ],
+      "transactions": [],
       "categoryMap": null,
       "categoryColors": null,
       "budgets": {
@@ -388,19 +309,11 @@
         }
       ],
       "alertItems": [],
-      "updatedAt": 1791401929310
+      "updatedAt": 1791401929310,
+      "vencimientos": []
     },
     "mariano.silva@outlook.com": {
-      "transactions": [
-        {
-          "id": "tx-m1",
-          "concepto": "Gimnasio Megatlon",
-          "monto": 28000,
-          "categoria": "Salud",
-          "fecha": "2026-10-07",
-          "paidBy": "user1"
-        }
-      ],
+      "transactions": [],
       "categoryMap": null,
       "categoryColors": null,
       "budgets": {
@@ -410,7 +323,7 @@
       "profile": {
         "accountCode": "IND-3391",
         "user1Name": "Mariano",
-        "user2Name": "Mi Pareja",
+        "user2Name": "Cuenta Compartida",
         "currentUser": "user1",
         "currency": "ARS",
         "defaultSplit": "50_50"
@@ -441,19 +354,11 @@
         }
       ],
       "alertItems": [],
-      "updatedAt": 1791401929310
+      "updatedAt": 1791401929310,
+      "vencimientos": []
     },
     "IND-3391": {
-      "transactions": [
-        {
-          "id": "tx-m1",
-          "concepto": "Gimnasio Megatlon",
-          "monto": 28000,
-          "categoria": "Salud",
-          "fecha": "2026-10-07",
-          "paidBy": "user1"
-        }
-      ],
+      "transactions": [],
       "categoryMap": null,
       "categoryColors": null,
       "budgets": {
@@ -463,7 +368,7 @@
       "profile": {
         "accountCode": "IND-3391",
         "user1Name": "Mariano",
-        "user2Name": "Mi Pareja",
+        "user2Name": "Cuenta Compartida",
         "currentUser": "user1",
         "currency": "ARS",
         "defaultSplit": "50_50"
@@ -494,27 +399,11 @@
         }
       ],
       "alertItems": [],
-      "updatedAt": 1791401929310
+      "updatedAt": 1791401929310,
+      "vencimientos": []
     },
     "valeria.fernandez@gmail.com": {
-      "transactions": [
-        {
-          "id": "tx-v1",
-          "concepto": "Cena Restaurante",
-          "monto": 38000,
-          "categoria": "Salidas",
-          "fecha": "2026-10-07",
-          "paidBy": "user1"
-        },
-        {
-          "id": "tx-v2",
-          "concepto": "Farmacia Farmacity",
-          "monto": 14500,
-          "categoria": "Salud",
-          "fecha": "2026-10-07",
-          "paidBy": "user2"
-        }
-      ],
+      "transactions": [],
       "categoryMap": null,
       "categoryColors": null,
       "budgets": {
@@ -558,27 +447,11 @@
         }
       ],
       "alertItems": [],
-      "updatedAt": 1791401929310
+      "updatedAt": 1791401929310,
+      "vencimientos": []
     },
     "COMPARTIDA-5512": {
-      "transactions": [
-        {
-          "id": "tx-v1",
-          "concepto": "Cena Restaurante",
-          "monto": 38000,
-          "categoria": "Salidas",
-          "fecha": "2026-10-07",
-          "paidBy": "user1"
-        },
-        {
-          "id": "tx-v2",
-          "concepto": "Farmacia Farmacity",
-          "monto": 14500,
-          "categoria": "Salud",
-          "fecha": "2026-10-07",
-          "paidBy": "user2"
-        }
-      ],
+      "transactions": [],
       "categoryMap": null,
       "categoryColors": null,
       "budgets": {
@@ -622,19 +495,11 @@
         }
       ],
       "alertItems": [],
-      "updatedAt": 1791401929310
+      "updatedAt": 1791401929310,
+      "vencimientos": []
     },
     "franco.rodriguez@gmail.com": {
-      "transactions": [
-        {
-          "id": "tx-f1",
-          "concepto": "Café Starbucks",
-          "monto": 4500,
-          "categoria": "Salidas",
-          "fecha": "2026-10-07",
-          "paidBy": "user1"
-        }
-      ],
+      "transactions": [],
       "categoryMap": null,
       "categoryColors": null,
       "budgets": {
@@ -644,7 +509,7 @@
       "profile": {
         "accountCode": "IND-9021",
         "user1Name": "Franco",
-        "user2Name": "Mi Pareja",
+        "user2Name": "Cuenta Compartida",
         "currentUser": "user1",
         "currency": "ARS",
         "defaultSplit": "50_50"
@@ -677,19 +542,11 @@
         }
       ],
       "alertItems": [],
-      "updatedAt": 1791401929310
+      "updatedAt": 1791401929310,
+      "vencimientos": []
     },
     "IND-9021": {
-      "transactions": [
-        {
-          "id": "tx-f1",
-          "concepto": "Café Starbucks",
-          "monto": 4500,
-          "categoria": "Salidas",
-          "fecha": "2026-10-07",
-          "paidBy": "user1"
-        }
-      ],
+      "transactions": [],
       "categoryMap": null,
       "categoryColors": null,
       "budgets": {
@@ -699,7 +556,7 @@
       "profile": {
         "accountCode": "IND-9021",
         "user1Name": "Franco",
-        "user2Name": "Mi Pareja",
+        "user2Name": "Cuenta Compartida",
         "currentUser": "user1",
         "currency": "ARS",
         "defaultSplit": "50_50"
@@ -732,7 +589,8 @@
         }
       ],
       "alertItems": [],
-      "updatedAt": 1791401929310
+      "updatedAt": 1791401929310,
+      "vencimientos": []
     }
   },
   "accountCodeToEmail": {

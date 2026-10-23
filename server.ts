@@ -10,7 +10,30 @@ import QRCode from "qrcode";
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+
+function parsePort(): number {
+  const argPortIdx = process.argv.indexOf("--port");
+  if (argPortIdx !== -1 && process.argv[argPortIdx + 1]) {
+    const val = parseInt(process.argv[argPortIdx + 1], 10);
+    if (!isNaN(val)) return val;
+  }
+  if (process.env.DEFAULT_APP_PORT) {
+    const val = parseInt(process.env.DEFAULT_APP_PORT, 10);
+    if (!isNaN(val)) return val;
+  }
+  return 3000;
+}
+
+function parseHost(): string {
+  const argHostIdx = process.argv.indexOf("--host");
+  if (argHostIdx !== -1 && process.argv[argHostIdx + 1]) {
+    return process.argv[argHostIdx + 1];
+  }
+  return "0.0.0.0";
+}
+
+const PORT = parsePort();
+const HOST = parseHost();
 
 app.use(express.json({ limit: "25mb" }));
 
@@ -48,6 +71,11 @@ interface UserDataPayload {
   goals?: any[];
   subscriptions?: any[];
   alertItems?: any[];
+  vencimientos?: any[];
+  wallets?: any[];
+  walletTransfers?: any[];
+  cardConfigs?: any[];
+  members?: Array<{ email: string; name: string; lastSeen: number }>;
   updatedAt: number;
 }
 
@@ -115,11 +143,7 @@ function seedDefaultUsersIfNeeded(db: DatabaseSchema): boolean {
         autoRenew: true,
         notes: "Cliente verificado. Pago automático mensual por Mercado Pago débito.",
       },
-      sampleTxs: [
-        { id: "tx-s1", concepto: "Supermercado Coto", monto: 45200, categoria: "Supermercado", fecha: todayStr, paidBy: "user1" },
-        { id: "tx-s2", concepto: "Internet Fibertel", monto: 22000, categoria: "Servicios", fecha: todayStr, paidBy: "user2" },
-        { id: "tx-s3", concepto: "Combustible YPF", monto: 35000, categoria: "Transporte", fecha: todayStr, paidBy: "user1" },
-      ],
+      sampleTxs: [],
     },
     {
       user: {
@@ -145,7 +169,7 @@ function seedDefaultUsersIfNeeded(db: DatabaseSchema): boolean {
         partnerName: "Camila López",
         accountCode: "COMPARTIDA-8492",
         planId: "pareja",
-        planName: "Plan Parejas Dúo",
+        planName: "Plan Dúo",
         status: "active",
         billingCycle: "annual",
         pricePaid: 63000,
@@ -159,10 +183,7 @@ function seedDefaultUsersIfNeeded(db: DatabaseSchema): boolean {
         autoRenew: true,
         notes: "Suscripción anual abonada con dinero en cuenta Mercado Pago.",
       },
-      sampleTxs: [
-        { id: "tx-l1", concepto: "Alquiler Depto", monto: 280000, categoria: "Vivienda", fecha: todayStr, paidBy: "user1" },
-        { id: "tx-l2", concepto: "Expensas", monto: 65000, categoria: "Vivienda", fecha: todayStr, paidBy: "user2" },
-      ],
+      sampleTxs: [],
     },
     {
       user: {
@@ -186,7 +207,7 @@ function seedDefaultUsersIfNeeded(db: DatabaseSchema): boolean {
         userName: "Mariano Silva",
         accountCode: "IND-3391",
         planId: "individual",
-        planName: "Plan Individual",
+        planName: "Plan Personal",
         status: "active",
         billingCycle: "monthly",
         pricePaid: 4900,
@@ -200,9 +221,7 @@ function seedDefaultUsersIfNeeded(db: DatabaseSchema): boolean {
         autoRenew: true,
         notes: "Cobro recurrente mensual activo.",
       },
-      sampleTxs: [
-        { id: "tx-m1", concepto: "Gimnasio Megatlon", monto: 28000, categoria: "Salud", fecha: todayStr, paidBy: "user1" },
-      ],
+      sampleTxs: [],
     },
     {
       user: {
@@ -228,7 +247,7 @@ function seedDefaultUsersIfNeeded(db: DatabaseSchema): boolean {
         partnerName: "Esteban Rossi",
         accountCode: "COMPARTIDA-5512",
         planId: "pareja",
-        planName: "Plan Parejas Dúo",
+        planName: "Plan Dúo",
         status: "trial",
         billingCycle: "monthly",
         pricePaid: 0,
@@ -244,10 +263,7 @@ function seedDefaultUsersIfNeeded(db: DatabaseSchema): boolean {
         autoRenew: true,
         notes: "Período de prueba vigente por 15 días.",
       },
-      sampleTxs: [
-        { id: "tx-v1", concepto: "Cena Restaurante", monto: 38000, categoria: "Salidas", fecha: todayStr, paidBy: "user1" },
-        { id: "tx-v2", concepto: "Farmacia Farmacity", monto: 14500, categoria: "Salud", fecha: todayStr, paidBy: "user2" },
-      ],
+      sampleTxs: [],
     },
     {
       user: {
@@ -271,7 +287,7 @@ function seedDefaultUsersIfNeeded(db: DatabaseSchema): boolean {
         userName: "Franco Rodríguez",
         accountCode: "IND-9021",
         planId: "individual",
-        planName: "Plan Individual",
+        planName: "Plan Personal",
         status: "trial",
         billingCycle: "monthly",
         pricePaid: 0,
@@ -287,9 +303,7 @@ function seedDefaultUsersIfNeeded(db: DatabaseSchema): boolean {
         autoRenew: true,
         notes: "Nueva cuenta registrada hoy. Prueba de 15 días activa.",
       },
-      sampleTxs: [
-        { id: "tx-f1", concepto: "Café Starbucks", monto: 4500, categoria: "Salidas", fecha: todayStr, paidBy: "user1" },
-      ],
+      sampleTxs: [],
     },
   ];
 
@@ -300,14 +314,14 @@ function seedDefaultUsersIfNeeded(db: DatabaseSchema): boolean {
       db.accountCodeToEmail[item.user.accountCode] = email;
       db.subscriptions[email] = item.sub;
       db.accountsData[email] = {
-        transactions: item.sampleTxs,
+        transactions: [],
         categoryMap: null,
         categoryColors: null,
         budgets: { categories: {}, subcategories: {} },
         profile: {
           accountCode: item.user.accountCode,
           user1Name: item.user.name,
-          user2Name: item.user.partnerName || "Mi Pareja",
+          user2Name: item.user.partnerName || (item.user.accountType === "individual" ? "Fondo Ahorro" : "Cuenta Compartida"),
           currentUser: "user1",
           currency: "ARS",
           defaultSplit: "50_50",
@@ -316,6 +330,7 @@ function seedDefaultUsersIfNeeded(db: DatabaseSchema): boolean {
         goals: [],
         subscriptions: [item.sub],
         alertItems: [],
+        vencimientos: [],
         updatedAt: now,
       };
       db.accountsData[item.user.accountCode] = db.accountsData[email];
@@ -334,7 +349,7 @@ function seedDefaultUsersIfNeeded(db: DatabaseSchema): boolean {
         userName: "Test User",
         accountCode: "VERCEL-1234",
         planId: "individual",
-        planName: "Plan Individual",
+        planName: "Plan Personal",
         status: "trial",
         billingCycle: "monthly",
         pricePaid: 0,
@@ -350,6 +365,28 @@ function seedDefaultUsersIfNeeded(db: DatabaseSchema): boolean {
         notes: "Cuenta de prueba restablecida con 15 días.",
       };
       changed = true;
+    }
+  }
+
+  // Limpiar movimientos y vencimientos de prueba precargados en cuentas de usuario
+  if (db.accountsData) {
+    for (const key of Object.keys(db.accountsData)) {
+      const acc = db.accountsData[key];
+      if (acc && Array.isArray(acc.transactions)) {
+        const hasSampleTxs = acc.transactions.some((t: any) => t && (String(t.id).startsWith('tx-') || ['1','2','3','4','5'].includes(String(t.id))));
+        if (hasSampleTxs) {
+          acc.transactions = acc.transactions.filter((t: any) => t && !String(t.id).startsWith('tx-') && !['1','2','3','4','5'].includes(String(t.id)));
+          changed = true;
+        }
+      }
+      if (acc && !acc.vencimientos) {
+        acc.vencimientos = [];
+        changed = true;
+      }
+      if (acc?.profile?.user2Name === "Mi Pareja") {
+        acc.profile.user2Name = "Cuenta Compartida";
+        changed = true;
+      }
     }
   }
 
@@ -519,7 +556,7 @@ app.post("/api/auth/register", (req, res) => {
       partnerName: partnerName ? String(partnerName).trim() : undefined,
       accountCode: finalAccountCode,
       planId: userPlan,
-      planName: userPlan === "pro_ai" ? "Plan Pro & IA" : (userPlan === "individual" ? "Plan Individual" : "Plan Parejas Dúo"),
+      planName: userPlan === "pro_ai" ? "Plan Pro & IA" : (userPlan === "individual" ? "Plan Personal" : "Plan Dúo"),
       status: "trial",
       billingCycle: "monthly",
       pricePaid: 0,
@@ -543,7 +580,7 @@ app.post("/api/auth/register", (req, res) => {
       profile: initialData?.profile || {
         accountCode: finalAccountCode,
         user1Name: name.trim(),
-        user2Name: partnerName ? partnerName.trim() : (accountType === "individual" ? "Fondo Ahorro" : "Mi Pareja"),
+        user2Name: partnerName ? partnerName.trim() : (accountType === "individual" ? "Fondo Ahorro" : "Cuenta Compartida"),
         currentUser: "user1",
         currency,
         defaultSplit: "50_50",
@@ -552,6 +589,7 @@ app.post("/api/auth/register", (req, res) => {
       goals: initialData?.goals || [],
       subscriptions: initialData?.subscriptions?.length ? initialData.subscriptions : [userInitialSubscription],
       alertItems: initialData?.alertItems || [],
+      vencimientos: initialData?.vencimientos || [],
       updatedAt: now,
     };
 
@@ -658,6 +696,10 @@ app.post("/api/sync/save", (req, res) => {
       goals: data?.goals || [],
       subscriptions: data?.subscriptions || [],
       alertItems: data?.alertItems || [],
+      vencimientos: data?.vencimientos || [],
+      wallets: data?.wallets || undefined,
+      walletTransfers: data?.walletTransfers || undefined,
+      cardConfigs: data?.cardConfigs || undefined,
       updatedAt: now,
     };
 
@@ -672,9 +714,48 @@ app.post("/api/sync/save", (req, res) => {
     }
 
     if (finalCode) {
+      const existingRoom = db.accountsData[finalCode] || { updatedAt: now };
+      const existingSharedTxs: any[] = Array.isArray(existingRoom.transactions)
+        ? existingRoom.transactions.filter((t: any) => t && t.tipo === "pareja")
+        : [];
+      const incomingSharedTxs: any[] = Array.isArray(payload.transactions)
+        ? payload.transactions.filter((t: any) => t && t.tipo === "pareja")
+        : [];
+
+      const mergedSharedMap = new Map<string, any>();
+      for (const tx of existingSharedTxs) {
+        if (tx?.id) mergedSharedMap.set(tx.id, tx);
+      }
+      for (const tx of incomingSharedTxs) {
+        if (!tx?.id) continue;
+        const prev = mergedSharedMap.get(tx.id);
+        if (!prev) {
+          mergedSharedMap.set(tx.id, tx);
+        } else if (tx.deletedAt || prev.deletedAt) {
+          mergedSharedMap.set(tx.id, {
+            ...prev,
+            ...tx,
+            deletedAt: tx.deletedAt || prev.deletedAt,
+          });
+        } else {
+          mergedSharedMap.set(tx.id, { ...prev, ...tx });
+        }
+      }
+
+      const mergedSettlementsMap = new Map<string, any>();
+      for (const s of existingRoom.settlementHistory || []) {
+        if (s?.id) mergedSettlementsMap.set(s.id, s);
+      }
+      for (const s of payload.settlementHistory || []) {
+        if (s?.id) mergedSettlementsMap.set(s.id, s);
+      }
+
       db.accountsData[finalCode] = {
-        ...db.accountsData[finalCode],
-        ...payload,
+        ...existingRoom,
+        transactions: Array.from(mergedSharedMap.values()),
+        settlementHistory: Array.from(mergedSettlementsMap.values()),
+        profile: payload.profile || existingRoom.profile,
+        updatedAt: now,
       };
     }
 
@@ -1094,7 +1175,7 @@ function getOrBuildSubscriptionForUser(user: UserRecord, db: DatabaseSchema): an
     partnerName: user.partnerName || undefined,
     accountCode: user.accountCode || `ACC-${Math.floor(1000 + Math.random() * 9000)}`,
     planId: userPlan,
-    planName: userPlan === "pro_ai" ? "Plan Pro & IA" : (userPlan === "individual" ? "Plan Individual" : "Plan Parejas Dúo"),
+    planName: userPlan === "pro_ai" ? "Plan Pro & IA" : (userPlan === "individual" ? "Plan Personal" : "Plan Dúo"),
     status: trialEndTime < now ? "trial" : "trial",
     billingCycle: "monthly",
     pricePaid: 0,
@@ -1345,7 +1426,7 @@ app.post("/api/admin/accounts/create", (req, res) => {
       partnerName: partnerName ? String(partnerName).trim() : undefined,
       accountCode: finalCode,
       planId: selectedPlanId,
-      planName: selectedPlanId === "pro_ai" ? "Plan Pro & IA" : (selectedPlanId === "individual" ? "Plan Individual" : "Plan Parejas Dúo"),
+      planName: selectedPlanId === "pro_ai" ? "Plan Pro & IA" : (selectedPlanId === "individual" ? "Plan Personal" : "Plan Dúo"),
       status: status,
       billingCycle: "monthly",
       pricePaid: status === "active" ? (selectedPlanId === "pro_ai" ? 6900 : (selectedPlanId === "pareja" ? 4900 : 2900)) : 0,
@@ -1434,7 +1515,7 @@ app.post("/api/admin/accounts/update", (req, res) => {
     if (updates.partnerName !== undefined) sub.partnerName = user.partnerName || undefined;
     if (updates.selectedPlanId !== undefined) {
       sub.planId = updates.selectedPlanId;
-      sub.planName = updates.selectedPlanId === "pro_ai" ? "Plan Pro & IA" : (updates.selectedPlanId === "individual" ? "Plan Individual" : "Plan Parejas Dúo");
+      sub.planName = updates.selectedPlanId === "pro_ai" ? "Plan Pro & IA" : (updates.selectedPlanId === "individual" ? "Plan Personal" : "Plan Dúo");
     }
     if (updates.status !== undefined) sub.status = updates.status;
     if (updates.billingCycle !== undefined) sub.billingCycle = updates.billingCycle;
@@ -2462,6 +2543,279 @@ app.post("/api/mercadopago/webhook", async (req, res) => {
   }
 });
 
+// ==========================================
+// REAL MULTI-USER SHARED COUPLE SYNC
+// ==========================================
+app.post("/api/couple/sync", (req, res) => {
+  try {
+    const {
+      accountCode,
+      email,
+      userName,
+      sharedTransactions,
+      settlementHistory,
+    } = req.body || {};
+
+    const cleanCode =
+      typeof accountCode === "string" ? accountCode.trim().toUpperCase() : "";
+    if (!cleanCode) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Código de vínculo requerido." });
+    }
+
+    const db = getDb();
+    const now = Date.now();
+    const room: UserDataPayload = db.accountsData[cleanCode] || {
+      transactions: [],
+      settlementHistory: [],
+      members: [],
+      updatedAt: now,
+    };
+
+    const txMap = new Map<string, any>();
+    for (const tx of room.transactions || []) {
+      if (tx?.id && tx.tipo === "pareja") {
+        txMap.set(tx.id, tx);
+      }
+    }
+    if (Array.isArray(sharedTransactions)) {
+      for (const tx of sharedTransactions) {
+        if (!tx?.id || tx.tipo !== "pareja") continue;
+        const prev = txMap.get(tx.id);
+        if (!prev) {
+          txMap.set(tx.id, tx);
+        } else if (tx.deletedAt || prev.deletedAt) {
+          txMap.set(tx.id, {
+            ...prev,
+            ...tx,
+            deletedAt: tx.deletedAt || prev.deletedAt,
+          });
+        } else {
+          txMap.set(tx.id, { ...prev, ...tx });
+        }
+      }
+    }
+
+    const settlementMap = new Map<string, any>();
+    for (const st of room.settlementHistory || []) {
+      if (st?.id) settlementMap.set(st.id, st);
+    }
+    if (Array.isArray(settlementHistory)) {
+      for (const st of settlementHistory) {
+        if (st?.id) settlementMap.set(st.id, st);
+      }
+    }
+
+    const members = Array.isArray(room.members) ? [...room.members] : [];
+    const cleanEmail =
+      typeof email === "string" && email.trim()
+        ? email.trim().toLowerCase()
+        : `guest_${(userName || "user").toLowerCase().replace(/\s+/g, "_")}`;
+    const displayName =
+      typeof userName === "string" && userName.trim()
+        ? userName.trim()
+        : "Integrante";
+
+    const existingMemberIdx = members.findIndex((m) => m.email === cleanEmail);
+    if (existingMemberIdx >= 0) {
+      members[existingMemberIdx] = {
+        email: cleanEmail,
+        name: displayName,
+        lastSeen: now,
+      };
+    } else if (members.length < 4) {
+      members.push({ email: cleanEmail, name: displayName, lastSeen: now });
+    }
+
+    const updatedRoom: UserDataPayload = {
+      ...room,
+      transactions: Array.from(txMap.values()),
+      settlementHistory: Array.from(settlementMap.values()),
+      members,
+      updatedAt: now,
+    };
+
+    db.accountsData[cleanCode] = updatedRoom;
+    saveDb(db);
+
+    return res.json({
+      success: true,
+      accountCode: cleanCode,
+      sharedTransactions: updatedRoom.transactions,
+      settlementHistory: updatedRoom.settlementHistory,
+      members: updatedRoom.members,
+      updatedAt: now,
+    });
+  } catch (err: any) {
+    console.error("Error in /api/couple/sync:", err);
+    return res
+      .status(500)
+      .json({ success: false, error: "Error al sincronizar gastos compartidos." });
+  }
+});
+
+// ==========================================
+// STATEMENT & RECEIPT IMPORTER (/api/import/analyze)
+// ==========================================
+function parseStatementLinesFallback(rawText: string): any[] {
+  const today = new Date().toISOString().split("T")[0];
+  const lines = (rawText || "")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 4);
+
+  const items: any[] = [];
+  for (const line of lines) {
+    const amountMatch = line.match(
+      /(?:US\$|USD|\$)?\s*(-?\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})|-?\d+(?:[.,]\d{2})?)\s*$/i
+    );
+    if (!amountMatch) continue;
+
+    let rawNum = amountMatch[1].replace(/\s/g, "");
+    const lastComma = rawNum.lastIndexOf(",");
+    const lastDot = rawNum.lastIndexOf(".");
+    if (lastComma > lastDot) {
+      rawNum = rawNum.replace(/\./g, "").replace(",", ".");
+    } else if (lastDot > lastComma && lastComma !== -1) {
+      rawNum = rawNum.replace(/,/g, "");
+    } else if (lastDot !== -1 && /\.\d{3}$/.test(rawNum)) {
+      rawNum = rawNum.replace(/\./g, "");
+    }
+    const monto = Math.abs(parseFloat(rawNum) || 0);
+    if (monto <= 0) continue;
+
+    let fecha = today;
+    const dateMatch = line.match(/^(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?/);
+    if (dateMatch) {
+      const d = dateMatch[1].padStart(2, "0");
+      const m = dateMatch[2].padStart(2, "0");
+      const y = dateMatch[3]
+        ? dateMatch[3].length === 2
+          ? `20${dateMatch[3]}`
+          : dateMatch[3]
+        : String(new Date().getFullYear());
+      fecha = `${y}-${m}-${d}`;
+    }
+
+    let concepto = line
+      .slice(0, amountMatch.index || line.length)
+      .replace(/^(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\s*/, "")
+      .replace(/(?:US\$|USD|\$)\s*$/i, "")
+      .trim();
+    if (!concepto) concepto = "Consumo de resumen";
+
+    const cuotaMatch =
+      concepto.match(/(?:cuota|c\.?)\s*(\d{1,2})\s*(?:\/|de)\s*(\d{1,2})/i) ||
+      concepto.match(/\b(\d{1,2})\/(\d{1,2})\b/);
+    let esCuotas = false;
+    let cuotaActual = 1;
+    let cuotasTotal = 1;
+    if (cuotaMatch) {
+      const c1 = parseInt(cuotaMatch[1], 10);
+      const c2 = parseInt(cuotaMatch[2], 10);
+      if (c1 >= 1 && c2 >= 2 && c1 <= c2 && c2 <= 48) {
+        esCuotas = true;
+        cuotaActual = c1;
+        cuotasTotal = c2;
+      }
+    }
+
+    items.push({
+      fecha,
+      concepto,
+      monto,
+      moneda: /us\$|usd/i.test(line) ? "USD" : "ARS",
+      tipoTransaccion: /sueldo|acred|transferencia recibida/i.test(concepto)
+        ? "ingreso"
+        : "gasto",
+      esCuotas,
+      cuotaActual,
+      cuotasTotal,
+    });
+  }
+  return items;
+}
+
+app.post("/api/import/analyze", async (req, res) => {
+  try {
+    const { text, fileDataUrl, mimeType, categories } = req.body || {};
+    const catList = Array.isArray(categories) && categories.length > 0
+      ? categories.join(", ")
+      : "Alimentación, Supermercado, Transporte, Servicios, Salidas, Salud, Suscripciones, Hogar, Otros";
+
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const ai = getAiClient();
+        const parts: any[] = [];
+        if (typeof fileDataUrl === "string" && fileDataUrl.includes("base64,")) {
+          const base64Data = fileDataUrl.split("base64,")[1];
+          parts.push({
+            inlineData: {
+              data: base64Data,
+              mimeType: mimeType || "image/jpeg",
+            },
+          });
+        }
+        if (typeof text === "string" && text.trim()) {
+          parts.push({ text: `Texto del resumen/ticket:\n${text.trim()}` });
+        }
+        parts.push({
+          text: `Extraé todos los consumos o ingresos financieros de este comprobante o resumen argentino. Categorías disponibles: ${catList}. Si es un único ticket de compra, devolvé 1 ítem con su fecha YYYY-MM-DD, comercio como concepto y total como monto. Si menciona cuotas (ej. 02/06), marcá esCuotas=true, cuotaActual=2, cuotasTotal=6 y monto igual al valor de la cuota del mes.`,
+        });
+
+        const response = await ai.models.generateContent({
+          model: "gemini-3.8-flash",
+          contents: [{ role: "user", parts }],
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  fecha: { type: Type.STRING },
+                  concepto: { type: Type.STRING },
+                  monto: { type: Type.NUMBER },
+                  moneda: { type: Type.STRING },
+                  tipoTransaccion: { type: Type.STRING },
+                  categoria: { type: Type.STRING },
+                  esCuotas: { type: Type.BOOLEAN },
+                  cuotaActual: { type: Type.NUMBER },
+                  cuotasTotal: { type: Type.NUMBER },
+                },
+                required: ["concepto", "monto"],
+              },
+            },
+          },
+        });
+
+        const parsed = JSON.parse(response.text || "[]");
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return res.json({ success: true, items: parsed });
+        }
+      } catch (aiErr) {
+        console.warn("Fallback parser activated in /api/import/analyze:", aiErr);
+      }
+    }
+
+    if (typeof text === "string" && text.trim()) {
+      const fallbackItems = parseStatementLinesFallback(text);
+      return res.json({ success: true, items: fallbackItems });
+    }
+
+    return res.status(400).json({
+      success: false,
+      error: "No pudimos extraer filas automáticamente. Probá subiendo un CSV o pegando las líneas de texto.",
+    });
+  } catch (err: any) {
+    console.error("Error in /api/import/analyze:", err);
+    return res
+      .status(500)
+      .json({ success: false, error: "Error al procesar el archivo." });
+  }
+});
+
 // Handle unmatched API routes with JSON 404 instead of HTML SPA fallback
 app.all("/api/*", (_req, res) => {
   res.status(404).json({ success: false, error: "Ruta de API no encontrada." });
@@ -2474,7 +2828,7 @@ async function startServer() {
 
   if (!isProduction) {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false },
       appType: "spa",
     });
     app.use(vite.middlewares);
@@ -2485,9 +2839,32 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  const server = app.listen(PORT, HOST, () => {
+    console.log(`Server running on http://${HOST}:${PORT}`);
   });
+
+  server.on("error", (err: any) => {
+    if (err.code === "EADDRINUSE") {
+      console.warn(`Port ${PORT} is busy, retrying in 1000ms...`);
+      setTimeout(() => {
+        try {
+          server.close();
+        } catch {}
+        server.listen(PORT, HOST);
+      }, 1000);
+    } else {
+      console.error("Server listen error:", err);
+    }
+  });
+
+  const cleanup = () => {
+    try {
+      server.close();
+    } catch {}
+    process.exit(0);
+  };
+  process.on("SIGTERM", cleanup);
+  process.on("SIGINT", cleanup);
 }
 
 // Only listen when not in a serverless environment like Vercel

@@ -108,6 +108,16 @@ import {
 import { 
   MultiCurrencyWidget 
 } from './components/MultiCurrencyWidget';
+import {
+  WalletsSection,
+  DEFAULT_WALLETS
+} from './components/WalletsSection';
+import {
+  StatementImportModal
+} from './components/StatementImportModal';
+import {
+  MonthlyReportModal
+} from './components/MonthlyReportModal';
 import { 
   ScheduledPayment 
 } from './CashFlowEngine';
@@ -160,17 +170,21 @@ import {
   CategoryColors, 
   CategoryMap, 
   CoupleProfile, 
+  CreditCardConfig,
   ExpenseMode, 
   FilterState, 
   Goal, 
   GoalContribution, 
+  PaymentMethod,
   SettlementRecord, 
   SubscriptionPlan,
   SubscriptionPlanId,
   Transaction,
   UserAccount,
   UserSubscription,
-  Vencimiento
+  Vencimiento,
+  WalletAccount,
+  WalletTransfer
 } from './types';
 import { 
   DEFAULT_BUDGETS, 
@@ -304,6 +318,16 @@ export default function App() {
         setIsAuthenticated(true);
         localStorage.setItem('control_gastos_is_authenticated', 'true');
 
+        // Garantizar que cuentas reales de usuario no mantengan datos de demo en memoria
+        setTransactions(prev => {
+          const demoTxIds = new Set(DEFAULT_TRANSACTIONS.map(t => t.id));
+          return prev.filter(t => t && !demoTxIds.has(t.id) && !String(t.id).startsWith('tx-'));
+        });
+        setVencimientos(prev => {
+          const demoVencimientoIds = new Set(['v1', 'v2', 'v3', 'v4', 'v5']);
+          return prev.filter(v => v && !demoVencimientoIds.has(v.id));
+        });
+
         try {
           const profileFromDb = await getUserProfileFromFirestore(user.uid);
           if (profileFromDb) {
@@ -401,6 +425,15 @@ export default function App() {
       ownerId,
       isDemo ? DEFAULT_TRANSACTIONS : [],
     );
+
+    // En cuentas reales de usuario, los movimientos jamás deben venir precargados
+    if (!isDemo) {
+      if (!saved || saved.length === 0) return [];
+      const demoTxIds = new Set(DEFAULT_TRANSACTIONS.map(t => t.id));
+      const cleanSaved = saved.filter(tx => tx && !demoTxIds.has(tx.id) && !String(tx.id).startsWith('tx-'));
+      return cleanSaved;
+    }
+
     if (saved.length > 0) {
       try {
         const parsed: Transaction[] = saved;
@@ -589,7 +622,7 @@ export default function App() {
           return {
             accountCode: parsed.accountCode || ('COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000)),
             user1Name: 'Mi Usuario',
-            user2Name: 'Mi Pareja',
+            user2Name: 'Cuenta Compartida',
             currentUser: 'user1',
             currency: 'ARS',
             defaultSplit: '50_50',
@@ -684,6 +717,16 @@ export default function App() {
       ownerId,
       isDemo ? defaultItems : [],
     );
+
+    // En cuentas reales de usuario, los vencimientos jamás deben venir precargados
+    const demoVencimientoIds = new Set(['v1', 'v2', 'v3', 'v4', 'v5']);
+    if (!isDemo) {
+      if (Array.isArray(saved)) {
+        return saved.filter(v => v && !demoVencimientoIds.has(v.id));
+      }
+      return [];
+    }
+
     if (Array.isArray(saved) && saved.length > 0) {
       try {
         const parsed = saved;
@@ -708,17 +751,49 @@ export default function App() {
     return saved;
   });
 
+  // ─── Cuentas / Billeteras, Transferencias & Configuración de Tarjetas ─────────
+  const [wallets, setWallets] = useState<WalletAccount[]>(() => {
+    const ownerId = getStoredOwnerId();
+    const saved = readScopedStorage<WalletAccount[]>(
+      'gastoar_wallets_v1',
+      ownerId,
+      DEFAULT_WALLETS,
+    );
+    return Array.isArray(saved) && saved.length > 0 ? saved : DEFAULT_WALLETS;
+  });
+
+  const [walletTransfers, setWalletTransfers] = useState<WalletTransfer[]>(() => {
+    const ownerId = getStoredOwnerId();
+    return readScopedStorage<WalletTransfer[]>(
+      'gastoar_wallet_transfers_v1',
+      ownerId,
+      [],
+    );
+  });
+
+  const [cardConfigs, setCardConfigs] = useState<CreditCardConfig[]>(() => {
+    const ownerId = getStoredOwnerId();
+    return readScopedStorage<CreditCardConfig[]>(
+      'gastoar_card_configs_v1',
+      ownerId,
+      [],
+    );
+  });
+
+  const [partnerConnected, setPartnerConnected] = useState<boolean>(false);
+
   // UI States
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'installments' | 'card_alerts' | 'couple_balance' | 'budgets' | 'categories' | 'ai' | 'settlement' | 'goals' | 'subscriptions' | 'admin_subscriptions' | 'charts' | 'profile' | 'settings' | 'cashflow' | 'currency'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'wallets' | 'installments' | 'card_alerts' | 'couple_balance' | 'budgets' | 'categories' | 'ai' | 'settlement' | 'goals' | 'subscriptions' | 'admin_subscriptions' | 'charts' | 'profile' | 'settings' | 'cashflow' | 'currency'>('dashboard');
   const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState<boolean>(false);
 
   // Sync route path with activeTab if user accesses specific route
   useEffect(() => {
     const raw = location.pathname.replace(/^\/+/, '').toLowerCase();
     if (!raw || raw === 'login') return;
-    if (raw === 'installments' || raw === 'cuotas') setActiveTab('installments');
+    if (raw === 'wallets' || raw === 'cuentas' || raw === 'billeteras') setActiveTab('wallets');
+    else if (raw === 'installments' || raw === 'cuotas') setActiveTab('installments');
     else if (raw === 'card_alerts' || raw === 'vencimientos' || raw === 'alertas') setActiveTab('card_alerts');
-    else if (raw === 'couple_balance' || raw === 'balance') setActiveTab('couple_balance');
+    else if (raw === 'couple_balance' || raw === 'balance' || raw === 'compartido') setActiveTab('couple_balance');
     else if (raw === 'budgets' || raw === 'presupuestos') setActiveTab('budgets');
     else if (raw === 'categories' || raw === 'categorias') setActiveTab('categories');
     else if (raw === 'goals' || raw === 'metas') setActiveTab('goals');
@@ -765,6 +840,9 @@ export default function App() {
   const [isCardAlertsModalOpen, setIsCardAlertsModalOpen] = useState(false);
   const [isDiagnosisModalOpen, setIsDiagnosisModalOpen] = useState(false);
   const [isCloudSyncModalOpen, setIsCloudSyncModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importDefaultMethod, setImportDefaultMethod] = useState<PaymentMethod>('Crédito');
+  const [isMonthlyReportModalOpen, setIsMonthlyReportModalOpen] = useState(false);
 
   // Screen 1 & 4: Mobile startup splash and tutorial modal
   const [showSplash, setShowSplash] = useState<boolean>(() => {
@@ -893,13 +971,19 @@ export default function App() {
     }));
   }, [vencimientos]);
 
+  // Active (non-deleted) transactions for UI views & totals
+  const activeTransactions = useMemo(
+    () => transactions.filter(t => !t.deletedAt),
+    [transactions]
+  );
+
   const appTotalIncome = useMemo(() => {
-    return transactions.filter(t => t.tipoTransaccion === 'ingreso').reduce((s, t) => s + Number(t.monto || 0), 0);
-  }, [transactions]);
+    return activeTransactions.filter(t => t.tipoTransaccion === 'ingreso').reduce((s, t) => s + Number(t.monto || 0), 0);
+  }, [activeTransactions]);
 
   const appTotalExpenses = useMemo(() => {
-    return transactions.filter(t => t.tipoTransaccion !== 'ingreso').reduce((s, t) => s + Number(t.monto || 0), 0);
-  }, [transactions]);
+    return activeTransactions.filter(t => t.tipoTransaccion !== 'ingreso').reduce((s, t) => s + Number(t.monto || 0), 0);
+  }, [activeTransactions]);
 
   const appAvailableBalance = useMemo(() => {
     return appTotalIncome - appTotalExpenses;
@@ -918,6 +1002,21 @@ export default function App() {
     if (!localStorageOwnerId) return;
     writeScopedStorage('gastoar_vencimientos_v1', localStorageOwnerId, vencimientos);
   }, [vencimientos, localStorageOwnerId]);
+
+  useEffect(() => {
+    if (!localStorageOwnerId) return;
+    writeScopedStorage('gastoar_wallets_v1', localStorageOwnerId, wallets);
+  }, [wallets, localStorageOwnerId]);
+
+  useEffect(() => {
+    if (!localStorageOwnerId) return;
+    writeScopedStorage('gastoar_wallet_transfers_v1', localStorageOwnerId, walletTransfers);
+  }, [walletTransfers, localStorageOwnerId]);
+
+  useEffect(() => {
+    if (!localStorageOwnerId) return;
+    writeScopedStorage('gastoar_card_configs_v1', localStorageOwnerId, cardConfigs);
+  }, [cardConfigs, localStorageOwnerId]);
 
   useEffect(() => {
     if (!localStorageOwnerId) return;
@@ -962,6 +1061,37 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('control_gastos_is_demo', String(isDemoMode));
   }, [isDemoMode]);
+
+  // Listen to Service Worker notification clicks (NAVIGATE_TO)
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const onSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'NAVIGATE_TO' && typeof event.data.url === 'string') {
+        const target = event.data.url.replace(/^\/+/, '').toLowerCase();
+        if (target.includes('vencimiento') || target.includes('card_alerts')) {
+          setActiveTab('card_alerts');
+        }
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', onSwMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onSwMessage);
+  }, []);
+
+  // Auto-join Couple Room when opening an ?invite=COMPARTIDA-XXXX link
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const params = new URLSearchParams(location.search);
+    const inviteCode = params.get('invite');
+    if (inviteCode && inviteCode.trim()) {
+      const cleanInvite = inviteCode.trim().toUpperCase();
+      if (cleanInvite !== profile.accountCode) {
+        setProfile(prev => ({ ...prev, accountCode: cleanInvite }));
+        showToast(`¡Vinculado automáticamente a la sala ${cleanInvite}!`, 'success');
+      }
+      setActiveTab('couple_balance');
+      navigate('/compartido', { replace: true });
+    }
+  }, [isAuthenticated, location.search]);
 
   // Active user ID for Firebase Firestore partitioning
   const activeUserId = useMemo(() => {
@@ -1090,6 +1220,16 @@ export default function App() {
           );
         }
 
+        if (Array.isArray((data as any).wallets) && (data as any).wallets.length > 0) {
+          setWallets((data as any).wallets as WalletAccount[]);
+        }
+        if (Array.isArray((data as any).walletTransfers)) {
+          setWalletTransfers((data as any).walletTransfers as WalletTransfer[]);
+        }
+        if (Array.isArray((data as any).cardConfigs)) {
+          setCardConfigs((data as any).cardConfigs as CreditCardConfig[]);
+        }
+
         isInitialCloudLoadDone.current = true;
         setCloudSyncStatus('synced');
       },
@@ -1121,7 +1261,8 @@ export default function App() {
         await syncAppStateToFirestore(activeUserId, {
           transactions, categoryMap, categoryColors, budgets, profile,
           settlementHistory, goals, subscriptions, vencimientos,
-        });
+          wallets, walletTransfers, cardConfigs,
+        } as any);
         setCloudSyncStatus('synced');
       } catch {
         setCloudSyncStatus('offline');
@@ -1139,11 +1280,110 @@ export default function App() {
     goals,
     subscriptions,
     vencimientos,
+    wallets,
+    walletTransfers,
+    cardConfigs,
     isAuthenticated,
     currentUserAccount?.email,
     activeUserId,
     isDemoMode,
   ]);
+
+  // Real-time Shared Couple Room Sync (/api/couple/sync) — merges only 'pareja' movements & settlements
+  const sharedSyncRef = useRef<{ txs: Transaction[]; settlements: SettlementRecord[] }>({
+    txs: [],
+    settlements: [],
+  });
+  useEffect(() => {
+    sharedSyncRef.current = {
+      txs: transactions.filter(t => t.tipo === 'pareja'),
+      settlements: settlementHistory,
+    };
+  }, [transactions, settlementHistory]);
+
+  useEffect(() => {
+    if (!isAuthenticated || isDemoMode || !profile?.accountCode) return;
+
+    let isCancelled = false;
+    const syncCoupleRoom = async () => {
+      try {
+        const res = await fetch('/api/couple/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accountCode: profile.accountCode,
+            email: currentUserAccount?.email || '',
+            userName:
+              profile.currentUser === 'user2' ? profile.user2Name : profile.user1Name,
+            sharedTransactions: sharedSyncRef.current.txs,
+            settlementHistory: sharedSyncRef.current.settlements,
+          }),
+        });
+        if (!res.ok || isCancelled) return;
+        const json = await res.json();
+        if (!json?.success || isCancelled) return;
+
+        const members: Array<{ email: string; name: string; lastSeen: number }> =
+          Array.isArray(json.members) ? json.members : [];
+        const myEmail = (currentUserAccount?.email || '').trim().toLowerCase();
+        const otherMember = members.find(m => m.email && m.email !== myEmail);
+        setPartnerConnected(Boolean(otherMember || members.length >= 2));
+
+        if (otherMember?.name && (profile.user2Name === 'Cuenta Compartida' || profile.user2Name === 'Fondo Ahorro')) {
+          setProfile(prev => ({ ...prev, user2Name: otherMember.name }));
+        }
+
+        if (Array.isArray(json.sharedTransactions)) {
+          setTransactions(prev => {
+            const privateTxs = prev.filter(t => t.tipo !== 'pareja');
+            const sharedMap = new Map<string, Transaction>();
+            prev.filter(t => t.tipo === 'pareja').forEach(t => sharedMap.set(t.id, t));
+
+            let changed = false;
+            for (const remoteTx of json.sharedTransactions as Transaction[]) {
+              if (!remoteTx?.id) continue;
+              const localTx = sharedMap.get(remoteTx.id);
+              if (!localTx) {
+                sharedMap.set(remoteTx.id, remoteTx);
+                changed = true;
+              } else if (remoteTx.deletedAt && !localTx.deletedAt) {
+                sharedMap.set(remoteTx.id, { ...localTx, deletedAt: remoteTx.deletedAt });
+                changed = true;
+              }
+            }
+            if (!changed) return prev;
+            const merged = [...privateTxs, ...Array.from(sharedMap.values())];
+            merged.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+            return merged;
+          });
+        }
+
+        if (Array.isArray(json.settlementHistory)) {
+          setSettlementHistory(prev => {
+            const map = new Map<string, SettlementRecord>();
+            prev.forEach(s => map.set(s.id, s));
+            let changed = false;
+            for (const st of json.settlementHistory as SettlementRecord[]) {
+              if (st?.id && !map.has(st.id)) {
+                map.set(st.id, st);
+                changed = true;
+              }
+            }
+            return changed ? Array.from(map.values()) : prev;
+          });
+        }
+      } catch {
+        // Silent background sync resilience
+      }
+    };
+
+    syncCoupleRoom();
+    const intervalId = window.setInterval(syncCoupleRoom, 15000);
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [isAuthenticated, isDemoMode, profile.accountCode, currentUserAccount?.email]);
 
   // Subscription Handlers
   const handleUpdateSubscription = (id: string, updates: Partial<UserSubscription>) => {
@@ -1236,12 +1476,12 @@ export default function App() {
 
   // Calculate Couple Debt and Balances
   const debtInfo = useMemo(() => {
-    return calculateCoupleBalances(transactions, profile);
-  }, [transactions, profile]);
+    return calculateCoupleBalances(activeTransactions, profile);
+  }, [activeTransactions, profile]);
 
   // Filtered transactions
   const filteredTransactions = useMemo(() => {
-    return transactions.filter(tx => {
+    return activeTransactions.filter(tx => {
       // 0. Date Range Filter
       if (!isDateInRange(tx.fecha, filters.dateRange, filters.startDate, filters.endDate, filters.selectedMonth)) {
         return false;
@@ -1277,7 +1517,7 @@ export default function App() {
 
       return true;
     });
-  }, [transactions, filters]);
+  }, [activeTransactions, filters]);
 
   // Global Budget calculations
   const globalBudget = useMemo(() => {
@@ -1301,11 +1541,11 @@ export default function App() {
       // Create new transaction
       const isIncome = txData.tipoTransaccion === 'ingreso';
       const newTx: Transaction = {
-        id: Date.now().toString(),
+        id: Date.now().toString() + '-' + Math.random().toString(36).slice(2, 6),
         concepto: txData.concepto || (isIncome ? 'Nuevo Ingreso' : 'Nuevo Gasto'),
         descripcion: txData.descripcion || '',
         monto: txData.monto || 0,
-        moneda: profile.currency || 'ARS',
+        moneda: txData.moneda || profile.currency || 'ARS',
         categoria: txData.categoria || (isIncome ? 'Ingresos' : (Object.keys(categoryMap)[0] || 'Alimentación')),
         subcategoria: txData.subcategoria || (isIncome ? 'Sueldo' : 'General'),
         fecha: txData.fecha || new Date().toISOString().split('T')[0],
@@ -1317,12 +1557,15 @@ export default function App() {
         user1Amount: txData.user1Amount,
         user2Amount: txData.user2Amount,
         metodoPago: txData.metodoPago || 'Débito',
+        walletId: txData.walletId,
+        comprobanteUrl: txData.comprobanteUrl,
         tarjetaNombre: txData.tarjetaNombre,
         esCuotas: txData.esCuotas || false,
         cuotasTotal: txData.cuotasTotal,
         cuotaActual: txData.cuotaActual,
         montoCuota: txData.montoCuota,
         tipoTransaccion: isIncome ? 'ingreso' : 'gasto',
+        createdAt: Date.now(),
       };
       savedTx = newTx;
       setTransactions(prev => [newTx, ...prev]);
@@ -1370,6 +1613,9 @@ export default function App() {
             settlementHistory,
             goals,
             subscriptions,
+            wallets,
+            walletTransfers,
+            cardConfigs,
           }
         })
       }).catch(err => {
@@ -1391,7 +1637,10 @@ export default function App() {
         settlementHistory,
         goals,
         subscriptions,
-      }).catch(err => {
+        wallets,
+        walletTransfers,
+        cardConfigs,
+      } as any).catch(err => {
         console.warn('Could not sync app state on save:', err);
       });
     }
@@ -1406,6 +1655,41 @@ export default function App() {
     setEditingTransaction(null);
   };
 
+  const handleBulkImportTransactions = (items: Partial<Transaction>[]) => {
+    if (!items || items.length === 0) return;
+    const now = Date.now();
+    const createdList: Transaction[] = items.map((item, idx) => {
+      const isIncome = item.tipoTransaccion === 'ingreso';
+      const defaultCat = isIncome ? 'Ingresos' : (Object.keys(categoryMap)[0] || 'Alimentación');
+      const cat = item.categoria && categoryMap[item.categoria] ? item.categoria : defaultCat;
+      const sub = item.subcategoria || categoryMap[cat]?.[0] || 'General';
+      return {
+        id: `imp-${now}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+        concepto: item.concepto || 'Consumo importado',
+        descripcion: item.descripcion || 'Importado desde resumen/comprobante',
+        monto: Number(item.monto || 0),
+        moneda: item.moneda || profile.currency || 'ARS',
+        categoria: cat,
+        subcategoria: sub,
+        fecha: item.fecha || new Date().toISOString().split('T')[0],
+        tipo: item.tipo || (activeMode === 'pareja' ? 'pareja' : 'individual'),
+        pagadoPor: item.pagadoPor || profile.currentUser,
+        splitType: item.tipo === 'pareja' ? (profile.defaultSplit || '50_50') : undefined,
+        metodoPago: item.metodoPago || 'Crédito',
+        tarjetaNombre: item.tarjetaNombre,
+        esCuotas: Boolean(item.esCuotas),
+        cuotaActual: item.cuotaActual,
+        cuotasTotal: item.cuotasTotal,
+        montoCuota: item.esCuotas ? Number(item.monto || 0) : undefined,
+        tipoTransaccion: isIncome ? 'ingreso' : 'gasto',
+        createdAt: now + idx,
+      };
+    });
+
+    setTransactions(prev => [...createdList, ...prev]);
+    showToast(`¡${createdList.length} movimientos importados con éxito!`, 'success');
+  };
+
   const handleEditTransaction = (tx: Transaction) => {
     setEditingTransaction(tx);
     setInitialIsCuotas(Boolean(tx.esCuotas || (tx.cuotasTotal && tx.cuotasTotal > 1)));
@@ -1415,7 +1699,10 @@ export default function App() {
 
   const handleDeleteTransaction = (id: string) => {
     const toDelete = transactions.find(t => t.id === id);
-    const remainingTxs = transactions.filter(t => t.id !== id);
+    const remainingTxs =
+      toDelete?.tipo === 'pareja'
+        ? transactions.map(t => (t.id === id ? { ...t, deletedAt: Date.now() } : t))
+        : transactions.filter(t => t.id !== id);
     setTransactions(remainingTxs);
 
     if (localStorageOwnerId) {
@@ -1440,6 +1727,9 @@ export default function App() {
             settlementHistory,
             goals,
             subscriptions,
+            wallets,
+            walletTransfers,
+            cardConfigs,
           }
         })
       }).catch(err => {
@@ -1460,7 +1750,10 @@ export default function App() {
         settlementHistory,
         goals,
         subscriptions,
-      }).catch(err => {
+        wallets,
+        walletTransfers,
+        cardConfigs,
+      } as any).catch(err => {
         console.warn('Could not sync app state on delete:', err);
       });
     }
@@ -1788,7 +2081,7 @@ export default function App() {
             : {
                 ...DEFAULT_COUPLE_PROFILE,
                 user1Name: acc.name,
-                user2Name: acc.partnerName || 'Mi Pareja',
+                user2Name: acc.partnerName || 'Cuenta Compartida',
                 currency: acc.currency || 'ARS',
                 accountCode: acc.accountCode || DEFAULT_COUPLE_PROFILE.accountCode,
               },
@@ -1859,7 +2152,11 @@ export default function App() {
 
         if (json.data) {
           const data = json.data;
-          if (Array.isArray(data.transactions)) setTransactions(data.transactions);
+          const demoTxIds = new Set(DEFAULT_TRANSACTIONS.map(t => t.id));
+          const cleanTxs = Array.isArray(data.transactions)
+            ? (data.transactions as Transaction[]).filter((t: any) => t && !demoTxIds.has(t.id) && !String(t.id).startsWith('tx-'))
+            : [];
+          setTransactions(cleanTxs);
           if (data.categoryMap) setCategoryMap(data.categoryMap);
           if (data.categoryColors) setCategoryColors(data.categoryColors);
           if (data.budgets) setBudgets(data.budgets);
@@ -1867,19 +2164,26 @@ export default function App() {
           if (Array.isArray(data.settlementHistory)) setSettlementHistory(data.settlementHistory);
           if (Array.isArray(data.goals)) setGoals(data.goals);
           if (Array.isArray(data.subscriptions) && data.subscriptions.length > 0) setSubscriptions(data.subscriptions);
+          const demoVencimientoIds = new Set(['v1', 'v2', 'v3', 'v4', 'v5']);
+          const cleanVencs = Array.isArray(data.vencimientos)
+            ? (data.vencimientos as Vencimiento[]).filter((v: any) => v && !demoVencimientoIds.has(v.id))
+            : [];
+          setVencimientos(cleanVencs);
         } else {
           // If server didn't have data, check if we already have local scoped transactions
           const ownerId = acc.id || acc.email;
           const localScopedTxs = readScopedStorage<Transaction[]>('control_gastos_tx_v5', ownerId, []);
-          if (localScopedTxs.length > 0) {
-            setTransactions(localScopedTxs);
+          const demoTxIds = new Set(DEFAULT_TRANSACTIONS.map(t => t.id));
+          const cleanLocal = localScopedTxs.filter(t => t && !demoTxIds.has(t.id) && !String(t.id).startsWith('tx-'));
+          if (cleanLocal.length > 0) {
+            setTransactions(cleanLocal);
             fetch('/api/sync/save', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 email: acc.email,
                 accountCode: acc.accountCode,
-                data: { transactions: localScopedTxs, profile }
+                data: { transactions: cleanLocal, profile }
               })
             }).catch(() => {});
           } else {
@@ -1888,7 +2192,7 @@ export default function App() {
           setProfile({
             ...DEFAULT_COUPLE_PROFILE,
             user1Name: acc.name,
-            user2Name: acc.partnerName || 'Mi Pareja',
+            user2Name: acc.partnerName || 'Cuenta Compartida',
             currency: acc.currency || 'ARS',
             accountCode: acc.accountCode || DEFAULT_COUPLE_PROFILE.accountCode,
           });
@@ -2077,7 +2381,7 @@ export default function App() {
       const cleanProfile: CoupleProfile = {
         accountCode: initialSub.accountCode,
         user1Name: data.name.trim(),
-        user2Name: data.accountType === 'individual' ? 'Fondo Ahorro' : (data.partnerName ? data.partnerName.trim() : 'Mi Pareja'),
+        user2Name: data.accountType === 'individual' ? 'Fondo Ahorro' : (data.partnerName ? data.partnerName.trim() : 'Cuenta Compartida'),
         currentUser: 'user1',
         currency: data.currency || 'ARS',
         defaultSplit: data.accountType === 'individual' ? '100_user1' : '50_50',
@@ -2315,7 +2619,7 @@ export default function App() {
     setProfile({
       accountCode: 'COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000),
       user1Name: 'Mi Usuario',
-      user2Name: 'Mi Pareja',
+      user2Name: 'Cuenta Compartida',
       currentUser: 'user1',
       currency: 'ARS',
       defaultSplit: '50_50',
@@ -2359,7 +2663,7 @@ export default function App() {
     setProfile({
       accountCode: 'COMPARTIDA-' + Math.floor(1000 + Math.random() * 9000),
       user1Name: 'Mi Usuario',
-      user2Name: 'Mi Pareja',
+      user2Name: 'Cuenta Compartida',
       currentUser: 'user1',
       currency: 'ARS',
       defaultSplit: '50_50',
@@ -2516,11 +2820,36 @@ export default function App() {
         {/* Dashboard Main Container */}
         <main className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-6 flex-1 w-full space-y-6">
           
+          {/* TAB 0.5: WALLETS & ACCOUNT BALANCES */}
+          {activeTab === 'wallets' && (
+            <WalletsSection
+              wallets={wallets}
+              transfers={walletTransfers}
+              transactions={activeTransactions}
+              onSaveWallets={(nextWallets) => {
+                setWallets(nextWallets);
+              }}
+              onSaveTransfers={(nextTransfers) => {
+                setWalletTransfers(nextTransfers);
+              }}
+              onShowToast={(msg) => showToast(msg, 'success')}
+            />
+          )}
+
           {/* TAB 1: DEDICATED INSTALLMENTS SECTION */}
           {activeTab === 'installments' && (
             <InstallmentsSection
-              transactions={transactions}
+              transactions={activeTransactions}
               profile={profile}
+              cardConfigs={cardConfigs}
+              onSaveCardConfigs={(configs) => {
+                setCardConfigs(configs);
+                showToast('Configuración de cierres y vencimientos guardada', 'success');
+              }}
+              onOpenImportModal={() => {
+                setImportDefaultMethod('Crédito');
+                setIsImportModalOpen(true);
+              }}
               onOpenNewInstallmentModal={() => {
                 setEditingTransaction(null);
                 setInitialIsCuotas(true);
@@ -2539,7 +2868,7 @@ export default function App() {
           {activeTab === 'card_alerts' && (
             <AlertsSection
               profile={profile}
-              transactions={transactions}
+              transactions={activeTransactions}
               isDemoMode={isDemoMode}
               onShowToast={showToast}
               onSaveTransaction={handleSaveTransaction}
@@ -2556,11 +2885,14 @@ export default function App() {
           {/* TAB 2: COUPLE BALANCE & SETTLEMENTS */}
           {activeTab === 'couple_balance' && (
             <CoupleBalanceSection
-              transactions={transactions}
+              transactions={activeTransactions}
               profile={profile}
               debtInfo={debtInfo}
               categoryMap={categoryMap}
               categoryColors={categoryColors}
+              partnerConnected={partnerConnected}
+              onOpenCoupleSettings={() => setIsCoupleModalOpen(true)}
+              onOpenMonthlyReport={() => setIsMonthlyReportModalOpen(true)}
               onOpenSettlementModal={() => setIsSettlementModalOpen(true)}
               onOpenTransactionModal={() => {
                 setEditingTransaction(null);
@@ -2581,7 +2913,7 @@ export default function App() {
                 budgets={budgets}
                 categoryMap={categoryMap}
                 categoryColors={categoryColors}
-                transactions={transactions}
+                transactions={activeTransactions}
                 currency={profile.currency}
                 isPro={currentPlanId === 'pro_ai' || isAdmin || isDemoMode}
                 onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
@@ -2631,13 +2963,14 @@ export default function App() {
               onUpdateGoal={handleUpdateGoal}
               onDeleteGoal={handleDeleteGoal}
               onAddContribution={handleAddContribution}
+              onSaveTransaction={handleSaveTransaction}
             />
           )}
 
           {/* TAB 6: TRANSACTIONS LIST & FILTERS */}
           {activeTab === 'transactions' && (
             <TransactionsTable
-              transactions={transactions}
+              transactions={activeTransactions}
               filteredTransactions={filteredTransactions}
               filters={filters}
               onFilterChange={(newFilters) => setFilters(prev => ({ ...prev, ...newFilters }))}
@@ -2660,9 +2993,20 @@ export default function App() {
               onEditTransaction={handleEditTransaction}
               onDeleteTransaction={handleDeleteTransaction}
               onExportCSV={() => exportTransactionsToCSV(filteredTransactions, profile.currency)}
+              onOpenImportModal={() => {
+                setImportDefaultMethod('Débito');
+                setIsImportModalOpen(true);
+              }}
+              onOpenMonthlyReport={() => setIsMonthlyReportModalOpen(true)}
               onResetData={handleGuestDemo}
               onNavigateTab={(tab) => setActiveTab(tab)}
               onOpenCloudSync={() => setIsCloudSyncModalOpen(true)}
+              onOpenNewTransaction={() => {
+                setEditingTransaction(null);
+                setInitialIsCuotas(false);
+                setTxModalInitialType('gasto');
+                setIsTxModalOpen(true);
+              }}
             />
           )}
 
@@ -2670,7 +3014,7 @@ export default function App() {
           {activeTab === 'dashboard' && (
             <div className="space-y-7">
               <DashboardOverview
-                transactions={transactions}
+                transactions={activeTransactions}
                 profile={profile}
                 userAccount={currentUserAccount}
                 categoryColors={categoryColors}
@@ -2732,7 +3076,7 @@ export default function App() {
           {/* TAB: FLUJO DE CAJA (CASH FLOW PRO) */}
           {activeTab === 'cashflow' && (
             <CashFlowSection
-              transactions={transactions}
+              transactions={activeTransactions}
               currentBalance={appAvailableBalance}
               scheduledPayments={appScheduledPayments}
               isPro={currentPlanId === 'pro_ai' || isAdmin || isDemoMode}
@@ -2743,35 +3087,20 @@ export default function App() {
 
           {/* TAB: COTIZACIONES MULTIMONEDA & CONVERSOR DÓLAR */}
           {activeTab === 'currency' && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                    <span>💵 Dólar & Cotizaciones Multimoneda</span>
-                    <span className="px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-600 dark:text-orange-300 text-[10px] font-black uppercase border border-orange-300">
-                      En Vivo
-                    </span>
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Cotizaciones en tiempo real del Dólar Blue, MEP, Tarjeta, Cripto y Euro con conversor inteligente.
-                  </p>
-                </div>
-              </div>
-              <MultiCurrencyWidget
-                variant="card"
-                currentBalance={appAvailableBalance}
-                monthlyExpenses={appTotalExpenses}
-                isPro={currentPlanId === 'pro_ai' || isAdmin || isDemoMode}
-                onUpgradePro={() => setActiveTab('subscriptions')}
-                isDarkMode={isDarkMode}
-                onApplyConversion={(arsAmount) => {
-                  setEditingTransaction(null);
-                  setInitialIsCuotas(false);
-                  setTxModalInitialType('gasto');
-                  setIsTxModalOpen(true);
-                }}
-              />
-            </div>
+            <MultiCurrencyWidget
+              variant="full"
+              currentBalance={appAvailableBalance}
+              monthlyExpenses={appTotalExpenses}
+              isPro={currentPlanId === 'pro_ai' || isAdmin || isDemoMode}
+              onUpgradePro={() => setActiveTab('subscriptions')}
+              isDarkMode={isDarkMode}
+              onApplyConversion={() => {
+                setEditingTransaction(null);
+                setInitialIsCuotas(false);
+                setTxModalInitialType('gasto');
+                setIsTxModalOpen(true);
+              }}
+            />
           )}
 
           {/* TAB 9: ADMIN PANEL FOR CLIENT SUBSCRIPTIONS */}
@@ -2933,6 +3262,7 @@ export default function App() {
         editingTransaction={editingTransaction}
         categoryMap={categoryMap}
         profile={profile}
+        wallets={wallets}
         initialIsCuotas={initialIsCuotas}
         initialTransactionType={txModalInitialType}
         activeMode={activeMode}
@@ -3014,14 +3344,14 @@ export default function App() {
         isOpen={isCoupleModalOpen}
         onClose={() => setIsCoupleModalOpen(false)}
         profile={profile}
-        onSaveProfile={(newProfile) => {
-          setProfile(newProfile);
-          showToast('Configuración de cuenta compartida actualizada', 'success');
+        onUpdateProfile={(newProfile) => {
+          setProfile(prev => ({ ...prev, ...newProfile }));
         }}
+        onShowToast={showToast}
         onGenerateNewCode={handleGenerateNewCode}
         onJoinAccount={handleJoinAccount}
         onImportData={handleImportData}
-        transactions={transactions}
+        transactions={activeTransactions}
       />
 
       <SettlementModal
@@ -3029,9 +3359,27 @@ export default function App() {
         onClose={() => setIsSettlementModalOpen(false)}
         debtInfo={debtInfo}
         profile={profile}
-        transactions={transactions}
+        transactions={activeTransactions}
         settlementHistory={settlementHistory}
         onSettleDebt={handleSettleDebt}
+      />
+
+      <StatementImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        categoryMap={categoryMap}
+        profile={profile}
+        defaultPaymentMethod={importDefaultMethod}
+        onImportTransactions={handleBulkImportTransactions}
+        onShowToast={(msg) => showToast(msg, 'success')}
+      />
+
+      <MonthlyReportModal
+        isOpen={isMonthlyReportModalOpen}
+        onClose={() => setIsMonthlyReportModalOpen(false)}
+        transactions={activeTransactions}
+        profile={profile}
+        onShowToast={(msg) => showToast(msg, 'success')}
       />
 
       {/* User Profile & Account Settings Modal (Req 12) */}

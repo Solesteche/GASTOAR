@@ -362,37 +362,102 @@ export const CashFlowSection: React.FC<CashFlowSectionProps> = ({
     );
   }
 
+  const totalScheduledAmount = useMemo(
+    () => scheduledPayments.reduce((acc, p) => acc + (p.amount || 0), 0),
+    [scheduledPayments]
+  );
+
+  const liquidityProgressPct = useMemo(() => {
+    const base = Math.max(Math.abs(currentBalance), 1);
+    if (kpiData.in30Days.amount <= 0) return 15;
+    return Math.min(100, Math.max(10, Math.round((kpiData.in30Days.amount / base) * 100)));
+  }, [currentBalance, kpiData.in30Days.amount]);
+
   return (
-    <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-200">
+    <div className="max-w-4xl mx-auto space-y-4 font-sans pb-16 animate-in fade-in duration-200">
       
-      {/* ═════════════════════════════════════════════════════════════════════════ */}
-      {/* 1. HEADER PRINCIPAL CON TÍTULO, BADGE PRO Y BOTÓN "¿CÓMO SE CALCULA?"  */}
-      {/* ═════════════════════════════════════════════════════════════════════════ */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+      {/* 1. UNIFIED TOP HEADER (Outside Banner) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
         <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              Proyección de flujo de caja
-            </h1>
-            <span className="px-2.5 py-0.5 rounded-full bg-[#6F2EC5] text-white text-[11px] font-black uppercase tracking-wider shadow-xs">
-              PRO
-            </span>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Proyecta el saldo de tu cuenta a 30 días, detecta riesgos y anticipa tus gastos programados.
-          </p>
+          <p className="text-sm text-gray-400">Liquidez proyectada a 30 días</p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+            Flujo de Caja
+          </h1>
         </div>
 
-        {/* Botón "¿Cómo se calcula?" */}
-        <button
-          type="button"
-          onClick={() => setIsHowModalOpen(true)}
-          className="self-start sm:self-auto px-4 py-2.5 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 text-slate-800 text-xs font-bold shadow-2xs transition-all flex items-center gap-2 cursor-pointer active:scale-98 shrink-0"
-        >
-          <Lightbulb className="w-4 h-4 text-amber-500" />
-          <span>¿Cómo se calcula?</span>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setIsHowModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/90 text-slate-700 text-xs font-semibold shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+            <span>¿Cómo se calcula?</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className="px-4 py-2 rounded-xl bg-[#6936F5] hover:bg-[#5b2bd9] text-white text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>Recalcular</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 1.5 FULL-WIDTH PURPLE HERO BALANCE CARD */}
+      <div
+        className="rounded-3xl p-6 sm:p-7 text-white shadow-lg relative overflow-hidden"
+        style={{
+          background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)',
+        }}
+      >
+        <div className="relative z-10 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-purple-200/90">
+                Saldo proyectado en {daysAhead} días
+              </p>
+              <div className="text-3xl sm:text-4xl font-black tracking-tight tabular-nums mt-1">
+                {formatCurrencyFlow(
+                  daysAhead === 7
+                    ? kpiData.in7Days.amount
+                    : daysAhead === 15
+                    ? kpiData.in15Days.amount
+                    : kpiData.in30Days.amount
+                )}
+              </div>
+            </div>
+            <div className="text-xs text-purple-100/90 font-medium">
+              Saldo disponible hoy:{' '}
+              <span className="font-bold text-white tabular-nums">
+                {formatCurrencyFlow(currentBalance)}
+              </span>
+            </div>
+          </div>
+
+          <div className="w-full h-2 rounded-full bg-white/15 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[#FFA234] via-[#F97316] to-[#F95420] transition-all duration-500"
+              style={{ width: `${liquidityProgressPct}%` }}
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-purple-100/90 pt-0.5">
+            <span>
+              7 días: <strong className="text-white tabular-nums">{formatCurrencyFlow(kpiData.in7Days.amount)}</strong>
+            </span>
+            <span className="opacity-50">•</span>
+            <span>
+              15 días: <strong className="text-white tabular-nums">{formatCurrencyFlow(kpiData.in15Days.amount)}</strong>
+            </span>
+            <span className="opacity-50">•</span>
+            <span>
+              Pagos programados ({scheduledPayments.length}):{' '}
+              <strong className="text-white tabular-nums">{formatCurrencyFlow(totalScheduledAmount)}</strong>
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* ═════════════════════════════════════════════════════════════════════════ */}

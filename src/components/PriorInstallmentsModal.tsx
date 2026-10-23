@@ -462,7 +462,7 @@ export const PriorInstallmentsModal: React.FC<PriorInstallmentsModalProps> = ({
                       : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  Compartido Pareja
+                  Compartido
                 </button>
               </div>
             </div>

@@ -371,6 +371,361 @@ export const MultiCurrencyWidget: React.FC<MultiCurrencyWidgetProps> = ({
     );
   }
 
+  // ─── Full Tab Mode (Unified GastoAR Header + Purple Hero Card + Filter Bar) ──
+  if (variant === 'full') {
+    const spreadProgress = Math.min(100, Math.max(8, Math.round(Math.abs(brecha) * 1.8)));
+    return (
+      <div className="max-w-4xl mx-auto space-y-4 font-sans pb-16">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+          <div>
+            <p className="text-sm text-gray-400">Mercado cambiario argentino en vivo</p>
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+              Dólar y Divisas
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={fetchRates}
+              disabled={isLoading}
+              className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/90 text-slate-700 text-xs font-semibold shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-[#6936F5]' : ''}`} />
+              <span>Actualizar</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab(activeTab === 'converter' ? 'rates' : 'converter')}
+              className="px-4 py-2 rounded-xl bg-[#6936F5] hover:bg-[#5b2bd9] text-white text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+              <span>{activeTab === 'converter' ? 'Ver Pizarrón' : 'Conversor Rápido'}</span>
+            </button>
+          </div>
+        </div>
+
+        <div
+          className="rounded-3xl p-6 sm:p-7 text-white shadow-lg relative overflow-hidden"
+          style={{
+            background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)',
+          }}
+        >
+          <div className="relative z-10 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-purple-200/90">
+                  Dólar Blue · Referencia Venta
+                </p>
+                <div className="text-3xl sm:text-4xl font-black tracking-tight tabular-nums mt-1">
+                  {ars(blueRate.venta)}
+                </div>
+              </div>
+              <div className="text-xs text-purple-100/90 font-medium">
+                Compra: <strong className="text-white tabular-nums">{ars(blueRate.compra)}</strong>
+                {' · '}
+                Brecha oficial: <strong className="text-amber-300 tabular-nums">{brecha}%</strong>
+              </div>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-white/15 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#FFA234] via-[#F97316] to-[#F95420] transition-all duration-500"
+                style={{ width: `${spreadProgress}%` }}
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-purple-100/90 pt-0.5">
+              <span>
+                Oficial BNA: <strong className="text-white tabular-nums">{ars(oficialRate.venta)}</strong>
+              </span>
+              <span className="opacity-50">•</span>
+              <span>
+                Dólar MEP: <strong className="text-white tabular-nums">{ars(mepRate.venta)}</strong>
+              </span>
+              <span className="opacity-50">•</span>
+              <span>
+                Dólar Tarjeta: <strong className="text-white tabular-nums">{ars(tarjetaRate.venta)}</strong>
+              </span>
+              {(currentBalance !== 0 || monthlyExpenses > 0) && (
+                <>
+                  <span className="opacity-50">•</span>
+                  <span>
+                    Tu saldo en MEP:{' '}
+                    <strong className="text-emerald-300 tabular-nums">
+                      {usd(currentBalance / (mepRate.venta || 1))}
+                    </strong>
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-3xl p-3.5 sm:p-4 shadow-xs border border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setActiveTab('rates')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === 'rates'
+                  ? 'bg-[#6936F5] text-white shadow-2xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+              }`}
+            >
+              Pizarrón en Vivo
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('converter')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === 'converter'
+                  ? 'bg-[#6936F5] text-white shadow-2xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+              }`}
+            >
+              Conversor ARS ⇄ USD
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('card_calculator')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === 'card_calculator'
+                  ? 'bg-[#6936F5] text-white shadow-2xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+              }`}
+            >
+              Calculadora Tarjeta Exterior
+            </button>
+          </div>
+          <span className="text-[11px] text-slate-400 font-medium">
+            Sincronizado {lastUpdated.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+          </span>
+        </div>
+
+        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs">
+          <AnimatePresence mode="wait">
+            {activeTab === 'rates' && (
+              <motion.div
+                key="rates-full"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                className="space-y-4"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {rates.map(rate => {
+                    const isBlue = rate.casa === 'blue';
+                    const isTarjeta = rate.casa === 'tarjeta';
+                    const isMep = rate.casa === 'bolsa';
+                    return (
+                      <div
+                        key={`${rate.moneda}-${rate.casa}`}
+                        className={`rounded-2xl p-4 border transition-all ${
+                          isBlue
+                            ? 'bg-emerald-50/40 border-emerald-200'
+                            : isTarjeta
+                            ? 'bg-orange-50/40 border-orange-200'
+                            : isMep
+                            ? 'bg-purple-50/40 border-purple-200'
+                            : 'bg-slate-50/60 border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">{rate.emoji || '💵'}</span>
+                            <div>
+                              <p className="text-xs font-bold text-slate-900">{rate.nombre}</p>
+                              <span className="text-[11px] text-slate-500">{rate.badge || rate.casa}</span>
+                            </div>
+                          </div>
+                          {rate.variacion !== undefined && (
+                            <span className={`text-[11px] font-bold flex items-center gap-0.5 ${rate.variacion >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                              {rate.variacion >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                              {rate.variacion > 0 ? `+${rate.variacion}%` : `${rate.variacion}%`}
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-slate-200/60">
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Compra</p>
+                            <p className="text-sm font-black text-slate-700 tabular-nums">
+                              {rate.compra > 0 ? ars(rate.compra) : '—'}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Venta</p>
+                            <p className="text-base font-black text-slate-900 tabular-nums">{ars(rate.venta)}</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedRateKey(`${rate.moneda}-${rate.casa}`);
+                            setActiveTab('converter');
+                          }}
+                          className="w-full mt-3 py-1.5 px-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200/80 text-[11px] font-semibold text-slate-700 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <Calculator className="w-3 h-3 text-[#6936F5]" />
+                          <span>Calcular con {rate.nombre.split(' ')[1] || rate.nombre}</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'converter' && (
+              <motion.div
+                key="converter-full"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                className="space-y-4"
+              >
+                <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
+                  <div className="flex flex-col md:flex-row items-center gap-4">
+                    <div className="flex-1 w-full">
+                      <label className="text-xs font-bold text-slate-600 mb-1.5 block">
+                        {converterDirection === 'USD_TO_ARS' ? 'Monto en Dólares (USD)' : 'Monto en Pesos (ARS)'}
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400">
+                          {converterDirection === 'USD_TO_ARS' ? 'U$S' : '$'}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={converterAmount}
+                          onChange={e => setConverterAmount(e.target.value)}
+                          placeholder="100"
+                          className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-300 bg-white font-black text-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setConverterDirection(d => d === 'USD_TO_ARS' ? 'ARS_TO_USD' : 'USD_TO_ARS')}
+                      className="p-3 rounded-2xl bg-purple-100 hover:bg-purple-200 text-purple-700 transition-transform active:rotate-180 duration-300 cursor-pointer shrink-0"
+                      title="Intercambiar divisas"
+                    >
+                      <ArrowRightLeft className="w-5 h-5" />
+                    </button>
+                    <div className="flex-1 w-full">
+                      <label className="text-xs font-bold text-slate-600 mb-1.5 block">
+                        Cotización de referencia
+                      </label>
+                      <select
+                        value={selectedRateKey}
+                        onChange={e => setSelectedRateKey(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white font-bold text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
+                      >
+                        {rates.map(r => {
+                          const optKey = `${r.moneda}-${r.casa}`;
+                          return (
+                            <option key={optKey} value={optKey}>
+                              {r.nombre} ({ars(r.venta)})
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="mt-5 p-4 rounded-2xl bg-gradient-to-br from-[#4C1D95] via-[#6D3FEA] to-[#7C3AED] text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md">
+                    <div>
+                      <span className="text-xs text-purple-200 font-medium">Equivalente estimado:</span>
+                      <p className="text-2xl sm:text-3xl font-black text-white tabular-nums tracking-tight mt-0.5">
+                        {converterDirection === 'USD_TO_ARS' ? ars(convertedResult) : usd(convertedResult)}
+                      </p>
+                      <span className="text-[11px] text-purple-200 mt-1 block">
+                        1 USD = {ars(activeRate.venta)} ({activeRate.nombre})
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCopy}
+                        className="px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copied ? 'Copiado' : 'Copiar'}</span>
+                      </button>
+                      {onApplyConversion && converterDirection === 'USD_TO_ARS' && (
+                        <button
+                          type="button"
+                          onClick={() => onApplyConversion(Math.round(convertedResult), `${converterAmount} USD a ${activeRate.nombre}`)}
+                          className="px-3.5 py-2 rounded-xl bg-[#F95420] hover:bg-[#e04819] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <span>Cargar Gasto</span>
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'card_calculator' && (
+              <motion.div
+                key="card-calc-full"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                className="space-y-4"
+              >
+                <div className="bg-orange-50/50 rounded-2xl p-5 border border-orange-200/70 space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 mb-1.5 block">
+                      Consumo en dólares en tu resumen (Netflix, Spotify, viajes, compras exterior)
+                    </label>
+                    <div className="relative max-w-xs">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400">
+                        U$S
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={converterAmount}
+                        onChange={e => setConverterAmount(e.target.value)}
+                        className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-orange-300 bg-white font-black text-base focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded-2xl p-4 bg-white border border-orange-200/60 space-y-2 text-xs">
+                    <div className="flex justify-between text-slate-600">
+                      <span>Base oficial ({usd(tarjetaBreakdown.usdAmount)} × {ars(oficialRate.venta)} BNA):</span>
+                      <span className="font-semibold tabular-nums">{ars(tarjetaBreakdown.baseArs)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>+ Percepción RG / Impuestos aplicables:</span>
+                      <span className="font-semibold text-orange-600 tabular-nums">
+                        {ars(tarjetaBreakdown.impuestoPais + tarjetaBreakdown.percepcionGanancias)}
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-sm">
+                      <span className="font-bold text-slate-900">Pagando con pesos (Dólar Tarjeta):</span>
+                      <span className="font-black text-lg text-orange-600 tabular-nums">
+                        {ars(tarjetaBreakdown.totalTarjetaArs)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs pt-1 text-emerald-700 font-semibold">
+                      <span>Pagando el resumen con tus USD MEP ({ars(mepRate.venta)}):</span>
+                      <span className="tabular-nums">{ars(tarjetaBreakdown.usdAmount * mepRate.venta)}</span>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    );
+  }
+
   // ─── Main Card / Section Widget ────────────────────────────────────────────
   return (
     <div className={`rounded-3xl border transition-all overflow-hidden ${

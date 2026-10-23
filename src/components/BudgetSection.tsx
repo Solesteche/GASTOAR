@@ -235,31 +235,86 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
   ];
 
   return (
-    <div className="budget-responsive space-y-5 pb-24 sm:pb-6">
-      <section className="rounded-[28px] border border-purple-200/80 bg-white shadow-[0_8px_30px_-12px_rgba(109,63,234,0.25)] overflow-hidden dark:bg-[#140728] dark:border-purple-900/40">
-        
-        {/* ─── CAJA DE TÍTULO PRINCIPAL (Limpia y sin saturación) ──────────── */}
-        <div
-          style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
-          className="p-4 sm:p-6 text-white"
-        >
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-[10px] font-black uppercase tracking-wider">
-                Planificación financiera
-              </span>
-              <span className="px-2.5 py-1 rounded-full bg-emerald-400/20 border border-emerald-300/30 text-[10px] font-bold">
-                {monthLabel}
-              </span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight">Presupuesto</h2>
-            <p className="text-xs sm:text-sm text-purple-100/80 mt-0.5 max-w-2xl">
-              Definí tus límites mensuales, seguí el consumo diario y mantené tus finanzas bajo control.
-            </p>
-          </div>
+    <div className="budget-responsive max-w-4xl mx-auto space-y-4 font-sans pb-16">
+      {/* 1. Unified Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+        <div>
+          <p className="text-sm text-gray-400">Planificación · {monthLabel}</p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Presupuesto</h1>
         </div>
 
-        {/* ─── BARRA DE PESTAÑAS Y MENÚ DESPLEGABLE (Debajo del título, fuera de la caja) ─ */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {hasActiveBudget && (
+            <button
+              type="button"
+              onClick={() => setPreviewMode(p => p === 'empty' ? 'active' : 'empty')}
+              className="px-3.5 py-2 rounded-xl bg-white hover:bg-purple-50/50 border border-slate-200 text-slate-700 font-bold text-xs transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              title={isBudgetEmpty ? "Volver a la vista con presupuesto" : "Previsualizar versión sin presupuesto"}
+            >
+              <Eye className="w-3.5 h-3.5 text-slate-500" />
+              <span>{isBudgetEmpty ? 'Ver con presupuesto' : 'Vista inicial'}</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof onCreateBudget === 'function') {
+                onCreateBudget(isBudgetEmpty ? selectedStartMode : 'empty');
+              } else if (typeof onOpenBudgetModal === 'function') {
+                onOpenBudgetModal();
+              }
+            }}
+            className="px-4 py-2 rounded-xl bg-[#6936F5] hover:bg-[#5b2bd9] text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-xs active:scale-95 cursor-pointer"
+            title="Crear o editar límites mensuales"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Crear Presupuesto</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 2. Unified Full-Width Purple Hero Balance Card (Zero Circular Gauges) */}
+      <div
+        style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
+        className="text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-purple-300/30 relative overflow-hidden"
+      >
+        <div className="w-full">
+          <p className="text-xs sm:text-sm font-medium text-white/80 mb-1.5 tracking-wide">
+            {summary.totalBudget > 0 ? 'Disponible restante del presupuesto' : 'Gasto registrado este mes'}
+          </p>
+          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <h2 className="text-[32px] sm:text-4xl font-black font-outfit text-white tracking-tight leading-none truncate">
+              {formatCurrency(summary.totalBudget > 0 ? summary.remaining : summary.totalSpent, currency)}
+            </h2>
+            {summary.totalBudget > 0 && (
+              <span className="text-xs text-white/80 font-medium">
+                {summary.pct}% utilizado
+              </span>
+            )}
+          </div>
+          <div className="h-1.5 rounded-full overflow-hidden mb-3 bg-white/20">
+            <div
+              className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#FFA234] via-[#F97316] to-[#F95420]"
+              style={{ width: `${Math.min(100, Math.max(summary.totalSpent > 0 ? 5 : 0, summary.pct))}%` }}
+            />
+          </div>
+          <div className="flex items-center gap-2 text-xs text-white/85 flex-wrap">
+            <span>Asignado:{" "}
+              <span className="font-semibold text-white">{formatCurrency(summary.totalBudget, currency)}</span>
+            </span>
+            <span>•</span>
+            <span>Gastado:{" "}
+              <span className="font-semibold text-amber-300">{formatCurrency(summary.totalSpent, currency)}</span>
+            </span>
+            <span>•</span>
+            <span>Restan {daysRemaining} días del mes</span>
+          </div>
+        </div>
+      </div>
+
+      <section className="rounded-3xl border border-slate-200/80 bg-white shadow-xs overflow-hidden dark:bg-[#140728] dark:border-purple-900/40">
+        {/* ─── BARRA DE PESTAÑAS ─── */}
         <div className="px-3 sm:px-5 border-b border-slate-100 dark:border-purple-900/40 flex items-center justify-between gap-2.5 bg-slate-50/50 dark:bg-[#16072b]/50">
           <div className="flex min-w-0 overflow-x-auto gap-1 pt-2 sm:pt-2.5 pb-1 no-scrollbar">
             {tabs.map(([id, label, Icon]) => (
@@ -276,40 +331,6 @@ export const BudgetSection: React.FC<BudgetSectionProps> = ({
                 <span>{label}</span>
               </button>
             ))}
-          </div>
-
-          {/* Botón de acción DEBAJO del título y FUERA de la caja del título */}
-          <div className="flex items-center gap-2 shrink-0 py-1.5">
-            {/* Si ya hay presupuesto, botón para alternar y previsualizar la versión sin presupuesto */}
-            {hasActiveBudget && (
-              <button
-                type="button"
-                onClick={() => setPreviewMode(p => p === 'empty' ? 'active' : 'empty')}
-                className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 border border-purple-200/80 dark:border-purple-800 text-[#7928CA] dark:text-purple-300 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
-                title={isBudgetEmpty ? "Volver a la vista con presupuesto" : "Previsualizar versión sin presupuesto"}
-              >
-                <Eye className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">{isBudgetEmpty ? 'Ver con presupuesto' : 'Ver sin presupuesto'}</span>
-                <span className="inline md:hidden">{isBudgetEmpty ? 'Con pres.' : 'Sin pres.'}</span>
-              </button>
-            )}
-
-            {/* Botón Crear presupuesto VISIBLE y DIRECTO */}
-            <button
-              type="button"
-              onClick={() => {
-                if (typeof onCreateBudget === 'function') {
-                  onCreateBudget(isBudgetEmpty ? selectedStartMode : 'empty');
-                } else if (typeof onOpenBudgetModal === 'function') {
-                  onOpenBudgetModal();
-                }
-              }}
-              className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-gradient-to-r from-[#7928CA] to-[#A855F7] hover:from-[#6D28D9] hover:to-[#9333EA] text-white font-black text-xs transition-all flex items-center gap-1.5 shadow-sm hover:shadow active:scale-95 cursor-pointer shrink-0"
-              title="Crear o armar un nuevo presupuesto"
-            >
-              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Crear presupuesto</span>
-            </button>
           </div>
         </div>
 

@@ -105,7 +105,7 @@ export const TrialExpiredBlockedScreen: React.FC<TrialExpiredBlockedScreenProps>
           </h1>
 
           <p className="text-slate-300 text-xs sm:text-sm max-w-xl mx-auto">
-            ¡Esperamos que hayas disfrutado tus primeros 15 días! Tus datos, presupuestos, compras en cuotas y balances de pareja siguen guardados de forma segura. Elegí tu plan para desbloquear tu cuenta de inmediato con Mercado Pago.
+            ¡Esperamos que hayas disfrutado tus primeros 15 días! Tus datos, presupuestos, compras en cuotas y balances compartidos siguen guardados de forma segura. Elegí tu plan para desbloquear tu cuenta de inmediato con Mercado Pago.
           </p>
 
           {subscription && (

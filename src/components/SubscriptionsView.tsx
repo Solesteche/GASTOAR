@@ -67,7 +67,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({
             </h2>
 
             <p className="text-xs sm:text-sm text-slate-300">
-              Desbloqueá sincronización automática en pareja, control ilimitado de cuotas de tarjetas y escaneo inteligente de comprobantes con IA.
+              Desbloqueá sincronización automática de cuenta compartida, control ilimitado de cuotas de tarjetas y escaneo inteligente de comprobantes con IA.
             </p>
           </div>
 
@@ -78,7 +78,7 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({
             </div>
             <div className="flex items-center gap-2">
               <span className="text-lg font-black text-white">
-                {currentSubscription ? currentSubscription.planName : 'Plan Parejas Dúo'}
+                {currentSubscription ? currentSubscription.planName : 'Plan Dúo'}
               </span>
               <span className={`px-2 py-0.5 rounded-full text-white text-[10px] font-extrabold uppercase ${
                 currentSubscription?.status === 'trial' ? 'bg-purple-500' : 'bg-emerald-500'

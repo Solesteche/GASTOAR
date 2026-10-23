@@ -92,7 +92,7 @@ export const CategoriesSection: React.FC<CategoriesSectionProps> = ({
 
   const handleOpenAddCategory = () => {
     if (!canManageCategories) {
-      onShowToast?.('Tu plan actual no permite crear categorías. Pasate al Plan Parejas Dúo o Plan Pro.', 'info');
+      onShowToast?.('Tu plan actual no permite crear categorías. Pasate al Plan Dúo o Plan Pro.', 'info');
       return;
     }
     setNewCatName('');
@@ -103,7 +103,7 @@ export const CategoriesSection: React.FC<CategoriesSectionProps> = ({
 
   const handleOpenAddSubcat = (catName?: string) => {
     if (!canManageCategories) {
-      onShowToast?.('Tu plan actual no permite crear subcategorías. Pasate al Plan Parejas Dúo o Plan Pro.', 'info');
+      onShowToast?.('Tu plan actual no permite crear subcategorías. Pasate al Plan Dúo o Plan Pro.', 'info');
       return;
     }
     setSelectedParentCategory(catName || categories[0] || '');
@@ -148,128 +148,120 @@ export const CategoriesSection: React.FC<CategoriesSectionProps> = ({
 
   const handleDeleteCat = (catName: string) => {
     if (!canManageCategories) return;
-    if (confirm(`¿Eliminar la categoría "${catName}" y todas sus subcategorías?`)) {
-      onDeleteCategory(catName);
-      onShowToast?.(`Categoría eliminada`, 'info');
-    }
+    onDeleteCategory(catName);
+    onShowToast?.(`Categoría "${catName}" eliminada`, 'info');
   };
 
   const handleDeleteSub = (catName: string, subName: string) => {
     if (!canManageCategories) return;
-    if (confirm(`¿Eliminar la subcategoría "${subName}"?`)) {
-      onDeleteSubcategory(catName, subName);
-      onShowToast?.(`Subcategoría eliminada`, 'info');
-    }
+    onDeleteSubcategory(catName, subName);
+    onShowToast?.(`Subcategoría "${subName}" eliminada`, 'info');
   };
 
   return (
-    <div className="space-y-6">
-      {/* 1. TOP HEADER */}
-      <section
-        style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
-        className="text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-purple-400/20 space-y-5"
-      >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div 
-              className="w-11 h-11 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0 bg-white/15 border border-white/20 backdrop-blur-xs"
+    <div className="space-y-4 max-w-4xl mx-auto font-sans pb-16">
+      {/* 1. UNIFIED TOP HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+        <div>
+          <p className="text-sm text-gray-400">Estructura contable</p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Categorías y Subcategorías</h1>
+        </div>
+
+        {canManageCategories ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => handleOpenAddSubcat()}
+              className="px-3.5 py-2 rounded-xl bg-white hover:bg-purple-50/50 text-slate-700 border border-slate-200 font-bold text-xs transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
             >
-              <FolderPlus className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                  Categorías y Subcategorias
-                </h1>
-                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-white/15 text-white border border-white/20">
-                  {categories.length} categorías • {totalSubcategories} subcategorías
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-purple-200 font-medium">
-                Estructura contable para clasificar con precisión tus gastos personales y de pareja.
-              </p>
-            </div>
+              <Plus className="w-3.5 h-3.5 text-slate-500" />
+              <span>Nueva Subcategoría</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOpenAddCategory}
+              className="px-4 py-2 rounded-xl bg-[#6936F5] hover:bg-[#5b2bd9] text-white font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Nueva Categoría</span>
+            </button>
           </div>
+        ) : onUpgradePlan ? (
+          <button
+            type="button"
+            onClick={onUpgradePlan}
+            className="px-4 py-2 rounded-xl bg-[#6936F5] hover:bg-[#5b2bd9] text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            <Sparkles className="w-4 h-4 text-amber-300" />
+            <span>Personalizar Categorías</span>
+          </button>
+        ) : null}
+      </div>
 
-          {canManageCategories ? (
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <button
-                type="button"
-                onClick={() => handleOpenAddSubcat()}
-                className="px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white border border-white/20 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer backdrop-blur-xs active:scale-95"
-              >
-                <Plus className="w-4 h-4 text-purple-200" />
-                <span>+ Nueva Subcategoría</span>
-              </button>
+      {/* 2. UNIFIED FULL-WIDTH PURPLE HERO CARD (Zero Circular Gauges) */}
+      <div
+        style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
+        className="text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-purple-300/30 relative overflow-hidden"
+      >
+        <div className="w-full">
+          <p className="text-xs sm:text-sm font-medium text-white/80 mb-1.5 tracking-wide">
+            Catálogo contable activo
+          </p>
+          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <h2 className="text-[32px] sm:text-4xl font-black font-outfit text-white tracking-tight leading-none">
+              {categories.length} categorías
+            </h2>
+            <span className="text-xs text-white/80 font-medium">
+              {totalSubcategories} subcategorías en uso
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full overflow-hidden mb-3 bg-white/20">
+            <div
+              className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#FFA234] via-[#F97316] to-[#F95420]"
+              style={{ width: `${Math.min(100, Math.max(15, Math.round((filteredCategories.length / Math.max(1, categories.length)) * 100)))}%` }}
+            />
+          </div>
+          <div className="flex items-center gap-2 text-xs text-white/85 flex-wrap">
+            <span>{categories.length} rubros principales</span>
+            <span>•</span>
+            <span>{totalSubcategories} subrubros</span>
+            <span>•</span>
+            <span>{canManageCategories ? 'Edición personalizada activa' : 'Catálogo oficial estándar'}</span>
+          </div>
+        </div>
+      </div>
 
-              <button
-                type="button"
-                onClick={handleOpenAddCategory}
-                className="px-4 py-2.5 rounded-2xl bg-[#F95420] hover:bg-[#E04412] text-white font-bold text-xs shadow-lg active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
-              >
-                <Plus className="w-4 h-4 stroke-[2.5]" />
-                <span>+ Nueva Categoría</span>
-              </button>
-            </div>
-          ) : onUpgradePlan ? (
+      {!canManageCategories && (
+        <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            <Lock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-900">
+              Tenés activo el catálogo oficial completo. Para crear tus propias categorías y subcategorías personalizadas, pasate al Plan Dúo o Plan Pro.
+            </p>
+          </div>
+          {onUpgradePlan && (
             <button
               type="button"
               onClick={onUpgradePlan}
-              className="px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white border border-white/20 font-bold text-xs transition-all flex items-center gap-2 cursor-pointer shrink-0 backdrop-blur-xs"
+              className="px-3.5 py-1.5 rounded-xl bg-[#6936F5] text-white font-bold text-xs shrink-0 cursor-pointer"
             >
-              <Sparkles className="w-4 h-4 text-amber-300" />
-              <span>Personalizar Categorías (Ver Planes)</span>
+              Mejorar Plan
             </button>
-          ) : null}
+          )}
         </div>
+      )}
 
-        {/* Informative notice for free plan */}
-        {!canManageCategories && (
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50/60 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
-                <Lock className="w-4 h-4 text-amber-700" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-bold text-amber-900">
-                    Catálogo Estándar (Plan Gratis)
-                  </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300/60">
-                    Fijo Oficial
-                  </span>
-                </div>
-                <p className="text-xs text-amber-800/90 mt-0.5">
-                  Tenés acceso al catálogo oficial completo de categorías fijas (incluye <strong>Suscripciones & Plataformas</strong>). Para crear tus propias categorías y subcategorías personalizadas, pasate al Plan Parejas Dúo o Plan Pro.
-                </p>
-              </div>
-            </div>
-
-            {onUpgradePlan && (
-              <button
-                type="button"
-                onClick={onUpgradePlan}
-                className="px-4 py-2 rounded-xl text-white font-bold text-xs shrink-0 shadow-xs hover:opacity-95 transition-all flex items-center gap-1.5 cursor-pointer"
-                style={{ backgroundColor: P }}
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Mejorar Plan</span>
-              </button>
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* 2. SEARCH BAR */}
-      <section className="bg-white rounded-3xl p-4 sm:p-5 shadow-xs border border-slate-200/80">
+      {/* 3. REDUCED COMPACT FILTER BAR */}
+      <section className="bg-white rounded-3xl p-3.5 sm:p-4 shadow-xs border border-slate-200/80">
         <div className="relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Buscar categorías o plataformas (Netflix, Spotify, Supermercado, Expensas...)"
+            placeholder="Buscar categorías o subcategorías (Netflix, Supermercado, Expensas...)"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6936F5]/25"
           />
         </div>
       </section>

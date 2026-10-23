@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Users, 
@@ -44,6 +44,15 @@ export const CoupleSettingsModal: React.FC<CoupleSettingsModalProps> = ({
   const [defaultSplit, setDefaultSplit] = useState<SplitType>(profile.defaultSplit || '50_50');
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  useEffect(() => {
+    setUser1Name(profile.user1Name);
+    setUser2Name(profile.user2Name);
+    setCurrentUser(profile.currentUser);
+    setCurrency(profile.currency || 'ARS');
+    setDefaultSplit(profile.defaultSplit || '50_50');
+  }, [profile]);
 
   if (!isOpen) return null;
 
@@ -52,6 +61,14 @@ export const CoupleSettingsModal: React.FC<CoupleSettingsModalProps> = ({
     setCopied(true);
     onShowToast('¡Código de cuenta copiado al portapapeles!', 'success');
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyInviteLink = () => {
+    const inviteUrl = `${window.location.origin}/?invite=${encodeURIComponent(profile.accountCode)}`;
+    navigator.clipboard.writeText(inviteUrl);
+    setCopiedLink(true);
+    onShowToast('¡Link de invitación copiado! Enviáselo por WhatsApp a tu pareja.', 'success');
+    setTimeout(() => setCopiedLink(false), 2500);
   };
 
   const handleSaveProfile = (e: React.FormEvent) => {
@@ -161,15 +178,24 @@ export const CoupleSettingsModal: React.FC<CoupleSettingsModalProps> = ({
               <button
                 type="button"
                 onClick={handleCopyCode}
-                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl flex items-center gap-1.5 transition-all shrink-0 active:scale-95"
+                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl flex items-center gap-1.5 transition-all shrink-0 active:scale-95 cursor-pointer"
               >
                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                 <span>{copied ? 'Copiado' : 'Copiar'}</span>
               </button>
             </div>
 
+            <button
+              type="button"
+              onClick={handleCopyInviteLink}
+              className="w-full py-2 px-3 rounded-xl bg-white hover:bg-amber-100/70 border border-amber-300 text-amber-900 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+            >
+              {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Link className="w-3.5 h-3.5 text-amber-700" />}
+              <span>{copiedLink ? '¡Link directo copiado!' : 'Copiar link directo de invitación (WhatsApp)'}</span>
+            </button>
+
             <p className="text-[11px] text-amber-800 leading-snug">
-              Comparte este código con tu pareja para sincronizar los gastos en ambas pantallas.
+              Compartí este link o código con tu pareja: al abrirlo, ambos verán y editarán los gastos compartidos en vivo sin mezclar sus gastos personales.
             </p>
           </div>
 

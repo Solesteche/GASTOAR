@@ -25,7 +25,10 @@ import {
   Hourglass,
   CalendarDays,
   Pin,
-  Bell
+  Bell,
+  SlidersHorizontal,
+  Upload,
+  X
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -37,7 +40,7 @@ import {
   CartesianGrid, 
   Legend 
 } from 'recharts';
-import { CoupleProfile, Transaction } from '../types';
+import { CoupleProfile, CreditCardConfig, Transaction } from '../types';
 import { formatCurrency, formatDateEs } from '../utils/formatters';
 import { 
   getInstallmentPlanDetails, 
@@ -48,6 +51,9 @@ import {
 interface InstallmentsSectionProps {
   transactions: Transaction[];
   profile: CoupleProfile;
+  cardConfigs?: CreditCardConfig[];
+  onSaveCardConfigs?: (configs: CreditCardConfig[]) => void;
+  onOpenImportModal?: () => void;
   onOpenNewInstallmentModal: () => void;
   onOpenPriorInstallmentsModal?: () => void;
   onOpenCardAlerts?: () => void;
@@ -65,6 +71,9 @@ const P_ORANGE = "#F95420";
 export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
   transactions,
   profile,
+  cardConfigs,
+  onSaveCardConfigs,
+  onOpenImportModal,
   onOpenNewInstallmentModal,
   onOpenPriorInstallmentsModal,
   onEditTransaction,
@@ -77,6 +86,60 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
   const [filterPerson, setFilterPerson] = useState<string>('ALL');
   const [selectedMonthKey, setSelectedMonthKey] = useState<string>('');
   const [expandedScheduleTxId, setExpandedScheduleTxId] = useState<string | null>(null);
+
+  const [localCardConfigs, setLocalCardConfigs] = useState<CreditCardConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem('gastoar_card_configs_v1');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const effectiveCardConfigs = cardConfigs || localCardConfigs;
+  const [editingCardName, setEditingCardName] = useState<string | null>(null);
+  const [cardCloseDay, setCardCloseDay] = useState<string>('24');
+  const [cardDueDay, setCardDueDay] = useState<string>('6');
+  const [cardLimit, setCardLimit] = useState<string>('');
+
+  const persistCardConfigs = (next: CreditCardConfig[]) => {
+    setLocalCardConfigs(next);
+    try {
+      localStorage.setItem('gastoar_card_configs_v1', JSON.stringify(next));
+    } catch {}
+    onSaveCardConfigs?.(next);
+  };
+
+  const openCardConfigEditor = (name: string) => {
+    const existing = effectiveCardConfigs.find(
+      (c) => c.tarjetaNombre.toLowerCase() === name.toLowerCase()
+    );
+    setEditingCardName(name);
+    setCardCloseDay(String(existing?.diaCierre || 24));
+    setCardDueDay(String(existing?.diaVencimiento || 6));
+    setCardLimit(existing?.limite ? String(existing.limite) : '');
+  };
+
+  const handleSaveCardConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCardName) return;
+    const cierre = Math.min(31, Math.max(1, parseInt(cardCloseDay, 10) || 24));
+    const venc = Math.min(31, Math.max(1, parseInt(cardDueDay, 10) || 6));
+    const lim = parseFloat(cardLimit) > 0 ? parseFloat(cardLimit) : undefined;
+    const filtered = effectiveCardConfigs.filter(
+      (c) => c.tarjetaNombre.toLowerCase() !== editingCardName.toLowerCase()
+    );
+    persistCardConfigs([
+      ...filtered,
+      {
+        id: `cc_${editingCardName.toLowerCase().replace(/\s+/g, '_')}`,
+        tarjetaNombre: editingCardName,
+        diaCierre: cierre,
+        diaVencimiento: venc,
+        limite: lim,
+      },
+    ]);
+    setEditingCardName(null);
+  };
 
   // Month pinning state for Installments View
   const [isMonthPinned, setIsMonthPinned] = useState<boolean>(() => {
@@ -326,15 +389,10 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
     });
   }, [installmentTxs, filterStatus, filterCard, filterPerson]);
 
-  // Circular progress math (matching Resumen style)
-  const r = 38, cx = 50, cy = 50;
-  const circ = 2 * Math.PI * r;
-  const dash = (metrics.percentPaid / 100) * circ;
-
   return (
     <div className="space-y-4 max-w-4xl mx-auto pb-16 font-sans">
       
-      {/* 1. Header: Section title + Actions (sin el botón de alertas de calendar) */}
+      {/* 1. Header: Section title + Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
         <div>
           <p className="text-sm text-gray-400">Tarjetas & Financiación</p>
@@ -342,6 +400,18 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {onOpenImportModal && (
+            <button
+              type="button"
+              onClick={onOpenImportModal}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-purple-50/50 text-slate-700 hover:text-[#6F2EC5] transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+              title="Importar resumen de tarjeta CSV, PDF o texto"
+            >
+              <Upload className="w-3.5 h-3.5 text-[#6936F5]" />
+              <span>Importar Resumen</span>
+            </button>
+          )}
+
           {onOpenPriorInstallmentsModal && (
             <button
               onClick={onOpenPriorInstallmentsModal}
@@ -355,8 +425,7 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
 
           <button
             onClick={onOpenNewInstallmentModal}
-            className="px-4 py-2 rounded-xl text-xs font-bold text-white transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
-            style={{ backgroundColor: P }}
+            className="px-4 py-2 rounded-xl text-xs font-bold text-white transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 bg-[#6936F5] hover:bg-[#5b2bd9]"
           >
             <Plus className="w-4 h-4" />
             <span>Nueva Compra en Cuotas</span>
@@ -364,52 +433,41 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
         </div>
       </div>
 
-      {/* 2. Hero Balance Card (Estilo Resumen: Saldo por pagar & % Amortizado con linear-gradient) */}
+      {/* 2. Hero Balance Card (Unified GastoAR style — Zero Circular Gauge) */}
       <div
         style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #6D3FEA 55%, #7C3AED 100%)' }}
         className="text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-purple-300/30 relative overflow-hidden"
       >
-        <div className="flex items-center justify-between gap-4 sm:gap-6">
-          <div className="flex-1 min-w-0">
-            <p className="text-xs sm:text-sm font-medium text-white/80 mb-1.5 tracking-wide">Saldo total por pagar</p>
-            <div className="flex items-center gap-2 mb-3">
-              <h2 className="text-[32px] font-black font-outfit text-white tracking-tight leading-none truncate">
-                {formatCurrency(metrics.totalPending, currency)}
-              </h2>
-            </div>
-            <div className="h-1 rounded-full overflow-hidden mb-2.5 bg-white/20">
-              <div
-                className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#FFA234] via-[#F97316] to-[#F95420]"
-                style={{ 
-                  width: `${Math.min(100, Math.max(5, metrics.percentPaid))}%`, 
-                }}
-              />
-            </div>
-            <div className="flex items-center gap-2 text-xs text-white/80">
-              <span>Total financiado:{" "}
-                <span className="font-semibold text-white">{formatCurrency(metrics.totalCommitted, currency)}</span>
-              </span>
-              <span>•</span>
-              <span>Pagado:{" "}
-                <span className="font-semibold text-emerald-300">{formatCurrency(metrics.totalPaidSoFar, currency)}</span>
-              </span>
-            </div>
+        <div className="w-full">
+          <p className="text-xs sm:text-sm font-medium text-white/80 mb-1.5 tracking-wide">Saldo total por pagar</p>
+          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <h2 className="text-[32px] sm:text-4xl font-black font-outfit text-white tracking-tight leading-none truncate">
+              {formatCurrency(metrics.totalPending, currency)}
+            </h2>
+            <span className="text-xs text-white/80 font-medium">
+              {metrics.percentPaid}% amortizado
+            </span>
           </div>
-
-          {/* Circular Progress Gauge (72px, solo porcentaje adentro) */}
-          <div className="relative shrink-0 w-[72px] h-[72px] flex items-center justify-center">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-              <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255, 255, 255, 0.15)" strokeWidth="8" />
-              <circle
-                cx={cx} cy={cy} r={r} fill="none"
-                stroke="#F95420" strokeWidth="8" strokeLinecap="round"
-                strokeDasharray={`${dash} ${circ}`}
-                className="transition-all duration-1000 ease-out"
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <p className="text-base sm:text-[17px] font-black font-outfit leading-none text-white tabular-nums">{metrics.percentPaid}%</p>
-            </div>
+          <div className="h-1.5 rounded-full overflow-hidden mb-3 bg-white/20">
+            <div
+              className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-[#FFA234] via-[#F97316] to-[#F95420]"
+              style={{ 
+                width: `${Math.min(100, Math.max(metrics.percentPaid > 0 ? 5 : 0, metrics.percentPaid))}%`, 
+              }}
+            />
+          </div>
+          <div className="flex items-center gap-2 text-xs text-white/85 flex-wrap">
+            <span>Total financiado:{" "}
+              <span className="font-semibold text-white">{formatCurrency(metrics.totalCommitted, currency)}</span>
+            </span>
+            <span>•</span>
+            <span>Pagado:{" "}
+              <span className="font-semibold text-emerald-300">{formatCurrency(metrics.totalPaidSoFar, currency)}</span>
+            </span>
+            <span>•</span>
+            <span>Cuota este mes:{" "}
+              <span className="font-semibold text-amber-300">{formatCurrency(metrics.monthlyThisMonth, currency)}</span>
+            </span>
           </div>
         </div>
       </div>
@@ -484,7 +542,7 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
             <div>
               <p className="text-xs text-gray-400 font-medium">Compromiso en Cuotas</p>
               <h4 className="font-bold text-gray-900 text-sm sm:text-base">{profile.user1Name}</h4>
-              <p className="text-[11px] text-gray-400">Individuales + proporcional</p>
+              <p className="text-[11px] text-gray-400">Personales + proporcional</p>
             </div>
           </div>
           <div className="text-right">
@@ -504,7 +562,7 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
             <div>
               <p className="text-xs text-gray-400 font-medium">Compromiso en Cuotas</p>
               <h4 className="font-bold text-gray-900 text-sm sm:text-base">{profile.user2Name}</h4>
-              <p className="text-[11px] text-gray-400">Individuales + proporcional</p>
+              <p className="text-[11px] text-gray-400">Personales + proporcional</p>
             </div>
           </div>
           <div className="text-right">
@@ -740,7 +798,7 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
                             </span>
                             <span>•</span>
                             <span>Titular: <strong className="text-gray-600">{item.pagadoPor === 'user1' ? profile.user1Name : profile.user2Name}</strong></span>
-                            <span>({item.tipo === 'pareja' ? 'Compartido' : 'Individual'})</span>
+                            <span>({item.tipo === 'pareja' ? 'Compartido' : 'Personal'})</span>
                           </div>
                         </div>
 
@@ -765,48 +823,192 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
         </div>
       )}
 
-      {/* 7. Breakdown by Cards / Banks (Estilo Resumen) */}
+      {/* 7. Breakdown by Cards / Banks with Closing & Due Date Cycle */}
       {cardList.length > 0 && (
         <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-white space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <div>
               <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
                 <CardIcon className="w-4 h-4" style={{ color: P }} />
-                <span>Desglose por Tarjeta de Crédito</span>
+                <span>Desglose y Cierre por Tarjeta de Crédito</span>
               </h3>
-              <p className="text-xs text-gray-400 mt-0.5">Total comprometido y vencimiento mensual por plástico</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Configurá el día de cierre y vencimiento para saber si una compra entra hoy o pasa al próximo resumen
+              </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {(Object.entries(cardsSummary) as [string, { count: number; total: number; monthly: number; pending: number }][]).map(([cardName, data]) => (
-              <div 
-                key={cardName}
-                className="p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:bg-slate-50 hover:border-purple-200 transition-all space-y-2.5"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs" style={{ backgroundColor: P_LIGHT, color: P }}>
-                    💳
+            {(Object.entries(cardsSummary) as [string, { count: number; total: number; monthly: number; pending: number }][]).map(([cardName, data]) => {
+              const cfg = effectiveCardConfigs.find(
+                (c) => c.tarjetaNombre.toLowerCase() === cardName.toLowerCase()
+              );
+              const todayDay = new Date().getDate();
+              const alreadyClosed = cfg ? todayDay > cfg.diaCierre : false;
+              const limitUsedPct =
+                cfg?.limite && cfg.limite > 0
+                  ? Math.min(100, Math.round((data.pending / cfg.limite) * 100))
+                  : null;
+
+              return (
+                <div 
+                  key={cardName}
+                  className="p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:bg-slate-50 hover:border-purple-200 transition-all space-y-2.5 flex flex-col justify-between"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0" style={{ backgroundColor: P_LIGHT, color: P }}>
+                          💳
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-xs sm:text-sm text-gray-900 truncate">{cardName}</h4>
+                          <span className="text-[10px] text-gray-400">{data.count} {data.count === 1 ? 'compra' : 'compras'}</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openCardConfigEditor(cardName)}
+                        title="Configurar día de cierre y vencimiento"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-[#6936F5] hover:bg-purple-50 transition-colors"
+                      >
+                        <SlidersHorizontal className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {cfg ? (
+                      <div className="text-[11px] text-slate-600 space-y-1 pt-0.5">
+                        <div className="flex items-center justify-between">
+                          <span>Cierre día <strong>{cfg.diaCierre}</strong> · Vence día <strong>{cfg.diaVencimiento}</strong></span>
+                        </div>
+                        <p className={`text-[11px] font-semibold ${alreadyClosed ? 'text-emerald-600' : 'text-amber-600'}`}>
+                          {alreadyClosed
+                            ? '✓ Ya cerró · Compras hoy pasan al próximo mes'
+                            : '• Abierta · Compras hoy entran en este resumen'}
+                        </p>
+                        {limitUsedPct !== null && (
+                          <div className="pt-1">
+                            <div className="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                              <span>Cupo ocupado</span>
+                              <span>{limitUsedPct}% de {formatCurrency(cfg.limite || 0, currency)}</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-[#6936F5]"
+                                style={{ width: `${limitUsedPct}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openCardConfigEditor(cardName)}
+                        className="text-[11px] font-semibold text-[#6936F5] hover:underline text-left"
+                      >
+                        + Configurar día de cierre y vencimiento
+                      </button>
+                    )}
                   </div>
+
+                  <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-[10px] text-gray-400 font-medium block">Cuota mensual:</span>
+                      <span className="font-bold font-outfit" style={{ color: P }}>{formatCurrency(data.monthly, currency)}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-gray-400 font-medium block">Resta pagar:</span>
+                      <span className="font-bold font-outfit text-[#F95420]">{formatCurrency(data.pending, currency)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {editingCardName && (
+            <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-xl border border-slate-200 space-y-4">
+                <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-bold text-xs sm:text-sm text-gray-900">{cardName}</h4>
-                    <span className="text-[10px] text-gray-400">{data.count} {data.count === 1 ? 'compra' : 'compras'}</span>
+                    <h4 className="text-base font-bold text-slate-900">Ciclo de {editingCardName}</h4>
+                    <p className="text-xs text-slate-500">Definí cuándo corta y cuándo vence el resumen</p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingCardName(null)}
+                    className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
 
-                <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
+                <form onSubmit={handleSaveCardConfig} className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Día de Cierre (1-31)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={31}
+                        required
+                        value={cardCloseDay}
+                        onChange={(e) => setCardCloseDay(e.target.value)}
+                        className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Día Vencimiento (1-31)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={31}
+                        required
+                        value={cardDueDay}
+                        onChange={(e) => setCardDueDay(e.target.value)}
+                        className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200"
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <span className="text-[10px] text-gray-400 font-medium block">Cuota mensual:</span>
-                    <span className="font-bold font-outfit" style={{ color: P }}>{formatCurrency(data.monthly, currency)}</span>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Límite total de compra (opcional)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={cardLimit}
+                      onChange={(e) => setCardLimit(e.target.value)}
+                      placeholder="Ej: 2500000"
+                      className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200"
+                    />
                   </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-gray-400 font-medium block">Resta pagar:</span>
-                    <span className="font-bold font-outfit text-[#F95420]">{formatCurrency(data.pending, currency)}</span>
+
+                  <div className="pt-2 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingCardName(null)}
+                      className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#6936F5] hover:bg-[#5b2bd9] text-white"
+                    >
+                      Guardar Ciclo
+                    </button>
                   </div>
-                </div>
+                </form>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -943,7 +1145,7 @@ export const InstallmentsSection: React.FC<InstallmentsSectionProps> = ({
                         {/* Type Badge */}
                         {tx.tipo === 'pareja' ? (
                           <span className="px-2 py-0.5 bg-orange-50 text-[#F95420] border border-orange-200 rounded-md text-[10px] font-semibold flex items-center gap-1">
-                            <Users className="w-3 h-3" /> Pareja ({payerName})
+                            <Users className="w-3 h-3" /> Compartido ({payerName})
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 bg-purple-50 text-[#6F2EC5] border border-purple-100 rounded-md text-[10px] font-semibold flex items-center gap-1">
