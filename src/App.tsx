@@ -2832,6 +2832,7 @@ export default function App() {
               onSaveTransfers={(nextTransfers) => {
                 setWalletTransfers(nextTransfers);
               }}
+              onSaveTransaction={handleSaveTransaction}
               onShowToast={(msg) => showToast(msg, 'success')}
             />
           )}
@@ -3050,6 +3051,10 @@ export default function App() {
                 onOpenCashFlowTab={() => setActiveTab('cashflow')}
                 onOpenProfileModal={() => setIsProfileModalOpen(true)}
                 onOpenSettlementModal={() => setIsSettlementModalOpen(true)}
+                onOpenImportModal={() => {
+                  setImportDefaultMethod('Crédito');
+                  setIsImportModalOpen(true);
+                }}
                 onRestartTour={handleRestartOnboardingTour}
               />
             </div>

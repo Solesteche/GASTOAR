@@ -15,6 +15,7 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   Copy,
+  SlidersHorizontal,
 } from 'lucide-react';
 import {
   Transaction,
@@ -31,6 +32,7 @@ interface WalletsSectionProps {
   usdRate?: number;
   onSaveWallets: (wallets: WalletAccount[]) => void;
   onSaveTransfers: (transfers: WalletTransfer[]) => void;
+  onSaveTransaction?: (tx: Partial<Transaction>) => void;
   onShowToast?: (msg: string) => void;
 }
 
@@ -172,6 +174,7 @@ export const WalletsSection: React.FC<WalletsSectionProps> = ({
   usdRate = 1200,
   onSaveWallets,
   onSaveTransfers,
+  onSaveTransaction,
   onShowToast,
 }) => {
   const [search, setSearch] = useState('');
@@ -216,6 +219,12 @@ export const WalletsSection: React.FC<WalletsSectionProps> = ({
   });
 
   const [confirmDeleteWalletId, setConfirmDeleteWalletId] = useState<string | null>(null);
+
+  // Quick Balance Reconciliation ("Ajustar saldo real") state
+  const [reconcileWallet, setReconcileWallet] = useState<WalletAccount | null>(null);
+  const [reconcileRealInput, setReconcileRealInput] = useState<string>('');
+  const [reconcileMode, setReconcileMode] = useState<'transaction' | 'base'>('transaction');
+  const [reconcileConcept, setReconcileConcept] = useState<string>('');
 
   const balanceMap = useMemo(
     () => computeWalletBalances(wallets, transactions, transfers),
@@ -434,6 +443,72 @@ export const WalletsSection: React.FC<WalletsSectionProps> = ({
     onShowToast?.('Transferencia revertida');
   };
 
+  const openReconcileModal = (w: WalletAccount) => {
+    const currentSaldo = balanceMap.get(w.id)?.saldoActual ?? w.saldoInicial ?? 0;
+    setReconcileWallet(w);
+    setReconcileRealInput(String(currentSaldo));
+    setReconcileMode(onSaveTransaction ? 'transaction' : 'base');
+    setReconcileConcept('');
+  };
+
+  const handleConfirmReconcile = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reconcileWallet) return;
+
+    const currentAppBalance =
+      balanceMap.get(reconcileWallet.id)?.saldoActual ?? reconcileWallet.saldoInicial ?? 0;
+    const realAmount = parseFloat(reconcileRealInput.replace(',', '.'));
+    if (Number.isNaN(realAmount)) return;
+
+    const diff = Number((realAmount - currentAppBalance).toFixed(2));
+    if (Math.abs(diff) < 0.01) {
+      setReconcileWallet(null);
+      onShowToast?.('El saldo ya está al día');
+      return;
+    }
+
+    if (reconcileMode === 'transaction' && onSaveTransaction) {
+      const isShortfall = diff < 0;
+      const fallbackMethod: PaymentMethod =
+        reconcileWallet.metodoPagoAsociado ||
+        (reconcileWallet.tipo === 'efectivo'
+          ? 'Efectivo'
+          : reconcileWallet.tipo === 'billetera_virtual'
+          ? 'Mercado Pago'
+          : 'Débito');
+
+      const defaultConcept = isShortfall
+        ? `Gastos varios / Ajuste (${reconcileWallet.nombre})`
+        : `Rendimientos / Ajuste (${reconcileWallet.nombre})`;
+
+      onSaveTransaction({
+        concepto: reconcileConcept.trim() || defaultConcept,
+        descripcion: `Ajuste rápido de saldo real en ${reconcileWallet.nombre}`,
+        monto: Math.abs(diff),
+        moneda: reconcileWallet.moneda,
+        categoria: isShortfall ? 'Otros' : 'Ingresos',
+        subcategoria: isShortfall ? 'Gastos hormiga / Ajuste' : 'Rendimientos / Ajuste',
+        fecha: new Date().toISOString().split('T')[0],
+        tipo: 'individual',
+        metodoPago: fallbackMethod,
+        walletId: reconcileWallet.id,
+        tipoTransaccion: isShortfall ? 'gasto' : 'ingreso',
+      });
+    } else {
+      const updated = wallets.map((w) =>
+        w.id === reconcileWallet.id
+          ? { ...w, saldoInicial: Number(((w.saldoInicial || 0) + diff).toFixed(2)) }
+          : w
+      );
+      onSaveWallets(updated);
+      onShowToast?.(
+        `Saldo de "${reconcileWallet.nombre}" actualizado a ${formatMoney(realAmount, reconcileWallet.moneda)}`
+      );
+    }
+
+    setReconcileWallet(null);
+  };
+
   const renderWalletIcon = (tipo: WalletAccountType) => {
     switch (tipo) {
       case 'billetera_virtual':
@@ -622,7 +697,7 @@ export const WalletsSection: React.FC<WalletsSectionProps> = ({
                   <button
                     type="button"
                     onClick={() => openEditWalletModal(w)}
-                    title="Editar saldo inicial o datos"
+                    title="Editar saldo inicial o datos de la cuenta"
                     className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                   >
                     <Pencil className="w-4 h-4" />
@@ -657,27 +732,38 @@ export const WalletsSection: React.FC<WalletsSectionProps> = ({
                 </div>
               </div>
 
-              <div>
-                <div
-                  className={`text-2xl font-extrabold tabular-nums tracking-tight ${
-                    st.saldoActual < 0 ? 'text-rose-600' : 'text-slate-900'
-                  }`}
-                >
-                  {formatMoney(st.saldoActual, w.moneda)}
-                </div>
-                {w.aliasCbu && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard?.writeText(w.aliasCbu || '');
-                      onShowToast?.(`Alias/CBU copiado: ${w.aliasCbu}`);
-                    }}
-                    className="mt-1 inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-[#6936F5] transition-colors"
+              <div className="flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <div
+                    className={`text-2xl font-extrabold tabular-nums tracking-tight ${
+                      st.saldoActual < 0 ? 'text-rose-600' : 'text-slate-900'
+                    }`}
                   >
-                    <Copy className="w-3 h-3" />
-                    <span className="truncate max-w-[220px]">{w.aliasCbu}</span>
-                  </button>
-                )}
+                    {formatMoney(st.saldoActual, w.moneda)}
+                  </div>
+                  {w.aliasCbu && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(w.aliasCbu || '');
+                        onShowToast?.(`Alias/CBU copiado: ${w.aliasCbu}`);
+                      }}
+                      className="mt-1 inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-[#6936F5] transition-colors"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span className="truncate max-w-[200px]">{w.aliasCbu}</span>
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => openReconcileModal(w)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#6936F5] text-xs font-semibold transition-colors shrink-0 cursor-pointer"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span>Ajustar saldo</span>
+                </button>
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
@@ -1090,6 +1176,186 @@ export const WalletsSection: React.FC<WalletsSectionProps> = ({
           </div>
         </div>
       )}
+
+      {/* Quick Balance Reconciliation ("Ajustar saldo real") Modal */}
+      {reconcileWallet && (() => {
+        const currentAppBalance =
+          balanceMap.get(reconcileWallet.id)?.saldoActual ?? reconcileWallet.saldoInicial ?? 0;
+        const parsedReal = parseFloat(reconcileRealInput.replace(',', '.'));
+        const isValidReal = !Number.isNaN(parsedReal);
+        const diff = isValidReal ? Number((parsedReal - currentAppBalance).toFixed(2)) : 0;
+        const hasDiff = isValidReal && Math.abs(diff) >= 0.01;
+        const isShortfall = diff < 0;
+        const autoConceptPlaceholder = isShortfall
+          ? `Gastos varios / Ajuste (${reconcileWallet.nombre})`
+          : `Rendimientos / Ajuste (${reconcileWallet.nombre})`;
+
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    Ajustar saldo · {reconcileWallet.nombre}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Escribí cuánta plata tenés hoy realmente y GastoAR cuadra la diferencia
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReconcileWallet(null)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleConfirmReconcile} className="space-y-4">
+                <div className="flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs">
+                  <span className="text-slate-500 font-medium">Saldo actual en GastoAR</span>
+                  <span className="font-bold text-slate-800 tabular-nums text-sm">
+                    {formatMoney(currentAppBalance, reconcileWallet.moneda)}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    ¿Cuánto tenés hoy realmente en {reconcileWallet.nombre}? ({reconcileWallet.moneda})
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    autoFocus
+                    value={reconcileRealInput}
+                    onChange={(e) => setReconcileRealInput(e.target.value)}
+                    placeholder="0"
+                    className="w-full px-4 py-3 text-lg font-bold tabular-nums rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#6936F5]/25 focus:border-[#6936F5]"
+                  />
+                </div>
+
+                {hasDiff ? (
+                  <div className="space-y-3">
+                    <div
+                      className={`px-3.5 py-2.5 rounded-2xl border text-xs ${
+                        isShortfall
+                          ? 'bg-amber-50/80 border-amber-200 text-amber-900'
+                          : 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+                      }`}
+                    >
+                      <span className="font-bold block">
+                        {isShortfall
+                          ? `Faltan ${formatMoney(Math.abs(diff), reconcileWallet.moneda)} respecto a la app`
+                          : `Hay ${formatMoney(diff, reconcileWallet.moneda)} más que en la app`}
+                      </span>
+                      <span className="opacity-85">
+                        {isShortfall
+                          ? 'Suele pasar por gastos hormiga o compras chicas no anotadas.'
+                          : 'Suele pasar por rendimientos diarios de billetera o un ingreso no anotado.'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-slate-600">
+                        ¿Cómo querés cuadrar esta diferencia?
+                      </p>
+
+                      {onSaveTransaction && (
+                        <label
+                          className={`block p-3 rounded-2xl border cursor-pointer transition-colors ${
+                            reconcileMode === 'transaction'
+                              ? 'border-[#6936F5] bg-purple-50/60'
+                              : 'border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <input
+                              type="radio"
+                              name="reconcileMode"
+                              checked={reconcileMode === 'transaction'}
+                              onChange={() => setReconcileMode('transaction')}
+                              className="mt-0.5 accent-[#6936F5]"
+                            />
+                            <div className="text-xs space-y-1 flex-1">
+                              <span className="font-bold text-slate-900 block">
+                                Registrar como {isShortfall ? 'gasto' : 'ingreso'} automático (Recomendado)
+                              </span>
+                              <span className="text-slate-500 block">
+                                {isShortfall
+                                  ? 'Suma la diferencia a tus gastos del mes para que las estadísticas sean reales.'
+                                  : 'Suma la diferencia como ingreso/rendimiento del mes.'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {reconcileMode === 'transaction' && (
+                            <div className="mt-2.5 pl-6">
+                              <input
+                                type="text"
+                                value={reconcileConcept}
+                                onChange={(e) => setReconcileConcept(e.target.value)}
+                                placeholder={autoConceptPlaceholder}
+                                className="w-full px-3 py-2 text-xs bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-[#6936F5]"
+                              />
+                            </div>
+                          )}
+                        </label>
+                      )}
+
+                      <label
+                        className={`block p-3 rounded-2xl border cursor-pointer transition-colors ${
+                          reconcileMode === 'base'
+                            ? 'border-[#6936F5] bg-purple-50/60'
+                            : 'border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <input
+                            type="radio"
+                            name="reconcileMode"
+                            checked={reconcileMode === 'base'}
+                            onChange={() => setReconcileMode('base')}
+                            className="mt-0.5 accent-[#6936F5]"
+                          />
+                          <div className="text-xs space-y-0.5">
+                            <span className="font-bold text-slate-900 block">
+                              Solo corregir el saldo base (sin crear movimiento)
+                            </span>
+                            <span className="text-slate-500 block">
+                              Deja el saldo en {formatMoney(parsedReal, reconcileWallet.moneda)} sin tocar tus gastos ni ingresos del mes.
+                            </span>
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 text-center py-1">
+                    Cambiá el monto de arriba si tu saldo real hoy es distinto al de GastoAR.
+                  </p>
+                )}
+
+                <div className="pt-1 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setReconcileWallet(null)}
+                    className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-[#6936F5] hover:bg-[#5b2bd9] text-white shadow-sm"
+                  >
+                    Aplicar ajuste
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

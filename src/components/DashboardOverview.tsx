@@ -15,6 +15,8 @@ import {
   Target,
   Users,
   ArrowRightLeft,
+  Wallet,
+  FileUp,
   X,
   User,
 } from 'lucide-react';
@@ -79,6 +81,7 @@ interface DashboardOverviewProps {
   isDarkMode?: boolean;
   onOpenProfileModal?: () => void;
   onOpenSettlementModal?: () => void;
+  onOpenImportModal?: () => void;
   onRestartTour?: () => void;
 }
 
@@ -160,6 +163,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   isDarkMode = false,
   onOpenProfileModal,
   onOpenSettlementModal,
+  onOpenImportModal,
   onRestartTour,
 }) => {
   const isUser1 = profile?.currentUser === 'user1';
@@ -955,24 +959,64 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </h4>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
-          {/* Card 1: Cuotas (Lila muy pálido #F7F3FC) */}
+          {/* Card 1: Cuentas y saldos (Lila muy pálido #F7F3FC) */}
           <button
             type="button"
-            onClick={() => onNavigateTab?.('installments')}
+            onClick={() => onNavigateTab?.('wallets')}
             className="bg-[#F7F3FC] hover:bg-[#EFE8FA] border border-[#E9E4F2] rounded-xl sm:rounded-2xl p-1.5 sm:p-2 flex flex-col justify-between h-11 sm:h-12 transition-all cursor-pointer group text-left"
           >
             <div className="flex items-center justify-between w-full">
               <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-md sm:rounded-lg bg-white/90 text-[#6A35E1] flex items-center justify-center shadow-2xs">
-                <CreditCard className="w-3 h-3" />
+                <Wallet className="w-3 h-3" />
               </div>
               <ChevronRight className="w-2.5 h-2.5 text-[#6A35E1] group-hover:translate-x-0.5 transition-transform" />
             </div>
-            <span className="text-[10px] sm:text-[11px] font-bold text-[#29344D] leading-tight">
+            <span className="text-[10px] sm:text-[11px] font-bold text-[#29344D] leading-tight truncate">
+              Cuentas y saldos
+            </span>
+          </button>
+
+          {/* Card 2: Cuotas (Rosa muy pálido #FFF1F5) */}
+          <button
+            type="button"
+            onClick={() => onNavigateTab?.('installments')}
+            className="bg-[#FFF1F5] hover:bg-[#FFE4ED] border border-[#FCDCE7] rounded-xl sm:rounded-2xl p-1.5 sm:p-2 flex flex-col justify-between h-11 sm:h-12 transition-all cursor-pointer group text-left"
+          >
+            <div className="flex items-center justify-between w-full">
+              <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-md sm:rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shadow-2xs">
+                <CreditCard className="w-3 h-3" />
+              </div>
+              <ChevronRight className="w-2.5 h-2.5 text-rose-500 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+            <span className="text-[10px] sm:text-[11px] font-bold text-[#29344D] leading-tight truncate">
               Cuotas
             </span>
           </button>
 
-          {/* Card 2: Metas (Crema muy suave #FFF8E8) */}
+          {/* Card 3: Importar resumen (Celeste muy pálido #F0F7FC) */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenImportModal) {
+                onOpenImportModal();
+              } else {
+                onNavigateTab?.('transactions');
+              }
+            }}
+            className="bg-[#F0F7FC] hover:bg-[#E2F0F9] border border-[#D9EAF7] rounded-xl sm:rounded-2xl p-1.5 sm:p-2 flex flex-col justify-between h-11 sm:h-12 transition-all cursor-pointer group text-left"
+          >
+            <div className="flex items-center justify-between w-full">
+              <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-md sm:rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shadow-2xs">
+                <FileUp className="w-3 h-3" />
+              </div>
+              <ChevronRight className="w-2.5 h-2.5 text-blue-500 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+            <span className="text-[10px] sm:text-[11px] font-bold text-[#29344D] leading-tight truncate">
+              Importar resumen
+            </span>
+          </button>
+
+          {/* Card 4: Metas (Crema muy suave #FFF8E8) */}
           <button
             type="button"
             onClick={() => onNavigateTab?.('goals')}
@@ -984,42 +1028,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               </div>
               <ChevronRight className="w-2.5 h-2.5 text-amber-500 group-hover:translate-x-0.5 transition-transform" />
             </div>
-            <span className="text-[10px] sm:text-[11px] font-bold text-[#29344D] leading-tight">
+            <span className="text-[10px] sm:text-[11px] font-bold text-[#29344D] leading-tight truncate">
               Metas
-            </span>
-          </button>
-
-          {/* Card 3: Cuenta compartida (Rosa muy pálido #FFF1F5) */}
-          <button
-            type="button"
-            onClick={() => onNavigateTab?.('balance')}
-            className="bg-[#FFF1F5] hover:bg-[#FFE4ED] border border-[#FCDCE7] rounded-xl sm:rounded-2xl p-1.5 sm:p-2 flex flex-col justify-between h-11 sm:h-12 transition-all cursor-pointer group text-left"
-          >
-            <div className="flex items-center justify-between w-full">
-              <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-md sm:rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shadow-2xs">
-                <Users className="w-3 h-3" />
-              </div>
-              <ChevronRight className="w-2.5 h-2.5 text-rose-500 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-            <span className="text-[10px] sm:text-[11px] font-bold text-[#29344D] leading-tight">
-              Cuenta compartida
-            </span>
-          </button>
-
-          {/* Card 4: Saldar deuda (Celeste muy pálido #F0F7FC) */}
-          <button
-            type="button"
-            onClick={() => onNavigateTab?.('balance')}
-            className="bg-[#F0F7FC] hover:bg-[#E2F0F9] border border-[#D9EAF7] rounded-xl sm:rounded-2xl p-1.5 sm:p-2 flex flex-col justify-between h-11 sm:h-12 transition-all cursor-pointer group text-left"
-          >
-            <div className="flex items-center justify-between w-full">
-              <div className="w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-md sm:rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shadow-2xs">
-                <ArrowRightLeft className="w-3 h-3" />
-              </div>
-              <ChevronRight className="w-2.5 h-2.5 text-blue-500 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-            <span className="text-[10px] sm:text-[11px] font-bold text-[#29344D] leading-tight">
-              Saldar deuda
             </span>
           </button>
         </div>
